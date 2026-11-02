@@ -171,6 +171,8 @@ class CoreAPI:
                 item = {k: copy.deepcopy(row[k]) for k in ('tag', 'listen', 'port', 'protocol') if k in row}
                 item['listen'] = item.get('listen') or '0.0.0.0'
                 item['settings'] = json_object(row['settings'])
+                if item['protocol'] == 'hysteria':
+                    item['settings']['users'] = [client for client in item['settings'].pop('clients', []) if client.get('enable') is not False]
                 item['streamSettings'] = json_object(row.get('streamSettings', {}))
                 item['sniffing'] = json_object(row.get('sniffing', {}))
                 native['inbounds'].append(item)
