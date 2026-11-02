@@ -101,8 +101,12 @@ func (p *Panel) raw(ctx context.Context, path string, payload Record, method str
 		route = p.state.WebPrefix + strings.TrimPrefix(route, "panel")
 	}
 	endpoint := *p.base
-	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/" + route
-	endpoint.RawPath = ""
+	endpoint.RawPath = strings.TrimRight(p.base.EscapedPath(), "/") + "/" + route
+	decodedPath, pathErr := url.PathUnescape(endpoint.RawPath)
+	if pathErr != nil {
+		return nil, errors.New("面板接口路径无效")
+	}
+	endpoint.Path = decodedPath
 	var body io.Reader
 	if payload != nil {
 		form := url.Values{}

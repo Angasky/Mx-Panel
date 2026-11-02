@@ -25,6 +25,7 @@ type Manager struct {
 	mu         sync.Mutex
 	operations map[string]chan struct{}
 	panels     map[string]*cachedPanel
+	monitor    *hostMonitor
 }
 type Record = map[string]any
 

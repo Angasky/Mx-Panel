@@ -104,7 +104,7 @@ func ValidateNode(node map[string]any) error {
 	}
 	if flow := stringValue(node["flow"]); flow != "" {
 		network := stringValue(node["network"])
-		if flow != "xtls-rprx-vision" || kind != "vless" || node["tls"] != true || network != "" && network != "tcp" {
+		if (flow != "xtls-rprx-vision" && flow != "xtls-rprx-vision-udp443") || kind != "vless" || node["tls"] != true || network != "" && network != "tcp" {
 			return errors.New("Vision 要求 VLESS、TLS 和 TCP 传输")
 		}
 	}

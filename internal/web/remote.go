@@ -62,7 +62,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
-	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || path == "/admin/api/servers/inbounds" && method == "GET" || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose" || path == "/admin/api/servers/attach") && method == "POST"
+	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || (path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/metrics") && method == "GET" || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose" || path == "/admin/api/servers/attach") && method == "POST"
 	if !supported {
 		return false
 	}
@@ -72,6 +72,15 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	if method == "GET" {
+		if path == "/admin/api/servers/metrics" {
+			result, err := manager.Metrics(r.Context(), r.URL.Query().Get("id"))
+			if err != nil {
+				problem(w, 400, err.Error())
+			} else {
+				respond(w, 200, result)
+			}
+			return true
+		}
 		if path == "/admin/api/servers/inbounds" {
 			ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 			defer cancel()
