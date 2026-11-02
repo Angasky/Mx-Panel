@@ -117,6 +117,10 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 		return nil, err
 	}
 	defer unlock()
+	return c.syncLocked(ctx, profile, true)
+}
+
+func (c *Controller) syncLocked(ctx context.Context, profile string, enforce bool) (Record, error) {
 	p, err := c.Repository.State(profile)
 	if err != nil {
 		return nil, err
@@ -158,7 +162,7 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 		if e != nil {
 			return nil, e
 		}
-		if state.Blocked(c.Now()) && !(traffic(current)["resetPeriod"] == "monthly" && !expired(state, c.Now())) {
+		if enforce && state.Blocked(c.Now()) && !(traffic(current)["resetPeriod"] == "monthly" && !expired(state, c.Now())) {
 			continue
 		}
 		response, e := c.Backend.SubscriptionUser(ctx, text(b["serverId"]), b, "read", nil)
@@ -175,6 +179,9 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 			failures = append(failures, e.Error())
 		}
 	}
+	if !enforce {
+		return c.finishSync(profile, failures)
+	}
 	p, err = c.Repository.State(profile)
 	if err != nil {
 		return nil, err
@@ -185,10 +192,22 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 	}
 	blocked := u.Blocked(c.Now())
 	monthly := traffic(p)["resetPeriod"] == "monthly" && !expired(u, c.Now()) && !u.Revoked
-	if blocked && !monthly {
-		if err = c.Repository.UpdateState(profile, func(p Record) error { p["accessRevoked"] = true; return nil }); err != nil {
-			return nil, err
+	// A fast quota save can occur during collection. Decide revocation again
+	// while holding the storage lock before marking access irreversibly revoked.
+	if err = c.Repository.UpdateState(profile, func(current Record) error {
+		latest, e := usage(current)
+		if e != nil {
+			return e
 		}
+		blocked = latest.Blocked(c.Now())
+		monthly = traffic(current)["resetPeriod"] == "monthly" && !expired(latest, c.Now()) && !latest.Revoked
+		if blocked && !monthly {
+			current["accessRevoked"] = true
+		}
+		p = current
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	for _, b := range objects(p["remoteNodes"]) {
 		if b["scope"] != "user" || b["status"] != "active" && b["status"] != "provisioning" {
@@ -222,7 +241,20 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 				failures = append(failures, "用户已手动停用，不接管自动恢复")
 				continue
 			}
-			if err = c.updateBinding(profile, b, func(_ Record, current Record) error { current["monthlyPaused"] = true; return nil }); err != nil {
+			if err = c.updateBinding(profile, b, func(record Record, current Record) error {
+				latest, e := usage(record)
+				if e != nil {
+					return e
+				}
+				if !latest.Blocked(c.Now()) {
+					return errQuotaChanged
+				}
+				current["monthlyPaused"] = true
+				return nil
+			}); err != nil {
+				if errors.Is(err, errQuotaChanged) {
+					continue
+				}
 				return nil, err
 			}
 		}
@@ -245,7 +277,13 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 			return nil, err
 		}
 	}
-	err = c.Repository.UpdateState(profile, func(p Record) error {
+	return c.finishSync(profile, failures)
+}
+
+var errQuotaChanged = errors.New("采集期间额度已调整")
+
+func (c *Controller) finishSync(profile string, failures []string) (Record, error) {
+	err := c.Repository.UpdateState(profile, func(p Record) error {
 		p["lastEnforcedAt"] = c.Now().Unix()
 		p["enforcementError"] = strings.Join(failures, "；")
 		return nil
@@ -345,6 +383,11 @@ func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, 
 	if units < 0 || units > 100000 {
 		return nil, errors.New("倍率范围为 0–100")
 	}
+	unlock, err := c.lock(ctx, profile)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	p, err := c.Repository.State(profile)
 	if err != nil {
 		return nil, err
@@ -356,27 +399,39 @@ func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, 
 	if !u.Enabled || !u.Enforce {
 		return nil, errors.New("请先启用独立用户计量")
 	}
-	// Settle old units under the same per-profile lock; failed accounting must
-	// not silently charge old traffic at the new rate.
-	if _, err := c.Sync(ctx, profile); err != nil {
-		return nil, err
-	}
-	unlock, err := c.lock(ctx, profile)
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	err = c.Repository.UpdateState(profile, func(p Record) error {
-		if text(p["enforcementError"]) != "" {
-			return errors.New("原倍率结算失败，请恢复服务器后再修改")
-		}
-		for _, b := range objects(p["remoteNodes"]) {
-			if text(b["serverId"]) == server && text(b["inboundId"]) == fmt.Sprint(inbound) && b["scope"] == "user" && b["status"] == "active" {
-				b["multiplierUnits"] = units
-				return nil
+	var binding Record
+	for _, b := range objects(p["remoteNodes"]) {
+		if text(b["serverId"]) == server && text(b["inboundId"]) == fmt.Sprint(inbound) && b["scope"] == "user" && b["status"] == "active" {
+			if binding != nil {
+				return nil, errors.New("存在重复节点归属，请先核对")
 			}
+			binding = b
 		}
-		return errors.New("有效节点绑定不存在")
+	}
+	if binding == nil {
+		return nil, errors.New("有效节点绑定不存在")
+	}
+	response, err := c.Backend.SubscriptionUser(ctx, server, binding, "read", nil)
+	if err != nil {
+		return nil, errors.New("目标节点原倍率结算失败")
+	}
+	reading, ok := response["reading"].(map[string]any)
+	if !ok {
+		return nil, errors.New("目标节点缺少独立用户计数")
+	}
+	if err = c.applyReading(profile, binding, reading); err != nil {
+		return nil, err
+	}
+	err = c.updateBinding(profile, binding, func(record, current Record) error {
+		u, e := usage(record)
+		if e != nil {
+			return e
+		}
+		if !u.Enabled || !u.Enforce {
+			return errors.New("计量设置已变化，请刷新")
+		}
+		current["multiplierUnits"] = units
+		return nil
 	})
 	if err != nil {
 		return nil, err

@@ -45,7 +45,8 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	path := r.URL.Path
 	read := path == "/admin/api/traffic" && r.Method == "GET"
 	write := r.Method == "POST" && (path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
-	if !read && !write {
+	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier")
+	if !read && !write && !policy {
 		return false
 	}
 	c, err := s.subscriptionController()
@@ -71,7 +72,32 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 	var result map[string]any
-	if path == "/admin/api/traffic/sync" {
+	if policy && path != "/admin/api/servers/multiplier" {
+		if path == "/admin/api/traffic" {
+			result, err = c.EditTraffic(ctx, profile, payload)
+		} else if path == "/admin/api/traffic/plan" {
+			result, err = c.ApplyPlan(ctx, profile, stringField(payload, "planId"))
+		} else {
+			var plan map[string]any
+			if path == "/admin/api/traffic/plans" {
+				plan, err = s.repository.SavePlan(payload)
+			} else {
+				err = s.repository.DeletePlan(stringField(payload, "id"))
+			}
+			if err == nil {
+				result, err = c.Info(profile)
+			}
+			if err == nil {
+				result = map[string]any{"traffic": result}
+				if plan != nil {
+					result["plan"] = plan
+				}
+			}
+		}
+		if err == nil && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan") {
+			result = map[string]any{"traffic": result}
+		}
+	} else if path == "/admin/api/traffic/sync" {
 		result, err = c.Sync(ctx, profile)
 	} else {
 		server := stringField(payload, "serverId")
@@ -91,6 +117,13 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 			}
 			if err == nil {
 				result, err = c.SetMultiplier(ctx, profile, server, id, units)
+				if err == nil {
+					var info map[string]any
+					info, err = c.Info(profile)
+					if err == nil {
+						result = map[string]any{"node": result, "traffic": info}
+					}
+				}
 			}
 		} else {
 			ids := []int{}

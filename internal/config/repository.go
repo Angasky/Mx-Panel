@@ -33,6 +33,7 @@ type Profile struct {
 	AccessRevoked    bool             `json:"accessRevoked"`
 	EnforcementError string           `json:"enforcementError"`
 	LastEnforcedAt   any              `json:"lastEnforcedAt"`
+	Plans            []Document       `json:"-"`
 }
 type Document = map[string]any
 
@@ -42,12 +43,30 @@ func (r *Repository) profiles() ([]Profile, error) {
 		return nil, errors.New("订阅索引读取失败")
 	}
 	var index struct {
-		Profiles []Profile `json:"profiles"`
+		Profiles          []Profile       `json:"profiles"`
+		SubscriptionPlans json.RawMessage `json:"subscriptionPlans"`
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.UseNumber()
 	if decoder.Decode(&index) != nil || index.Profiles == nil {
 		return nil, errors.New("订阅索引格式无效")
+	}
+	planIndex := Document{}
+	if len(index.SubscriptionPlans) > 0 {
+		var list any
+		d := json.NewDecoder(strings.NewReader(string(index.SubscriptionPlans)))
+		d.UseNumber()
+		if d.Decode(&list) != nil {
+			return nil, errors.New("套餐模板列表格式无效")
+		}
+		planIndex["subscriptionPlans"] = list
+	}
+	plans, err := plansFrom(planIndex)
+	if err != nil {
+		return nil, err
+	}
+	for i := range index.Profiles {
+		index.Profiles[i].Plans = plans
 	}
 	return index.Profiles, nil
 }
@@ -56,6 +75,10 @@ func public(p Profile) map[string]any {
 	if err != nil {
 		info = Document{"configured": false, "enforcementError": err.Error(), "bindings": []any{}}
 	}
+	if p.Plans == nil {
+		p.Plans, _ = plansFrom(Document{})
+	}
+	info["plans"] = p.Plans
 	return map[string]any{"id": p.ID, "name": p.Name, "slug": p.Slug, "protected": p.Protected, "customSlug": p.CustomSlug, "url": "/sub/" + url.PathEscape(p.Slug), "traffic": info}
 }
 func (r *Repository) Profiles() ([]map[string]any, error) {

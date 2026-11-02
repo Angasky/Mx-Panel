@@ -149,6 +149,12 @@ func TestSubscriptionHTTPProfileIsolationAuthenticationAndDurability(t *testing.
 	if b.adds != 2 {
 		t.Fatal("invalid requests or profile reuse duplicated remote grants")
 	}
+	w = call("PUT", "servers/multiplier", `{"serverId":"s","inboundId":1,"multiplier":0.5}`, "clash", token, "https://panel.test")
+	var rateResponse map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &rateResponse)
+	if w.Code != 200 || rateResponse["node"].(map[string]any)["multiplier"] != float64(0.5) || rateResponse["traffic"] == nil {
+		t.Fatal("frontend PUT multiplier contract", w.Body.String())
+	}
 	if err = s.repository.UpdateState("clash", func(p map[string]any) error {
 		p["traffic"].(map[string]any)["expire"] = time.Now().Add(-time.Hour).Unix()
 		return nil

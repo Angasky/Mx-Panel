@@ -426,5 +426,14 @@ func (c *Controller) Info(profile string) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.TrafficInfo(p, c.Now())
+	info, err := config.TrafficInfo(p, c.Now())
+	if err != nil {
+		return nil, err
+	}
+	plans, err := c.Repository.Plans()
+	if err != nil {
+		return nil, err
+	}
+	info["plans"] = plans
+	return info, nil
 }
