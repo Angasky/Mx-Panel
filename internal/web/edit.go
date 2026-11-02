@@ -175,6 +175,7 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 		doc["salt"] = next.Salt
 		doc["hash"] = next.Hash
 		doc["iterations"] = next.Iterations
+		doc["goSessions"] = encodeSessions(next, map[[32]byte]session{})
 		return nil
 	})
 	if err != nil {

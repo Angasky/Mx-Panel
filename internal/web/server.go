@@ -63,7 +63,15 @@ func New(options Options) (*Server, error) {
 	if auth.Username == "" || len(auth.Salt) != 32 || len(auth.Hash) != 64 || auth.Iterations < 100000 || auth.Iterations > 2000000 {
 		return nil, errors.New("invalid administrator credential file")
 	}
-	return &Server{options: options, account: auth, sessions: make(map[[32]byte]session), failures: make(map[string]failure), hashSlots: make(chan struct{}, 2), now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
+	var doc map[string]any
+	if err = json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	sessions, err := readSessions(doc, auth, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	return &Server{options: options, account: auth, sessions: sessions, failures: make(map[string]failure), hashSlots: make(chan struct{}, 2), now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -121,7 +129,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, value any) error {
 	}
 	return nil
 }
-func (s *Server) authorized(r *http.Request) bool {
+func requestSessionToken(r *http.Request) string {
 	token := ""
 	if strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
 		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -131,6 +139,10 @@ func (s *Server) authorized(r *http.Request) bool {
 			token = cookie.Value
 		}
 	}
+	return token
+}
+func (s *Server) authorized(r *http.Request) bool {
+	token := requestSessionToken(r)
 	if token == "" || len(token) > 256 {
 		return false
 	}
@@ -195,15 +207,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/admin/api/logout" && r.Method == "POST" {
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if token == "" {
-			if c, e := r.Cookie("mxioc_session"); e == nil {
-				token = c.Value
-			}
-		}
+		token := requestSessionToken(r)
 		s.mu.Lock()
-		delete(s.sessions, sha256.Sum256([]byte(token)))
+		err := s.updateSessions(func(entries map[[32]byte]session) { delete(entries, sha256.Sum256([]byte(token))) })
 		s.mu.Unlock()
+		if err != nil {
+			problem(w, 500, "退出登录保存失败，请重试")
+			return
+		}
 		http.SetCookie(w, &http.Cookie{Name: "mxioc_session", Path: "/admin", MaxAge: -1, HttpOnly: true, Secure: r.TLS != nil || !s.options.LocalDevelopment, SameSite: http.SameSiteStrictMode})
 		respond(w, 200, map[string]any{"ok": true})
 		return
@@ -348,23 +359,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "账号已变更，请重新登录")
 		return
 	}
-	for key, v := range s.sessions {
-		if !now.Before(v.Expires) {
-			delete(s.sessions, key)
-		}
+	if err := s.updateSessions(func(entries map[[32]byte]session) { addSession(entries, sha256.Sum256([]byte(token)), s.now()) }); err != nil {
+		s.mu.Unlock()
+		problem(w, 500, "登录会话保存失败，请重试")
+		return
 	}
-	if len(s.sessions) >= 8 {
-		var oldest [32]byte
-		var stamp time.Time
-		for key, v := range s.sessions {
-			if stamp.IsZero() || v.Created.Before(stamp) {
-				oldest = key
-				stamp = v.Created
-			}
-		}
-		delete(s.sessions, oldest)
-	}
-	s.sessions[sha256.Sum256([]byte(token))] = session{Created: now, Expires: now.Add(12 * time.Hour)}
 	for _, key := range keys {
 		delete(s.failures, key)
 	}
