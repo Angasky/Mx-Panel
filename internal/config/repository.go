@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -263,11 +264,14 @@ func (r *Repository) Mutate(id string, change func(Document) error) error {
 		}
 	}
 	backupDir := filepath.Join(r.Root, "backups")
+	if !regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`).MatchString(p.ID) {
+		return errors.New("订阅 ID 不适合生成备份")
+	}
 	if err = os.MkdirAll(backupDir, 0700); err != nil {
 		return err
 	}
 	// The backup filename does not interpolate user-provided profile identifiers.
-	backup, err := os.CreateTemp(backupDir, time.Now().UTC().Format("20060102T150405")+"-*.yaml")
+	backup, err := os.CreateTemp(backupDir, p.ID+"."+time.Now().UTC().Format("20060102T150405")+".*.yaml")
 	if err != nil {
 		return err
 	}

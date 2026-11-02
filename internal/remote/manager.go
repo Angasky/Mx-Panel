@@ -23,6 +23,8 @@ type Manager struct {
 	root, path string
 	key        []byte
 	mu         sync.Mutex
+	operations map[string]chan struct{}
+	panels     map[string]*cachedPanel
 }
 type Record = map[string]any
 
@@ -260,6 +262,9 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	id := value(payload["id"])
 	var record Record
 	if id != "" {
+		if operation := m.operations[id]; operation != nil && len(operation) > 0 {
+			return nil, errors.New("服务器正在处理其他操作，请稍后修改")
+		}
 		record, err = find(data, id)
 		if err != nil {
 			return nil, err

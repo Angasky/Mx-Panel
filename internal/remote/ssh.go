@@ -155,6 +155,13 @@ func Execute(ctx context.Context, c Connection, script string, maxOutput int) (s
 		return "", err
 	}
 	defer client.Close()
+	return executeClient(ctx, client, c, script, maxOutput)
+}
+
+func executeClient(ctx context.Context, client *ssh.Client, c Connection, script string, maxOutput int) (string, error) {
+	if maxOutput < 1 || maxOutput > 16<<20 {
+		return "", errors.New("输出大小限制无效")
+	}
 	session, err := client.NewSession()
 	if err != nil {
 		return "", errors.New("SSH 会话创建失败")

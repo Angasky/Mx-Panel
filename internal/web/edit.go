@@ -16,6 +16,28 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	path := r.URL.Path
 	method := r.Method
+	if path == "/admin/api/backups" && method == "GET" {
+		values, err := s.repository.Backups(r.Header.Get("X-Profile"))
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"backups": values})
+		}
+		return true
+	}
+	if path == "/admin/api/backups/restore" && method == "POST" {
+		var payload struct{ Name string }
+		if err := readJSON(w, r, &payload); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		if err := s.repository.Restore(r.Header.Get("X-Profile"), payload.Name); err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"ok": true})
+		}
+		return true
+	}
 	if (path == "/admin/api/account" || path == "/admin/api/password") && method == "POST" {
 		s.changeAccount(w, r)
 		return true

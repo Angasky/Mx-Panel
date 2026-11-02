@@ -62,7 +62,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
-	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose") && method == "POST"
+	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || path == "/admin/api/servers/inbounds" && method == "GET" || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose" || path == "/admin/api/servers/attach") && method == "POST"
 	if !supported {
 		return false
 	}
@@ -72,6 +72,17 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	if method == "GET" {
+		if path == "/admin/api/servers/inbounds" {
+			ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+			defer cancel()
+			result, err := manager.Inbounds(ctx, r.URL.Query().Get("id"))
+			if err != nil {
+				problem(w, 400, err.Error())
+			} else {
+				respond(w, 200, result)
+			}
+			return true
+		}
 		servers, err := manager.List()
 		if err != nil {
 			problem(w, 400, err.Error())
@@ -107,6 +118,17 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	id := stringField(payload, "id")
+	if path == "/admin/api/servers/attach" {
+		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+		defer cancel()
+		result, err := manager.AttachPanel(ctx, id)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
 	connection, err := manager.Connection(id)
 	if err != nil {
 		problem(w, 400, err.Error())
