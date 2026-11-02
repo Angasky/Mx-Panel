@@ -185,3 +185,93 @@ func TestMissingOrInvalidCountersNeverBecomeSuccessfulZero(t *testing.T) {
 		t.Fatal("preexisting email in another inbound accepted before user creation")
 	}
 }
+
+func TestModernPanelClientJSONFallbackAndScopedRemoval(t *testing.T) {
+	row := Record{"id": 1, "port": 443, "protocol": "hysteria", "settings": Record{"version": 2, "clients": []any{}}}
+	user, err := NewUser(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := bindingFor(t, row, user)
+	var paths []string
+	shared := false
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if strings.Contains(r.URL.Path, "/inbounds/") {
+			w.WriteHeader(404)
+			return
+		}
+		if strings.Contains(r.URL.Path, "/clients/get/") {
+			ids := []int{1}
+			if shared {
+				ids = append(ids, 2)
+			}
+			json.NewEncoder(w).Encode(Record{"success": true, "obj": Record{"inboundIds": ids}})
+			return
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Error("modern API requires JSON")
+		}
+		var payload Record
+		if json.NewDecoder(r.Body).Decode(&payload) != nil {
+			t.Error("invalid JSON")
+		}
+		if strings.HasSuffix(r.URL.Path, "/add") {
+			client := payload["client"].(map[string]any)
+			if client["auth"] != user["auth"] || client["email"] != user["email"] || len(payload["inboundIds"].([]any)) != 1 {
+				t.Error("HY2 credential or ownership changed")
+			}
+		} else if strings.HasSuffix(r.URL.Path, "/detach") {
+			if len(payload) != 1 || payload["inboundIds"].([]any)[0] != float64(1) {
+				t.Error("unscoped deletion")
+			}
+		} else if strings.Contains(r.URL.Path, "/update/") {
+			if payload["enable"] != false {
+				t.Error("pause ignored")
+			}
+		}
+		json.NewEncoder(w).Encode(Record{"success": true})
+	}))
+	defer host.Close()
+	base, _ := url.Parse(host.URL)
+	panel := newPanel(base, host.Client().Transport, Record{}, "", "fixture-token", nil)
+	if _, err = ChangeUser(context.Background(), panel, row, binding, "add", user); err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || paths[1] != "/panel/api/clients/add" {
+		t.Fatal(paths)
+	}
+	row["settings"].(Record)["clients"] = []any{user}
+	if _, err = ChangeUser(context.Background(), panel, row, binding, "pause", nil); err != nil {
+		t.Fatal(err)
+	}
+	shared = true
+	before := len(paths)
+	if _, err = ChangeUser(context.Background(), panel, row, binding, "pause", nil); err == nil || len(paths) != before+2 {
+		t.Fatal("shared global user was mutated")
+	}
+	if _, err = ChangeUser(context.Background(), panel, row, binding, "remove", nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(paths[len(paths)-1], "/detach") {
+		t.Fatal("global deletion used")
+	}
+}
+
+func TestPanelFallbackRequiresExplicit404(t *testing.T) {
+	for _, status := range []int{400, 401, 403, 500} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			calls := 0
+			host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(status) }))
+			defer host.Close()
+			base, _ := url.Parse(host.URL)
+			panel := newPanel(base, host.Client().Transport, Record{}, "", "fixture-token", nil)
+			row := Record{"id": 1, "protocol": "trojan", "settings": Record{"clients": []any{}}}
+			user, _ := NewUser(row)
+			binding := bindingFor(t, row, user)
+			if _, err := ChangeUser(context.Background(), panel, row, binding, "add", user); err == nil || calls != 1 {
+				t.Fatal("mutation replayed after rejection", calls, err)
+			}
+		})
+	}
+}

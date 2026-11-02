@@ -429,7 +429,34 @@ func ChangeUser(ctx context.Context, panel *Panel, row, binding Record, operatio
 		path = "panel/api/inbounds/updateClient/" + credential
 	}
 	if _, err = panel.Request(ctx, path, payload, ""); err != nil {
-		return nil, err
+		var status panelStatus
+		if !errors.As(err, &status) || status.Code != 404 {
+			return nil, err
+		}
+		// Only an explicit missing route permits protocol fallback. An
+		// interrupted request may have applied, and must never be replayed.
+		email := strings.ReplaceAll(url.QueryEscape(value(binding["userEmail"])), "+", "%20")
+		modernPayload := Record{"inboundIds": []int{id}}
+		modernPath := "panel/api/clients/" + email + "/detach"
+		if operation == "add" {
+			modernPath = "panel/api/clients/add"
+			modernPayload["client"] = account
+		} else if operation == "pause" || operation == "resume" {
+			details, readErr := panel.Request(ctx, "panel/api/clients/get/"+email, nil, "")
+			if readErr != nil {
+				return nil, readErr
+			}
+			model, ok := details.(map[string]any)
+			ids, valid := model["inboundIds"].([]any)
+			if !ok || !valid || len(ids) != 1 || value(ids[0]) != strconv.Itoa(id) {
+				return nil, errors.New("新版面板用户关联了多个入站，停止全局启停")
+			}
+			modernPath = "panel/api/clients/update/" + email
+			modernPayload = account
+		}
+		if _, err = panel.RequestJSON(ctx, modernPath, modernPayload); err != nil {
+			return nil, err
+		}
 	}
 	if operation == "remove" {
 		return Record{"removed": true}, nil

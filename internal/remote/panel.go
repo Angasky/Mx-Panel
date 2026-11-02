@@ -87,7 +87,7 @@ func newPanel(base *url.URL, transport http.RoundTripper, record Record, passwor
 	client := &http.Client{Transport: transport, Jar: state.Jar, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	return &Panel{base: base, client: client, state: state, username: value(record["panelUser"]), password: password, token: token, kind: value(record["installType"]), existing: record["connectionMode"] == "existing"}
 }
-func (p *Panel) raw(ctx context.Context, path string, payload Record, method string, bearer bool) (any, error) {
+func (p *Panel) raw(ctx context.Context, path string, payload Record, method string, bearer bool, jsonBody ...bool) (any, error) {
 	if method == "" {
 		method = "GET"
 		if payload != nil {
@@ -108,7 +108,14 @@ func (p *Panel) raw(ctx context.Context, path string, payload Record, method str
 	}
 	endpoint.Path = decodedPath
 	var body io.Reader
-	if payload != nil {
+	isJSON := len(jsonBody) > 0 && jsonBody[0]
+	if payload != nil && isJSON {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return nil, errors.New("面板 JSON 参数无法编码")
+		}
+		body = strings.NewReader(string(raw))
+	} else if payload != nil {
 		form := url.Values{}
 		for key, v := range payload {
 			switch item := v.(type) {
@@ -139,6 +146,9 @@ func (p *Panel) raw(ctx context.Context, path string, payload Record, method str
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if isJSON {
+			req.Header.Set("Content-Type", "application/json")
+		}
 	}
 	if bearer && p.token != "" {
 		req.Header.Set("Authorization", "Bearer "+p.token)
@@ -213,7 +223,7 @@ func (p *Panel) login(ctx context.Context) error {
 	p.state.BlockedUntil = time.Time{}
 	return nil
 }
-func (p *Panel) request(ctx context.Context, path string, payload Record, method string, retry bool) (any, error) {
+func (p *Panel) request(ctx context.Context, path string, payload Record, method string, retry bool, jsonBody ...bool) (any, error) {
 	cookie := p.token == "" || strings.HasPrefix(path, "panel/xray/") || p.state.APIPrefix != "panel/api"
 	if path == "login" {
 		return nil, p.login(ctx)
@@ -231,13 +241,13 @@ func (p *Panel) request(ctx context.Context, path string, payload Record, method
 			}
 		}
 	}
-	result, err := p.raw(ctx, path, payload, method, !cookie)
+	result, err := p.raw(ctx, path, payload, method, !cookie, jsonBody...)
 	var status panelStatus
 	if errors.As(err, &status) {
 		if status.Code == 404 && path == "panel/api/inbounds/list" && p.kind == "x-ui" && p.state.APIPrefix == "panel/api" {
 			p.state.APIPrefix = "xui/API"
 			p.state.WebPrefix = "xui"
-			return p.request(ctx, path, payload, method, retry)
+			return p.request(ctx, path, payload, method, retry, jsonBody...)
 		}
 		if status.Code == 401 && cookie && retry {
 			p.state.LoggedIn = false
@@ -246,9 +256,9 @@ func (p *Panel) request(ctx context.Context, path string, payload Record, method
 			jar, _ := cookiejar.New(nil)
 			p.state.Jar = jar
 			p.client.Jar = jar
-			return p.request(ctx, path, payload, method, false)
+			return p.request(ctx, path, payload, method, false, jsonBody...)
 		}
-		return nil, fmt.Errorf("面板接口 HTTP %d，请核对面板状态、端口、路径和 API 权限", status.Code)
+		return nil, fmt.Errorf("%w，请核对面板状态、端口、路径和 API 权限", status)
 	}
 	return result, err
 }
@@ -259,4 +269,10 @@ func (p *Panel) Request(ctx context.Context, path string, payload Record, method
 	p.state.mu.Lock()
 	defer p.state.mu.Unlock()
 	return p.request(ctx, path, payload, method, true)
+}
+
+func (p *Panel) RequestJSON(ctx context.Context, path string, payload Record) (any, error) {
+	p.state.mu.Lock()
+	defer p.state.mu.Unlock()
+	return p.request(ctx, path, payload, "POST", true, true)
 }
