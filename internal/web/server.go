@@ -166,6 +166,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
+		if s.publicRoutes(w, r) {
+			return
+		}
 		problem(w, 404, "接口不存在")
 		return
 	}
@@ -183,6 +186,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if r.URL.Path == "/admin/api/conversions" && s.publicRoutes(w, r) {
 		return
 	}
 	if s.linkRoutes(w, r) || s.editRoutes(w, r) {
