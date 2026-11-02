@@ -23,6 +23,9 @@ type fakeBackend struct {
 	adds                                            int
 	failBefore, failAfter, offline, missingCounters bool
 	ops                                             []string
+	kind                                            string
+	runtimeResult                                   Record
+	runtimeFailure                                  bool
 }
 
 func clone(t any) Record {
@@ -34,7 +37,11 @@ func clone(t any) Record {
 	return row
 }
 func (b *fakeBackend) Record(id string) (Record, error) {
-	return Record{"id": id, "installType": "3x-ui", "host": "192.0.2.1"}, nil
+	kind := b.kind
+	if kind == "" {
+		kind = "3x-ui"
+	}
+	return Record{"id": id, "installType": kind, "host": "192.0.2.1"}, nil
 }
 func (b *fakeBackend) SealUser(user Record) (string, error) { return b.sealer.SealUser(user) }
 func (b *fakeBackend) OpenUser(s string) (Record, error)    { return b.sealer.OpenUser(s) }
@@ -103,6 +110,18 @@ func (b *fakeBackend) SubscriptionUser(ctx context.Context, id string, binding R
 		current["enable"] = operation == "resume"
 	}
 	result := Record{"inbound": clone(row), "client": clone(current)}
+	if b.kind == "x-panel" && (operation == "add" || operation == "verify" || operation == "resume") {
+		if b.runtimeFailure {
+			return nil, errors.New("runtime not confirmed")
+		}
+		if b.runtimeResult == nil {
+			result["runtimeVerified"] = nil
+		} else {
+			for key, value := range b.runtimeResult {
+				result[key] = value
+			}
+		}
+	}
 	if !b.missingCounters {
 		result["reading"] = clone(b.stats[text(current["email"])])
 	}

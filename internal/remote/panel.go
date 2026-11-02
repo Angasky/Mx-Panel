@@ -39,6 +39,7 @@ type Panel struct {
 	state                           *PanelSession
 	username, password, token, kind string
 	existing                        bool
+	run                             func(context.Context, string, int) (string, error)
 }
 type panelStatus struct{ Code int }
 

@@ -210,6 +210,11 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 			item["ok"] = true
 			item["added"] = result["added"]
 			item["existing"] = result["existing"]
+			for _, key := range []string{"runtimeVerified", "runtimeRepaired", "warning"} {
+				if value, exists := result[key]; exists {
+					item[key] = value
+				}
+			}
 			succeeded++
 			added += result["added"].(int)
 			existing += result["existing"].(int)
@@ -250,8 +255,8 @@ func (c *Controller) preflight(record Record, server string) error {
 	if kind == "" {
 		kind = "3x-ui"
 	}
-	if kind != "3x-ui" && kind != "x-ui" {
-		return errors.New("当前独立用户创建已接入 3x-ui / X-ui；X-Panel 运行用户同步和独立内核尚待迁移")
+	if kind != "3x-ui" && kind != "x-ui" && kind != "x-panel" {
+		return errors.New("独立内核的用户创建尚待迁移")
 	}
 	return nil
 }
@@ -363,7 +368,14 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 		}
 		binding["operationId"] = token
 	}
+	serverRecord, err := c.Backend.Record(server)
+	if err != nil {
+		return nil, err
+	}
 	op := "read"
+	if serverRecord["installType"] == "x-panel" {
+		op = "verify"
+	}
 	if client != nil {
 		op = "add"
 	}
@@ -410,15 +422,24 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 		selected[k] = v
 	}
 	selected["settings"] = settings
-	serverRecord, err := c.Backend.Record(server)
-	if err != nil {
-		return nil, err
-	}
 	nodes, err := remote.InboundNodes(selected, serverRecord)
 	if err != nil || len(nodes) != 1 {
 		return nil, errors.New("用户已创建，唯一节点导入待重试")
 	}
-	return c.Repository.ImportOwnedNode(profile, text(binding["operationId"]), nodes[0])
+	result, err := c.Repository.ImportOwnedNode(profile, text(binding["operationId"]), nodes[0])
+	if err != nil {
+		return nil, err
+	}
+	if verified, present := response["runtimeVerified"]; present {
+		result["runtimeVerified"] = verified
+		result["runtimeRepaired"] = response["runtimeRepaired"]
+		if verified == nil {
+			result["warning"] = "当前内核不支持运行用户核验，请测试客户端连接"
+		} else if response["runtimeRepaired"] == true {
+			result["warning"] = "已补同步到运行内核"
+		}
+	}
+	return result, nil
 }
 
 func (c *Controller) Info(profile string) (Record, error) {

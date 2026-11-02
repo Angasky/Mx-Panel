@@ -325,11 +325,15 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 		if err != nil {
 			return nil, err
 		}
-		user, err := ChangeUser(ctx, panel, row, binding, operation, proposed)
+		changeOperation := operation
+		if operation == "verify" {
+			changeOperation = "read"
+		}
+		user, err := ChangeUser(ctx, panel, row, binding, changeOperation, proposed)
 		if err != nil {
 			return nil, err
 		}
-		if operation != "read" {
+		if changeOperation != "read" {
 			rows, err = readRows()
 			if err != nil {
 				return nil, errors.New("用户请求已发送，但结果未确认，请重新读取核对")
@@ -360,6 +364,15 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 			}
 		}
 		output := Record{"inbound": row, "client": user}
+		if record["installType"] == "x-panel" && (operation == "add" || operation == "verify" || operation == "resume") && user["enable"] != false {
+			runtime, err := syncRuntime(ctx, panel, row, user)
+			if err != nil {
+				return nil, err
+			}
+			for key, value := range runtime {
+				output[key] = value
+			}
+		}
 		// A newly added user may not have a counter row until its first connection.
 		// Report that state explicitly; never manufacture a successful zero reading.
 		counters, counterErr := UserCounters(row, binding)

@@ -200,6 +200,9 @@ func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, 
 	if err != nil {
 		return nil, err
 	}
+	panel.run = func(ctx context.Context, script string, limit int) (string, error) {
+		return executeClient(ctx, client, connection, script, limit)
+	}
 	return action(panel, record)
 }
 func (m *Manager) AttachPanel(ctx context.Context, id string) (Record, error) {

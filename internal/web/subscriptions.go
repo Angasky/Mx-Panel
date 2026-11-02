@@ -161,6 +161,11 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 					err = errors.New(stringField(item, "error"))
 				} else {
 					result = map[string]any{"added": item["added"], "existing": item["existing"], "bound": true, "enforcementEnabled": true}
+					for _, key := range []string{"runtimeVerified", "runtimeRepaired", "warning"} {
+						if value, exists := item[key]; exists {
+							result[key] = value
+						}
+					}
 				}
 			}
 		}
