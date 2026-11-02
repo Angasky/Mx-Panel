@@ -10,7 +10,30 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
 )
+
+func (m *Manager) SealUser(client Record) (string, error) {
+	data, err := json.Marshal(client)
+	if err != nil {
+		return "", err
+	}
+	return legacycrypto.EncryptFernet(m.key, data)
+}
+func (m *Manager) OpenUser(token string) (Record, error) {
+	data, err := legacycrypto.DecryptFernet(m.key, token)
+	if err != nil {
+		return nil, errors.New("待创建用户凭据解密失败，请检查原 credentials.key")
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+	var client Record
+	if decoder.Decode(&client) != nil || client == nil {
+		return nil, errors.New("待创建用户凭据格式无效")
+	}
+	return client, nil
+}
 
 func credentialField(row, user Record) string {
 	protocol := value(row["protocol"])

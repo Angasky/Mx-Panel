@@ -23,7 +23,7 @@ func (r *Repository) GuardServerUpdate(id string, payload, previous map[string]a
 		bindings, _ := record["remoteNodes"].([]any)
 		for _, value := range bindings {
 			binding, ok := value.(map[string]any)
-			if ok && binding["serverId"] == id && binding["status"] == "active" {
+			if ok && binding["serverId"] == id && (binding["status"] == "active" || binding["status"] == "provisioning") {
 				owned = true
 			}
 		}

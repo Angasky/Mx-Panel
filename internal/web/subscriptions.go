@@ -1,0 +1,142 @@
+package web
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/Angasky/dingzhi-ban/internal/billing"
+	"github.com/Angasky/dingzhi-ban/internal/subscriptions"
+)
+
+var subscriptionControllers sync.Map
+var subscriptionControllersMu sync.Mutex
+
+func (s *Server) subscriptionController() (*subscriptions.Controller, error) {
+	if v, ok := subscriptionControllers.Load(s.repository); ok {
+		return v.(*subscriptions.Controller), nil
+	}
+	subscriptionControllersMu.Lock()
+	defer subscriptionControllersMu.Unlock()
+	if v, ok := subscriptionControllers.Load(s.repository); ok {
+		return v.(*subscriptions.Controller), nil
+	}
+	backend, err := s.remoteManager()
+	if err != nil {
+		return nil, err
+	}
+	controller := subscriptions.New(s.repository, backend)
+	subscriptionControllers.Store(s.repository, controller)
+	return controller, nil
+}
+func (s *Server) RunBackground(ctx context.Context) error {
+	c, err := s.subscriptionController()
+	if err != nil {
+		return err
+	}
+	return c.Start(ctx)
+}
+
+func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool {
+	path := r.URL.Path
+	read := path == "/admin/api/traffic" && r.Method == "GET"
+	write := r.Method == "POST" && (path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
+	if !read && !write {
+		return false
+	}
+	c, err := s.subscriptionController()
+	if err != nil {
+		problem(w, 400, err.Error())
+		return true
+	}
+	profile := r.Header.Get("X-Profile")
+	if read {
+		result, err := c.Info(profile)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
+	var payload map[string]any
+	if readJSON(w, r, &payload) != nil || payload == nil {
+		problem(w, 400, "请求 JSON 必须为对象")
+		return true
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	var result map[string]any
+	if path == "/admin/api/traffic/sync" {
+		result, err = c.Sync(ctx, profile)
+	} else {
+		server := stringField(payload, "serverId")
+		parseID := func(v any) (int, error) {
+			n, err := strconv.Atoi(anyText(v))
+			if err != nil || n < 1 {
+				return 0, errors.New("入站 ID 必须为正整数")
+			}
+			return n, nil
+		}
+		if path == "/admin/api/servers/multiplier" {
+			var id int
+			var units int64
+			id, err = parseID(payload["inboundId"])
+			if err == nil {
+				units, err = billing.MultiplierUnits(anyText(payload["multiplier"]))
+			}
+			if err == nil {
+				result, err = c.SetMultiplier(ctx, profile, server, id, units)
+			}
+		} else {
+			ids := []int{}
+			if path == "/admin/api/servers/users" {
+				var id int
+				id, err = parseID(payload["inboundId"])
+				if err == nil {
+					ids = append(ids, id)
+				}
+			} else {
+				values, ok := payload["inboundIds"].([]any)
+				if !ok {
+					err = errors.New("请选择入站")
+				}
+				for _, v := range values {
+					if _, ok := v.(json.Number); !ok {
+						err = errors.New("入站 ID 必须为整数")
+						break
+					}
+					var id int
+					id, err = parseID(v)
+					if err != nil {
+						break
+					}
+					ids = append(ids, id)
+				}
+			}
+			if err == nil {
+				result, err = c.Batch(ctx, profile, server, ids)
+			}
+			if err == nil && path == "/admin/api/servers/users" {
+				results := result["results"].([]any)
+				item := results[0].(map[string]any)
+				if item["ok"] != true {
+					err = errors.New(stringField(item, "error"))
+				} else {
+					result = map[string]any{"added": item["added"], "existing": item["existing"], "bound": true, "enforcementEnabled": true}
+				}
+			}
+		}
+	}
+	if err != nil {
+		problem(w, 400, err.Error())
+	} else {
+		result["ok"] = true
+		respond(w, 200, result)
+	}
+	return true
+}

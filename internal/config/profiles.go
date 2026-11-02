@@ -36,6 +36,23 @@ func (r *Repository) index() (map[string]any, error) {
 	if _, ok := index["profiles"].([]any); !ok {
 		return nil, errors.New("订阅索引格式无效")
 	}
+	for _, value := range index["profiles"].([]any) {
+		record, ok := value.(map[string]any)
+		if !ok {
+			return nil, errors.New("订阅索引记录格式无效")
+		}
+		if value, present := record["remoteNodes"]; present && value != nil {
+			bindings, ok := value.([]any)
+			if !ok {
+				return nil, errors.New("订阅绑定列表格式无效")
+			}
+			for _, binding := range bindings {
+				if _, ok := binding.(map[string]any); !ok {
+					return nil, errors.New("订阅绑定记录格式无效")
+				}
+			}
+		}
+	}
 	return index, nil
 }
 func (r *Repository) writeIndex(index map[string]any) error {
@@ -48,7 +65,7 @@ func (r *Repository) writeIndex(index map[string]any) error {
 func hasActiveBindings(record map[string]any) bool {
 	bindings, _ := record["remoteNodes"].([]any)
 	for _, value := range bindings {
-		if binding, ok := value.(map[string]any); ok && binding["status"] == "active" {
+		if binding, ok := value.(map[string]any); ok && (binding["status"] == "active" || binding["status"] == "provisioning") {
 			return true
 		}
 	}

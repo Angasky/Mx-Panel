@@ -21,14 +21,18 @@ type Repository struct {
 	mu   sync.Mutex
 }
 type Profile struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Slug       string           `json:"slug"`
-	Protected  bool             `json:"protected"`
-	CustomSlug bool             `json:"customSlug"`
-	Files      []string         `json:"files"`
-	Traffic    map[string]any   `json:"traffic"`
-	Failovers  []map[string]any `json:"failovers"`
+	ID               string           `json:"id"`
+	Name             string           `json:"name"`
+	Slug             string           `json:"slug"`
+	Protected        bool             `json:"protected"`
+	CustomSlug       bool             `json:"customSlug"`
+	Files            []string         `json:"files"`
+	Traffic          map[string]any   `json:"traffic"`
+	Failovers        []map[string]any `json:"failovers"`
+	RemoteNodes      []any            `json:"remoteNodes"`
+	AccessRevoked    bool             `json:"accessRevoked"`
+	EnforcementError string           `json:"enforcementError"`
+	LastEnforcedAt   any              `json:"lastEnforcedAt"`
 }
 type Document = map[string]any
 
@@ -48,7 +52,11 @@ func (r *Repository) profiles() ([]Profile, error) {
 	return index.Profiles, nil
 }
 func public(p Profile) map[string]any {
-	return map[string]any{"id": p.ID, "name": p.Name, "slug": p.Slug, "protected": p.Protected, "customSlug": p.CustomSlug, "url": "/sub/" + url.PathEscape(p.Slug)}
+	info, err := TrafficInfo(Document{"traffic": p.Traffic, "remoteNodes": p.RemoteNodes, "accessRevoked": p.AccessRevoked, "enforcementError": p.EnforcementError, "lastEnforcedAt": p.LastEnforcedAt}, time.Now())
+	if err != nil {
+		info = Document{"configured": false, "enforcementError": err.Error(), "bindings": []any{}}
+	}
+	return map[string]any{"id": p.ID, "name": p.Name, "slug": p.Slug, "protected": p.Protected, "customSlug": p.CustomSlug, "url": "/sub/" + url.PathEscape(p.Slug), "traffic": info}
 }
 func (r *Repository) Profiles() ([]map[string]any, error) {
 	r.mu.Lock()
@@ -232,6 +240,10 @@ func atomic(path string, data []byte) error {
 func (r *Repository) Mutate(id string, change func(Document) error) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.mutateLocked(id, change)
+}
+
+func (r *Repository) mutateLocked(id string, change func(Document) error) error {
 	p, err := r.profile(id)
 	if err != nil {
 		return err

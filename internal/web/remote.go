@@ -35,6 +35,9 @@ func stringField(payload map[string]any, key string) string {
 	return value
 }
 func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if s.subscriptionRoutes(w, r) {
+		return true
+	}
 	path := r.URL.Path
 	method := r.Method
 	if path == "/admin/api/servers/probe" && method == "POST" {
