@@ -331,3 +331,31 @@ func TestBatchLinkImportShareAndQRCode(t *testing.T) {
 		t.Fatal("node QR bypassed authentication")
 	}
 }
+
+func TestNativeServerMetadataRoutesDoNotExposeCredentials(t *testing.T) {
+	s := fixture(t)
+	token := login(t, s)
+	pin := "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, 32))
+	payload, _ := json.Marshal(map[string]any{"name": "fixture server", "host": "198.51.100.20", "sshPort": 22, "sshUser": "root", "sshPassword": "sample-server-password", "fingerprint": pin, "installType": "xray", "connectionMode": "existing"})
+	w := request(s, "POST", "/admin/api/servers", string(payload), token, "https://panel.test", true)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "sample-server-password") {
+		t.Fatal("server credential exposed")
+	}
+	var created struct{ Server struct{ ID string } }
+	json.Unmarshal(w.Body.Bytes(), &created)
+	w = request(s, "GET", "/admin/api/servers", "", token, "", true)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "fixture server") || strings.Contains(w.Body.String(), "sshPassword") {
+		t.Fatal("server list contract or redaction failed")
+	}
+	updated, _ := json.Marshal(map[string]any{"id": created.Server.ID, "name": "renamed"})
+	w = request(s, "PUT", "/admin/api/servers", string(updated), token, "https://panel.test", true)
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	if request(s, "GET", "/admin/api/servers", "", "", "", true).Code != 401 {
+		t.Fatal("server metadata bypassed authentication")
+	}
+}

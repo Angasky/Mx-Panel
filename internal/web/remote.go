@@ -1,0 +1,161 @@
+package web
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/Angasky/dingzhi-ban/internal/remote"
+)
+
+var managers sync.Map
+var managersMu sync.Mutex
+
+func (s *Server) remoteManager() (*remote.Manager, error) {
+	if value, ok := managers.Load(s.options.Root); ok {
+		return value.(*remote.Manager), nil
+	}
+	managersMu.Lock()
+	defer managersMu.Unlock()
+	if value, ok := managers.Load(s.options.Root); ok {
+		return value.(*remote.Manager), nil
+	}
+	manager, err := remote.Open(s.options.Root)
+	if err != nil {
+		return nil, err
+	}
+	managers.Store(s.options.Root, manager)
+	return manager, nil
+}
+func stringField(payload map[string]any, key string) string {
+	value, _ := payload[key].(string)
+	return value
+}
+func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
+	path := r.URL.Path
+	method := r.Method
+	if path == "/admin/api/servers/probe" && method == "POST" {
+		var payload map[string]any
+		if err := readJSON(w, r, &payload); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		port := 22
+		if value, ok := payload["sshPort"]; ok {
+			var err error
+			port, err = strconv.Atoi(strings.TrimSpace(anyText(value)))
+			if err != nil {
+				problem(w, 400, "SSH 端口无效")
+				return true
+			}
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		pin, err := remote.Probe(ctx, remote.Connection{Host: stringField(payload, "host"), Port: port, User: "root"})
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"fingerprint": pin})
+		}
+		return true
+	}
+	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose") && method == "POST"
+	if !supported {
+		return false
+	}
+	manager, err := s.remoteManager()
+	if err != nil {
+		problem(w, 400, err.Error())
+		return true
+	}
+	if method == "GET" {
+		servers, err := manager.List()
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"servers": servers})
+		}
+		return true
+	}
+	var payload map[string]any
+	if err := readJSON(w, r, &payload); err != nil || payload == nil {
+		problem(w, 400, "请求 JSON 必须为对象")
+		return true
+	}
+	if path == "/admin/api/servers" {
+		id := stringField(payload, "id")
+		if id != "" {
+			previous, err := manager.Record(id)
+			if err != nil {
+				problem(w, 400, err.Error())
+				return true
+			}
+			if err = s.repository.GuardServerUpdate(id, payload, previous); err != nil {
+				problem(w, 400, err.Error())
+				return true
+			}
+		}
+		server, err := manager.Save(payload)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"ok": true, "server": server})
+		}
+		return true
+	}
+	id := stringField(payload, "id")
+	connection, err := manager.Connection(id)
+	if err != nil {
+		problem(w, 400, err.Error())
+		return true
+	}
+	script := "test $(id -u) = 0"
+	if path == "/admin/api/servers/diagnose" {
+		script = `set +e
+printf 'HOST\n'; hostname; uname -a; uptime
+printf '\nSERVICES\n'; systemctl --no-pager --full status x-ui xray sing-box 2>&1 | head -100
+printf '\nLISTENERS\n'; ss -lntup 2>/dev/null | head -40
+printf '\nRECENT LOGS\n'; journalctl --no-pager -u x-ui -u xray -u sing-box -n 60 2>&1
+true
+`
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	output, err := remote.Execute(ctx, connection, script, 256<<10)
+	if path == "/admin/api/servers/diagnose" {
+		record, recordErr := manager.Record(id)
+		if recordErr == nil {
+			for _, key := range []string{"sshPassword", "panelPassword"} {
+				if secret, secretErr := manager.Secret(record, key); secretErr == nil && secret != "" {
+					output = strings.ReplaceAll(output, secret, "[REDACTED]")
+				}
+			}
+		}
+		if err != nil {
+			output += "\n" + err.Error()
+		}
+		respond(w, 200, map[string]any{"log": output})
+		return true
+	}
+	if err != nil {
+		problem(w, 400, "SSH 或 root/sudo 权限检查失败："+err.Error())
+		return true
+	}
+	respond(w, 200, map[string]any{"connected": true, "message": "SSH 和提权权限检查通过"})
+	return true
+}
+
+func anyText(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case interface{ String() string }:
+		return v.String()
+	case int:
+		return strconv.Itoa(v)
+	}
+	return ""
+}

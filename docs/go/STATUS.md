@@ -7,7 +7,7 @@
 
 ## 已实现并验证
 
-- Go module，最低语言版本 1.24；本次使用 Go 1.27.3 构建测试。
+- Go module，最低语言版本 1.26；本次使用 Go 1.27.3 构建测试。
 - `internal/legacycrypto`：旧版 PBKDF2-HMAC-SHA256 密码格式，240000 / 600000 次迭代；Fernet 的 AES-CBC / HMAC-SHA256 加解密兼容，不改变凭据密钥。
 - 测试向量由 Python `cryptography.fernet` 和 `hashlib.pbkdf2_hmac` 生成，只包含固定示例密钥，不读取生产凭据。验证中文、特殊字符、空值、块边界、错误密码、篡改签名及截断数据。
 - `internal/storage`：读取 JSON 保留未知字段和大整数，串行化读改写，临时文件 0600、刷盘后原子替换。并发更新及失败不写入测试通过。
@@ -32,6 +32,15 @@ go vet ./...
 - 基础分享链接解析/导出：VLESS、VMess、Trojan、HY2、TUIC、SS、Snell、SOCKS5、HTTP(S)。Python 生成的固定示例验证密码、PSK、IPv6 与基本协议字段；高级协议选项仍需继续对齐。
 - 节点链接批量导入、同名改名、单节点分享与白底 SVG 二维码；非默认订阅的二维码显式传递 profile。
 - 真实 HTTPS、HTTP 接口、配置事务、凭据更换和 URI 兼容测试通过。
+
+## 原生 SSH 与服务器元数据
+
+- 使用 golang.org/x/crypto/ssh，主机指纹校验发生在密码认证之前；不调用系统 ssh 或 Python。
+- SSH 指纹探测、密码认证、上下文超时、远端 exec 通道、输出限长和密码脱敏；sudo 输入采用随机帧标记，兼容密码及 NOPASSWD 情况。
+- 读取旧 remote/servers.json 和 credentials.key，保存加密凭据，保留旧密钥；已有服务器缺失密钥时拒绝生成替代密钥。
+- 原生接口：服务器列表、登记/修改、SSH 探测/测试、诊断。保护所有订阅的活动用户绑定，避免更换服务器身份导致归属失效。
+- 本地真实 SSH 协议服务测试覆盖指纹前置校验、认证失败、连接保持、exec 输出、限长和脱敏；服务器元数据 HTTP、旧密钥与加密存储测试通过。尚未对生产服务器进行操作。
+- 面板 HTTP/CSRF/API 适配、原生入站和用户操作、安装任务及硬件/用量采集仍未完成。
 
 ## 开发运行
 

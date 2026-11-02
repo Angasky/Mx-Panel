@@ -11,6 +11,9 @@ import (
 )
 
 func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if s.remoteRoutes(w, r) {
+		return true
+	}
 	path := r.URL.Path
 	method := r.Method
 	if (path == "/admin/api/account" || path == "/admin/api/password") && method == "POST" {
