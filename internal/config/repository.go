@@ -71,7 +71,7 @@ func (r *Repository) profiles() ([]Profile, error) {
 	return index.Profiles, nil
 }
 func public(p Profile) map[string]any {
-	info, err := TrafficInfo(Document{"traffic": p.Traffic, "remoteNodes": p.RemoteNodes, "accessRevoked": p.AccessRevoked, "enforcementError": p.EnforcementError, "lastEnforcedAt": p.LastEnforcedAt}, time.Now())
+	info, err := TrafficInfo(Document{"id": p.ID, "traffic": p.Traffic, "remoteNodes": p.RemoteNodes, "accessRevoked": p.AccessRevoked, "enforcementError": p.EnforcementError, "lastEnforcedAt": p.LastEnforcedAt}, time.Now())
 	if err != nil {
 		info = Document{"configured": false, "enforcementError": err.Error(), "bindings": []any{}}
 	}

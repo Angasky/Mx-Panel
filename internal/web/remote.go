@@ -65,7 +65,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
-	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT") || (path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/metrics") && method == "GET" || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose" || path == "/admin/api/servers/attach") && method == "POST"
+	supported := path == "/admin/api/servers" && (method == "GET" || method == "POST" || method == "PUT" || method == "DELETE") || (path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/metrics") && method == "GET" || (path == "/admin/api/servers/test" || path == "/admin/api/servers/diagnose" || path == "/admin/api/servers/attach") && method == "POST"
 	if !supported {
 		return false
 	}
@@ -110,6 +110,20 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	if path == "/admin/api/servers" {
 		id := stringField(payload, "id")
+		if method == "DELETE" {
+			controller, err := s.subscriptionController()
+			var result map[string]any
+			if err == nil {
+				result, err = controller.ForgetServer(r.Context(), id, payload["detach"] == true)
+			}
+			if err != nil {
+				problem(w, 400, err.Error())
+			} else {
+				result["ok"] = true
+				respond(w, 200, result)
+			}
+			return true
+		}
 		if id != "" {
 			previous, err := manager.Record(id)
 			if err != nil {

@@ -68,12 +68,12 @@ func TrafficInfo(record Document, now time.Time) (Document, error) {
 		return nil, errors.New("流量倍率无效")
 	}
 	bindings := []any{}
-	for _, v := range rows(record, "remoteNodes") {
+	for index, v := range rows(record, "remoteNodes") {
 		b, ok := v.(map[string]any)
 		if !ok {
 			return nil, errors.New("用户绑定格式无效")
 		}
-		out := Document{}
+		out := Document{"recordIndex": index, "recordToken": BindingToken(stringValue(record["id"]), b)}
 		for _, k := range []string{"scope", "serverId", "inboundId", "name", "port", "status", "error", "importedNames", "multiplierUnits", "up", "down", "lastSampleAt", "lastRawDelta", "monthlyPaused"} {
 			if value, exists := b[k]; exists {
 				out[k] = value
