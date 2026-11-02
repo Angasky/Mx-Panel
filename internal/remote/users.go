@@ -364,7 +364,7 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 			}
 		}
 		output := Record{"inbound": row, "client": user}
-		if record["installType"] == "x-panel" && (operation == "add" || operation == "verify" || operation == "resume") && user["enable"] != false {
+		if (record["installType"] == "x-panel" || row["protocol"] == "hysteria" || row["protocol"] == "hysteria2") && (operation == "add" || operation == "verify" || operation == "resume") && user["enable"] != false {
 			runtime, err := syncRuntime(ctx, panel, row, user)
 			if err != nil {
 				return nil, err

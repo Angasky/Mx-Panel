@@ -373,7 +373,7 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 		return nil, err
 	}
 	op := "read"
-	if serverRecord["installType"] == "x-panel" {
+	if serverRecord["installType"] == "x-panel" || row["protocol"] == "hysteria" || row["protocol"] == "hysteria2" {
 		op = "verify"
 	}
 	if client != nil {

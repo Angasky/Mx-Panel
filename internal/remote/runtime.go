@@ -121,6 +121,8 @@ func runtimeStatus(output, protocol string, client Record) (string, error) {
 	key := "id"
 	if protocol == "trojan" {
 		key = "password"
+	} else if protocol == "hysteria" || protocol == "hysteria2" {
+		key = "auth"
 	}
 	actual, present := account[key]
 	if !present {
@@ -140,7 +142,11 @@ func runtimeStatus(output, protocol string, client Record) (string, error) {
 		}
 	} else {
 		a, ok := actual.(string)
-		b, valid := client[key].(string)
+		expected := client[key]
+		if key == "auth" && value(expected) == "" {
+			expected = client["password"]
+		}
+		b, valid := expected.(string)
 		if !ok || !valid || b == "" {
 			return "", errors.New("运行用户密码格式无效")
 		}
@@ -251,6 +257,15 @@ func syncRuntime(ctx context.Context, panel *Panel, row, client Record) (Record,
 	if err := runtimeAuthorized(row, client, time.Now()); err != nil {
 		return nil, err
 	}
+	if row["protocol"] == "hysteria" || row["protocol"] == "hysteria2" {
+		settings, err := object(row["settings"])
+		if err != nil {
+			return nil, err
+		}
+		if version := value(settings["version"]); version != "" && version != "2" {
+			return nil, errors.New("仅支持 HY2 运行用户同步")
+		}
+	}
 	raw, err := panel.Request(ctx, "panel/api/server/getConfigJson", nil, "")
 	if err != nil {
 		var status panelStatus
@@ -270,7 +285,7 @@ func syncRuntime(ctx context.Context, panel *Panel, row, client Record) (Record,
 	protocol := value(row["protocol"])
 	tag := value(row["tag"])
 	email := value(client["email"])
-	if address == "" || tag == "" || protocol != "vless" && protocol != "vmess" && protocol != "trojan" {
+	if address == "" || tag == "" || protocol != "vless" && protocol != "vmess" && protocol != "trojan" && protocol != "hysteria" && protocol != "hysteria2" {
 		return unknown, nil
 	}
 	if email == "" || len(email) > 1024 || len(tag) > 1024 || strings.ContainsAny(email+tag, "\x00\r\n") {
@@ -347,6 +362,18 @@ func syncRuntime(ctx context.Context, panel *Panel, row, client Record) (Record,
 	}
 	if protocol == "vless" && value(owned["flow"]) != "" {
 		owned["flow"] = strings.ReplaceAll(value(owned["flow"]), "-udp443", "")
+	}
+	if protocol == "hysteria" || protocol == "hysteria2" {
+		auth := value(owned["auth"])
+		if auth == "" {
+			auth = value(owned["password"])
+		}
+		if auth == "" {
+			return nil, errors.New("HY2 用户缺少认证密码")
+		}
+		owned["auth"] = auth
+		model["version"] = 2
+		protocol = "hysteria"
 	}
 	model["clients"] = []any{owned}
 	payload := Record{"inbounds": []any{Record{"tag": tag, "listen": "127.0.0.1", "port": row["port"], "protocol": protocol, "settings": model}}}

@@ -442,6 +442,7 @@ func Export(n map[string]any) (string, error) {
 		}
 	}
 	if kind == "hysteria2" {
+		u.Path = "/"
 		if n["obfs"] != nil {
 			q.Set("obfs", text(n["obfs"]))
 			q.Set("obfs-password", text(n["obfs-password"]))

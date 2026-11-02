@@ -2,10 +2,27 @@ package links
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestHY2StandardPathSNIAndEscapedPassword(t *testing.T) {
+	node := map[string]any{"name": "HY2", "type": "hysteria2", "server": "2001:db8::1", "port": 24443, "password": ":@ p+secret", "servername": "tls.example.com"}
+	uri, err := Export(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(uri)
+	if err != nil || u.Path != "/" || u.Query().Get("sni") != "tls.example.com" {
+		t.Fatal(uri, err)
+	}
+	restored, err := Parse(uri)
+	if err != nil || restored["password"] != node["password"] {
+		t.Fatal("HY2 password changed", restored, err)
+	}
+}
 
 func TestPythonURICompatibility(t *testing.T) {
 	data, err := os.ReadFile("testdata/python.json")

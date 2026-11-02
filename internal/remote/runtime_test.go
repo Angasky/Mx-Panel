@@ -217,3 +217,51 @@ func TestRuntimeConfigFailuresAndPublicAPIAreNotUsedForRepair(t *testing.T) {
 		})
 	}
 }
+
+func TestHY2RuntimeAuthRepair(t *testing.T) {
+	for _, protocol := range []string{"hysteria", "hysteria2"} {
+		t.Run(protocol, func(t *testing.T) {
+			panel, row, _ := runtimeFixture(t)
+			row["protocol"] = protocol
+			row["settings"] = Record{"version": 2, "clients": []any{}}
+			client := Record{"email": "hy2-owned", "enable": true}
+			if protocol == "hysteria" {
+				client["auth"] = "auth:+@ password"
+			} else {
+				client["password"] = "auth:+@ password"
+			}
+			live, adds := false, 0
+			panel.run = func(ctx context.Context, script string, max int) (string, error) {
+				if strings.HasPrefix(script, "for candidate") {
+					return runtimeBinaries[0], nil
+				}
+				if strings.Contains(script, " api adu ") {
+					encoded := regexp.MustCompile(`printf '%s' '([A-Za-z0-9+/=]+)'`).FindStringSubmatch(script)
+					raw, _ := base64.StdEncoding.DecodeString(encoded[1])
+					var payload Record
+					json.Unmarshal(raw, &payload)
+					inbound := payload["inbounds"].([]any)[0].(map[string]any)
+					users := inbound["settings"].(map[string]any)["clients"].([]any)
+					if inbound["protocol"] != "hysteria" || len(users) != 1 || users[0].(map[string]any)["auth"] != "auth:+@ password" {
+						t.Error("HY2 runtime auth lost", inbound)
+					}
+					live = true
+					adds++
+					return "Added 1 user", nil
+				}
+				if live {
+					return `{"users":[{"email":"hy2-owned","account":{"auth":"auth:+@ password"}}]}`, nil
+				}
+				return `{"users":[]}`, nil
+			}
+			result, err := syncRuntime(context.Background(), panel, row, client)
+			if err != nil || result["runtimeVerified"] != true || adds != 1 {
+				t.Fatal(result, err)
+			}
+			result, err = syncRuntime(context.Background(), panel, row, client)
+			if err != nil || result["runtimeRepaired"] != false || adds != 1 {
+				t.Fatal("HY2 repair repeated", result, err)
+			}
+		})
+	}
+}
