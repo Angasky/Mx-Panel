@@ -4763,7 +4763,7 @@ async function shareNode(index) {
     let encodedName = encodeURIComponent(data.name + '.txt');
     openModal('NODE_SHARE // 单节点二维码与导出', `
       <div class="node-share-hero">
-        <img class="node-share-qr" src="/admin/api/nodes/qrcode?name=${encodeURIComponent(data.name)}" alt="${esc(data.name)} 节点二维码">
+        <img class="node-share-qr" src="/admin/api/nodes/qrcode?name=${encodeURIComponent(data.name)}&profile=${encodeURIComponent(S.profile)}" alt="${esc(data.name)} 节点二维码">
         <div class="node-share-meta">
           <label>节点名称</label>
           <b>${esc(data.name)}</b>

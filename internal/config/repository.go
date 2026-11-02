@@ -181,15 +181,8 @@ func (r *Repository) Snapshot(id string) (map[string]any, error) {
 		groups = append(groups, map[string]any{"index": i, "name": g["name"], "type": g["type"], "count": len(refs), "config": g})
 	}
 	for i, v := range rows(doc, "rules") {
-		text := v.(string)
-		parts := strings.Split(text, ",")
-		item := map[string]any{"index": i, "raw": text, "type": parts[0], "payload": "", "target": ""}
-		if len(parts) > 1 {
-			item["target"] = parts[len(parts)-1]
-		}
-		if len(parts) > 2 {
-			item["payload"] = strings.Join(parts[1:len(parts)-1], ",")
-		}
+		item := RuleParts(v.(string))
+		item["index"] = i
 		rules = append(rules, item)
 	}
 	if dns, ok := doc["dns"].(map[string]any); ok {

@@ -84,11 +84,19 @@ func ValidateNode(node map[string]any) error {
 		if psk == "" || len(psk) > 1024 || strings.ContainsAny(psk, "\r\n\x00") {
 			return errors.New("Snell PSK 无效")
 		}
+		version := 1
 		if value := node["version"]; value != nil {
-			version, err := integer(value)
+			var err error
+			version, err = integer(value)
 			if err != nil || version < 1 || version > 5 {
 				return errors.New("Snell 版本必须为 1–5")
 			}
+		}
+		if version < 3 && node["udp"] == true {
+			return errors.New("Snell UDP 需要 v3 或以上")
+		}
+		if version < 4 && node["reuse"] == true {
+			return errors.New("Snell reuse 需要 v4 或以上")
 		}
 	}
 	if node["dialer-proxy"] == name {
@@ -242,6 +250,20 @@ func replaceReferences(doc Document, old, name string) {
 			}
 		}
 	}
+	updated := []any{}
+	for _, value := range rows(doc, "rules") {
+		raw := value.(string)
+		parts := RuleParts(raw)
+		if parts["action"] == old {
+			if name == "" {
+				continue
+			}
+			index := strings.LastIndex(raw, old)
+			raw = raw[:index] + name + raw[index+len(old):]
+		}
+		updated = append(updated, raw)
+	}
+	doc["rules"] = updated
 }
 
 func MoveNode(doc Document, payload map[string]any) error {

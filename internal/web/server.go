@@ -27,8 +27,10 @@ type Options struct {
 	TrustLoopbackProxy, LocalDevelopment bool
 }
 type account struct {
-	Username, Salt, Hash string
-	Iterations           int
+	Username   string `json:"username"`
+	Salt       string `json:"salt"`
+	Hash       string `json:"hash"`
+	Iterations int    `json:"iterations"`
 }
 type session struct{ Expires, Created time.Time }
 type failure struct {
@@ -183,6 +185,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "请重新登录")
 		return
 	}
+	if s.linkRoutes(w, r) || s.editRoutes(w, r) {
+		return
+	}
 	if r.URL.Path == "/admin/api/logout" && r.Method == "POST" {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if token == "" {
@@ -198,7 +203,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/admin/api/account" && r.Method == "GET" {
-		respond(w, 200, map[string]any{"username": s.account.Username})
+		s.mu.Lock()
+		username := s.account.Username
+		s.mu.Unlock()
+		respond(w, 200, map[string]any{"username": username})
 		return
 	}
 	if r.Method == "GET" {
@@ -312,9 +320,12 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		problem(w, 429, "登录请求过多，请稍后重试")
 		return
 	}
-	valid := legacycrypto.VerifyPassword(input.Password, s.account.Salt, s.account.Hash, s.account.Iterations)
+	s.mu.Lock()
+	auth := s.account
+	s.mu.Unlock()
+	valid := legacycrypto.VerifyPassword(input.Password, auth.Salt, auth.Hash, auth.Iterations)
 	<-s.hashSlots
-	valid = valid && subtle.ConstantTimeCompare([]byte(input.Username), []byte(s.account.Username)) == 1
+	valid = valid && subtle.ConstantTimeCompare([]byte(input.Username), []byte(auth.Username)) == 1
 	if !valid {
 		problem(w, 403, "账号或密码错误")
 		return
@@ -326,6 +337,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(random)
 	s.mu.Lock()
+	if s.account.Hash != auth.Hash || s.account.Username != auth.Username {
+		s.mu.Unlock()
+		problem(w, 403, "账号已变更，请重新登录")
+		return
+	}
 	for key, v := range s.sessions {
 		if !now.Before(v.Expires) {
 			delete(s.sessions, key)

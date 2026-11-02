@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -235,5 +236,98 @@ func TestActualHTTPSCookieWorkflow(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != 401 {
 		t.Fatal("revoked HTTPS cookie accepted")
+	}
+}
+
+func TestAccountChangePersistsAndRevokesEverySession(t *testing.T) {
+	s := fixture(t)
+	first := login(t, s)
+	second := login(t, s)
+	w := request(s, "POST", "/admin/api/account", `{"username":"admin","current":"wrong","newPassword":"new-password-12345"}`, first, "https://panel.test", true)
+	if w.Code != 403 {
+		t.Fatal("wrong current password accepted")
+	}
+	w = request(s, "POST", "/admin/api/account", `{"username":"admin","current":"long-test-password","newUsername":"new-admin","newPassword":"new-password-12345"}`, first, "https://panel.test", true)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	for _, token := range []string{first, second} {
+		if request(s, "GET", "/admin/api/account", "", token, "", true).Code != 401 {
+			t.Fatal("old session survived credential change")
+		}
+	}
+	reopened, err := New(s.options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w = request(reopened, "POST", "/admin/api/login", `{"username":"new-admin","password":"new-password-12345"}`, "", "https://panel.test", true)
+	if w.Code != 200 {
+		t.Fatal("new credentials did not survive restart", w.Body.String())
+	}
+}
+
+func TestEditingHTTPRoutes(t *testing.T) {
+	s := fixture(t)
+	token := login(t, s)
+	tasks := []struct{ method, path, body string }{
+		{"POST", "/admin/api/groups", `{"config":{"name":"Media","type":"select","proxies":["DIRECT"]}}`},
+		{"POST", "/admin/api/rules", `{"type":"DOMAIN-SUFFIX","value":"example.com","action":"Media"}`},
+		{"POST", "/admin/api/dns", `{"domain":"+.example.com","servers":["1.1.1.1"]}`},
+		{"PUT", "/admin/api/groups", `{"oldName":"Media","config":{"name":"Video","type":"select","proxies":["DIRECT"]}}`},
+	}
+	for _, task := range tasks {
+		w := request(s, task.method, task.path, task.body, token, "https://panel.test", true)
+		if w.Code != 200 {
+			t.Fatal(task.path, w.Code, w.Body.String())
+		}
+	}
+	w := request(s, "GET", "/admin/api/snapshot", "", token, "", true)
+	var snap struct {
+		Rules       []struct{ Value, Action string }
+		DNSPolicies []any
+	}
+	json.Unmarshal(w.Body.Bytes(), &snap)
+	if len(snap.Rules) != 1 || snap.Rules[0].Action != "Video" || snap.Rules[0].Value != "example.com" || len(snap.DNSPolicies) != 1 {
+		t.Fatal("edited snapshot contract differs", w.Body.String())
+	}
+}
+
+func TestBatchLinkImportShareAndQRCode(t *testing.T) {
+	s := fixture(t)
+	token := login(t, s)
+	uri := "snell://" + base64.RawStdEncoding.EncodeToString([]byte("chacha20-ietf-poly1305: 密码:@+secret @vpn.example.com:24443")) + "?version=4#Snell"
+	payload, _ := json.Marshal(map[string]any{"links": uri + "\n" + uri + "\nbad://secret@host:443"})
+	w := request(s, "POST", "/admin/api/import-node", string(payload), token, "https://panel.test", true)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var imported struct {
+		Total, Added    int
+		Failed, Renamed []any
+	}
+	json.Unmarshal(w.Body.Bytes(), &imported)
+	if imported.Total != 3 || imported.Added != 2 || len(imported.Failed) != 1 || len(imported.Renamed) != 1 {
+		t.Fatal("batch import result differs", w.Body.String())
+	}
+	w = request(s, "GET", "/admin/api/nodes/share?name=Snell", "", token, "", true)
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	var shared struct{ URI string }
+	json.Unmarshal(w.Body.Bytes(), &shared)
+	encoded := strings.Split(strings.TrimPrefix(shared.URI, "snell://"), "?")[0]
+	raw, err := base64.RawStdEncoding.DecodeString(encoded)
+	if err != nil || string(raw) != "chacha20-ietf-poly1305: 密码:@+secret @vpn.example.com:24443" {
+		t.Fatal("exported Snell auth payload lost PSK")
+	}
+	w = request(s, "GET", "/admin/api/nodes/qrcode?name=Snell&profile=clash", "", token, "", true)
+	if w.Code != 200 || !strings.Contains(w.Header().Get("Content-Type"), "image/svg+xml") || !strings.Contains(w.Body.String(), `fill="#fff"`) {
+		t.Fatal("node QR missing white background")
+	}
+	if request(s, "GET", "/admin/api/nodes/qrcode?name=Snell&profile=missing", "", token, "", true).Code != 400 {
+		t.Fatal("QR ignored selected profile")
+	}
+	if request(s, "GET", "/admin/api/nodes/qrcode?name=Snell", "", "", "", true).Code != 401 {
+		t.Fatal("node QR bypassed authentication")
 	}
 }
