@@ -18,10 +18,18 @@ func main() {
 	auth := flag.String("auth", "/etc/mxioc-rule-manager.auth.json", "existing administrator credential file")
 	proxy := flag.Bool("trust-loopback-proxy", false, "trust HTTPS forwarding only from loopback reverse proxy")
 	local := flag.Bool("local-development", false, "allow loopback HTTP for isolated development only")
+	check := flag.Bool("check-data", false, "validate existing credentials and every subscription without starting services")
 	flag.Parse()
 	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, TrustLoopbackProxy: *proxy, LocalDevelopment: *local})
 	if err != nil {
 		log.Fatal("startup validation failed: ", err)
+	}
+	if *check {
+		if err = handler.CheckData(); err != nil {
+			log.Fatal("data validation failed: ", err)
+		}
+		log.Print("existing credentials and subscription data validated; no service started")
+		return
 	}
 	server := &http.Server{Addr: *listen, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
