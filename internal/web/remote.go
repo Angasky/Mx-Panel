@@ -35,6 +35,9 @@ func stringField(payload map[string]any, key string) string {
 	return value
 }
 func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if s.certificateRoutes(w, r) {
+		return true
+	}
 	if s.subscriptionRoutes(w, r) {
 		return true
 	}

@@ -38,6 +38,11 @@ func (s *Server) RunBackground(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	backend, err := s.remoteManager()
+	if err != nil {
+		return err
+	}
+	backend.SetJobContext(ctx)
 	return c.Start(ctx)
 }
 

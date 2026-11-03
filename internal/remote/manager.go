@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -20,12 +21,16 @@ import (
 )
 
 type Manager struct {
-	root, path string
-	key        []byte
-	mu         sync.Mutex
-	operations map[string]chan struct{}
-	panels     map[string]*cachedPanel
-	monitor    *hostMonitor
+	root, path       string
+	key              []byte
+	mu               sync.Mutex
+	operations       map[string]chan struct{}
+	panels           map[string]*cachedPanel
+	monitor          *hostMonitor
+	certificates     map[string]*certificateTask
+	certificateSlots chan struct{}
+	jobContext       context.Context
+	certificateRun   func(context.Context, Connection, string) (string, error)
 }
 type Record = map[string]any
 
@@ -192,7 +197,7 @@ func (m *Manager) Secret(record Record, key string) (string, error) {
 }
 func publicServer(record Record) Record {
 	result := Record{}
-	for _, key := range []string{"id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "installType"} {
+	for _, key := range []string{"id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
 		if v, ok := record[key]; ok {
 			result[key] = v
 		}

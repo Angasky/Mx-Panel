@@ -40,7 +40,16 @@ func (c Connection) address(ctx context.Context) (string, error) {
 	}
 	return "", errors.New("SSH 地址不能是回环、链路本地、多播或未指定地址")
 }
-func handshake(ctx context.Context, c Connection, callback ssh.HostKeyCallback, auth []ssh.AuthMethod) (*ssh.Client, error) {
+func preferredHostKeys() []string {
+	algorithms := []string{ssh.KeyAlgoED25519}
+	for _, algorithm := range ssh.SupportedAlgorithms().HostKeys {
+		if algorithm != ssh.KeyAlgoED25519 {
+			algorithms = append(algorithms, algorithm)
+		}
+	}
+	return algorithms
+}
+func handshake(ctx context.Context, c Connection, callback ssh.HostKeyCallback, auth []ssh.AuthMethod, hostKeys ...string) (*ssh.Client, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	address, err := c.address(ctx)
@@ -66,6 +75,10 @@ func handshake(ctx context.Context, c Connection, callback ssh.HostKeyCallback, 
 		}
 	}()
 	config := &ssh.ClientConfig{User: c.User, Auth: auth, HostKeyCallback: callback, Timeout: 15 * time.Second}
+	if len(hostKeys) == 0 {
+		hostKeys = preferredHostKeys()
+	}
+	config.HostKeyAlgorithms = hostKeys
 	transport, channels, requests, err := ssh.NewClientConn(connection, address, config)
 	if err != nil {
 		connection.Close()
@@ -96,22 +109,52 @@ func Connect(ctx context.Context, c Connection) (*ssh.Client, error) {
 	if c.User == "" || c.Password == "" || !strings.HasPrefix(c.Fingerprint, "SHA256:") {
 		return nil, errors.New("SSH 账号、密码或主机指纹缺失")
 	}
-	mismatch := false
-	client, err := handshake(ctx, c, func(_ string, _ net.Addr, key ssh.PublicKey) error {
-		actual := ssh.FingerprintSHA256(key)
-		if subtle.ConstantTimeCompare([]byte(actual), []byte(c.Fingerprint)) != 1 {
-			mismatch = true
-			return errors.New("host key mismatch")
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	algorithms := preferredHostKeys()
+	mismatched := false
+	for len(algorithms) > 0 && ctx.Err() == nil {
+		keyType := ""
+		matched := false
+		client, err := handshake(ctx, c, func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			if subtle.ConstantTimeCompare([]byte(ssh.FingerprintSHA256(key)), []byte(c.Fingerprint)) != 1 {
+				keyType = key.Type()
+				return errors.New("host key mismatch")
+			}
+			matched = true
+			return nil
+		}, []ssh.AuthMethod{ssh.Password(c.Password)}, algorithms...)
+		if err == nil {
+			return client, nil
 		}
-		return nil
-	}, []ssh.AuthMethod{ssh.Password(c.Password)})
-	if err != nil {
-		if mismatch {
-			return nil, errors.New("SSH 主机指纹发生变化，已停止连接，请核对服务器后重新检测")
+		if keyType == "" {
+			// A matching key followed by an authentication failure is final.
+			// Only a callback-rejected key can trigger another negotiation.
+			if matched || !mismatched {
+				return nil, errors.New("SSH 握手或认证失败，请检查账号、密码和服务器状态")
+			}
+			break
 		}
-		return nil, errors.New("SSH 握手或认证失败，请检查账号、密码和服务器状态")
+		mismatched = true
+		next := []string{}
+		for _, algorithm := range algorithms {
+			same := algorithm == keyType
+			if keyType == ssh.KeyAlgoRSA {
+				same = algorithm == ssh.KeyAlgoRSASHA256 || algorithm == ssh.KeyAlgoRSASHA512
+			}
+			if keyType == ssh.CertAlgoRSAv01 {
+				same = algorithm == ssh.CertAlgoRSASHA256v01 || algorithm == ssh.CertAlgoRSASHA512v01
+			}
+			if !same {
+				next = append(next, algorithm)
+			}
+		}
+		if len(next) == len(algorithms) {
+			break
+		}
+		algorithms = next
 	}
-	return client, nil
+	return nil, errors.New("SSH 主机指纹不匹配，已停止连接，请核对服务器后重新检测")
 }
 
 type capture struct {

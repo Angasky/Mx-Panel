@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func sshFixture(t *testing.T) (Connection, *atomic.Int32) {
+func sshFixture(t *testing.T, extra ...ssh.Signer) (Connection, *atomic.Int32) {
 	t.Helper()
 	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -34,6 +34,9 @@ func sshFixture(t *testing.T) (Connection, *atomic.Int32) {
 		return nil, nil
 	}}
 	config.AddHostKey(signer)
+	for _, key := range extra {
+		config.AddHostKey(key)
+	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
