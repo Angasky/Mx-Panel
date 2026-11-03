@@ -178,6 +178,11 @@ func anyRecords(value any) []Record {
 }
 
 func editPanelInbound(ctx context.Context, panel *Panel, record Record, id int, payload Record, expected string, guard func(Record, Record) error) (Record, error) {
+	for _, relay := range anyRecords(record["relays"]) {
+		if value(relay["inboundId"]) == strconv.Itoa(id) && relay["deletePending"] == true {
+			return nil, errors.New("中转正在删除或清理，暂不编辑或启停")
+		}
+	}
 	old, exists, err := panelInbound(ctx, panel, id)
 	if err != nil {
 		return nil, err
@@ -278,6 +283,15 @@ func (m *Manager) DeleteInbound(ctx context.Context, server string, id int, expe
 		return nil, errors.New("入站 ID 无效")
 	}
 	result, err := m.WithPanel(ctx, server, func(panel *Panel, record Record) (any, error) {
+		relays, e := relayRecords(record)
+		if e != nil {
+			return nil, e
+		}
+		for _, relay := range relays {
+			if value(relay["inboundId"]) == strconv.Itoa(id) {
+				return m.deleteRelayInbound(ctx, panel, record, relay, id, expected, guard)
+			}
+		}
 		return deletePanelInbound(ctx, panel, record, id, expected, guard)
 	})
 	if err != nil {

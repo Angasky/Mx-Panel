@@ -190,7 +190,7 @@ func applyPanelRelay(ctx context.Context, p *Panel, entry Record, persist func(R
 	entry["status"] = "confirmed"
 	return persist(entry)
 }
-func (m *Manager) recordRelay(server string, inbound Record, tag, status string) error {
+func (m *Manager) recordRelay(server string, inbound Record, tag, status string, proofs ...Record) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, err := m.load()
@@ -214,10 +214,21 @@ func (m *Manager) recordRelay(server string, inbound Record, tag, status string)
 				return errors.New("入站已有其他中转归属")
 			}
 			row["status"] = status
+			if len(proofs) > 0 {
+				for k, v := range proofs[0] {
+					row[k] = v
+				}
+			}
 			return m.flush(data)
 		}
 	}
-	record["relays"] = appendRecord(rows, Record{"inboundId": inbound["id"], "outboundTag": tag, "status": status})
+	row := Record{"inboundId": inbound["id"], "outboundTag": tag, "status": status}
+	if len(proofs) > 0 {
+		for k, v := range proofs[0] {
+			row[k] = v
+		}
+	}
+	record["relays"] = appendRecord(rows, row)
 	return m.flush(data)
 }
 func appendRecord(rows []Record, row Record) []any {
@@ -256,6 +267,11 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	}
 	journalKey, _ := identity([]any{key, "relay"})
 	result, err := m.WithPanel(ctx, server, func(p *Panel, record Record) (any, error) {
+		for _, relay := range anyRecords(record["relays"]) {
+			if value(relay["inboundId"]) == strconv.Itoa(id) && relay["deletePending"] == true {
+				return nil, errors.New("中转正在删除或清理，未恢复创建")
+			}
+		}
 		fresh, exists, e := panelInbound(ctx, p, id)
 		if e != nil {
 			return nil, e
@@ -306,16 +322,28 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 			entry["desired"] = doc
 		}
 		persist := func(v Record) error { return m.persistCreate(journalKey, v) }
+		desired, e := inboundObject(entry["desired"])
+		if e != nil {
+			return nil, e
+		}
+		updated, e := inboundObject(desired["updated"])
+		if e != nil {
+			return nil, e
+		}
+		proof, e := relayOwnership(updated, tag, value(inbound["tag"]))
+		if e != nil {
+			return nil, e
+		}
 		if e = persist(entry); e != nil {
 			return nil, e
 		}
-		if e = m.recordRelay(server, inbound, tag, "pending"); e != nil {
+		if e = m.recordRelay(server, inbound, tag, "pending", proof); e != nil {
 			return nil, e
 		}
 		if e = applyPanelRelay(ctx, p, entry, persist); e != nil {
 			return nil, e
 		}
-		if e = m.recordRelay(server, inbound, tag, "active"); e != nil {
+		if e = m.recordRelay(server, inbound, tag, "active", proof); e != nil {
 			return nil, e
 		}
 		return created, nil

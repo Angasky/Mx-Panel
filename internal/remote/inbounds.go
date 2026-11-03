@@ -236,6 +236,25 @@ func (m *Manager) Inbounds(ctx context.Context, id string) (Record, error) {
 			return nil, errors.New("面板未返回有效的入站列表")
 		}
 		rows := []any{}
+		live := map[string]bool{}
+		for _, v := range input {
+			if row, ok := v.(map[string]any); ok {
+				live[value(row["id"])] = true
+			}
+		}
+		cleanupErrors := []string{}
+		for _, relay := range anyRecords(record["relays"]) {
+			if relay["deletePending"] != true || live[value(relay["inboundId"])] {
+				continue
+			}
+			if e := cleanupPanelRelay(ctx, panel, relay); e != nil {
+				cleanupErrors = append(cleanupErrors, "中转关联资源清理待重试："+e.Error())
+				continue
+			}
+			if e := m.finishRelayDelete(id, relay); e != nil {
+				cleanupErrors = append(cleanupErrors, "中转资源已清理，归属记录保存待重试")
+			}
+		}
 		for _, v := range input {
 			row, err := object(v)
 			if err != nil {
@@ -264,7 +283,7 @@ func (m *Manager) Inbounds(ctx context.Context, id string) (Record, error) {
 			}
 			rows = append(rows, row)
 		}
-		return Record{"server": publicServer(record), "inbounds": rows}, nil
+		return Record{"server": publicServer(record), "inbounds": rows, "relayCleanupErrors": cleanupErrors}, nil
 	})
 	if err != nil {
 		return nil, err

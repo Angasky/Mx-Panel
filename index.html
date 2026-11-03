@@ -2316,6 +2316,7 @@ async function serverNodes(force = false) {
     const data = await api('/servers/inbounds?id=' + encodeURIComponent(id));
     if (S.page !== 'serverNodes' || S.serverId !== id) return;
     S.remoteRows = data.inbounds; S.remoteServer = data.server; S.remoteLoaded = true;
+    if(data.relayCleanupErrors?.length)notice(data.relayCleanupErrors.join('；')+'；再次刷新会继续核对清理');
   }
   renderRemoteNodes();
 }
