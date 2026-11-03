@@ -43,6 +43,9 @@ func (s *Server) RunBackground(ctx context.Context) error {
 		return err
 	}
 	backend.SetJobContext(ctx)
+	if err = backend.RecoverInstallJobs(); err != nil {
+		return err
+	}
 	return c.Start(ctx)
 }
 

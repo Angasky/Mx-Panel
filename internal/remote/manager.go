@@ -32,6 +32,8 @@ type Manager struct {
 	certificateSlots chan struct{}
 	jobContext       context.Context
 	certificateRun   func(context.Context, Connection, string) (string, error)
+	installRun       func(context.Context, Connection, string) (string, error)
+	installRecovered bool
 }
 type Record = map[string]any
 
