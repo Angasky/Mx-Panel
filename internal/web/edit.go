@@ -16,6 +16,28 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	path := r.URL.Path
 	method := r.Method
+	if method == "GET" && (path == "/admin/api/failovers" || path == "/admin/api/server-chains") {
+		state, err := s.repository.State(r.Header.Get("X-Profile"))
+		if err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		key, responseKey := "failovers", "failovers"
+		if path == "/admin/api/server-chains" {
+			key, responseKey = "serverChains", "chains"
+		}
+		values := []any{}
+		if state[key] != nil {
+			var ok bool
+			values, ok = state[key].([]any)
+			if !ok {
+				problem(w, 400, "链路记录格式无效")
+				return true
+			}
+		}
+		respond(w, 200, map[string]any{responseKey: values})
+		return true
+	}
 	if path == "/admin/api/backups" && method == "GET" {
 		values, err := s.repository.Backups(r.Header.Get("X-Profile"))
 		if err != nil {
@@ -77,7 +99,7 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	allowed := map[string]bool{"/admin/api/groups": true, "/admin/api/rules": true, "/admin/api/dns": true}
 	standard := allowed[path] && (method == "POST" || method == "PUT" || method == "DELETE")
-	special := path == "/admin/api/raw" && method == "PUT" || (path == "/admin/api/rules/move" || path == "/admin/api/nodes/groups" || path == "/admin/api/nodes/bulk") && method == "POST"
+	special := path == "/admin/api/chains" && (method == "POST" || method == "PUT") || path == "/admin/api/raw" && method == "PUT" || (path == "/admin/api/rules/move" || path == "/admin/api/nodes/groups" || path == "/admin/api/nodes/bulk") && method == "POST"
 	if !standard && !special {
 		return false
 	}
@@ -87,7 +109,7 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	var groups []string
-	if path == "/admin/api/nodes/groups" {
+	if path == "/admin/api/nodes/groups" || path == "/admin/api/chains" {
 		var err error
 		groups, err = s.repository.GroupOptions(r.Header.Get("X-Profile"))
 		if err != nil {
@@ -97,6 +119,8 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	err := s.repository.Mutate(r.Header.Get("X-Profile"), func(doc config.Document) error {
 		switch path {
+		case "/admin/api/chains":
+			return config.EditChain(doc, method, payload, groups)
 		case "/admin/api/groups":
 			return config.EditGroup(doc, method, payload)
 		case "/admin/api/rules":
