@@ -124,6 +124,15 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 		}
 	}
 	script, err := coreInstallScript(value(record["installType"]), config)
+	if record["installType"] == "3x-ui" {
+		password, e := m.Secret(record, "panelPassword")
+		if e != nil {
+			return nil, e
+		}
+		script, err = panelInstallScript(record, password)
+		redaction, _ := json.Marshal(Record{"password": password})
+		config = string(redaction)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +191,15 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 	runner := m.installRun
 	if runner == nil {
 		runner = func(ctx context.Context, c Connection, script string) (string, error) {
-			return Execute(ctx, c, script, 64<<10)
+			output, e := Execute(ctx, c, script, 64<<10)
+			if e == nil && record["installType"] == "3x-ui" {
+				output += "\nMXIOC_STAGE=api-check\n"
+				_, e = m.verifyInstalledPanel(ctx, id)
+				if e != nil {
+					output += "\n面板验证失败：" + e.Error() + "\n"
+				}
+			}
+			return output, e
 		}
 	}
 	result := Record{}
@@ -240,6 +257,9 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 			continue
 		}
 		job["log"] = output
+		if server, e := find(data, value(job["serverId"])); e == nil && value(server["panelUrl"]) != "" {
+			job["panelUrl"] = server["panelUrl"]
+		}
 		job["finishedAt"] = time.Now().Unix()
 		if runErr == nil && strings.Contains(output, "MXIOC_STAGE=installed") {
 			job["status"] = "succeeded"
