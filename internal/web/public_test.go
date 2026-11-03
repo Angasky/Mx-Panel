@@ -61,7 +61,7 @@ func TestPublicSubscriptionHTTPIsolationHeadersAndRevocation(t *testing.T) {
 	w = request(s, "GET", "/admin/api/conversions", "", token, "", true)
 	var report map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &report)
-	if w.Code != 200 || len(report["formats"].([]any)) != 4 || strings.Contains(w.Body.String(), "fixture-only-password") {
+	if w.Code != 200 || len(report["formats"].([]any)) != 6 || strings.Contains(w.Body.String(), "fixture-only-password") {
 		t.Fatal("conversion report contract", w.Body.String())
 	}
 	_ = s.repository.UpdateState("clash", func(p map[string]any) error { p["traffic"].(map[string]any)["expire"] = int64(1); return nil })

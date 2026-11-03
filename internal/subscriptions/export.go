@@ -18,6 +18,8 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"shadowrocket-ha", "小火箭主备 · 第一步：节点订阅", "先导入节点，再启用配套策略配置。", true, true},
+	{"shadowrocket-config", "小火箭主备 · 第二步：策略配置", "按入口优先顺序 fallback，勿开启全局回退。", true, true},
 	{"v2rayn", "电脑 v2rayN 节点订阅", "流量与到期信息使用独立信息节点展示。", false, true},
 	{"v2rayng", "安卓 v2rayNG 节点订阅", "过滤 TUIC 与 Snell；流量与到期信息随订阅更新。", false, false},
 	{"v2ray", "V2Ray 通用节点订阅", "兼容旧链接；协议支持取决于客户端内核。", false, true},
@@ -66,6 +68,9 @@ func usageNodes(info Record, now time.Time) []Record {
 	return out
 }
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "shadowrocket-ha" || format == "shadowrocket-config" {
+		return convertRocketHA(source, format == "shadowrocket-config")
+	}
 	f, err := formatByID(format)
 	if err != nil {
 		return Export{}, err
@@ -116,7 +121,11 @@ func ConversionReport(source config.Subscription, now time.Time) []Record {
 		if err != nil {
 			message = err.Error()
 		}
-		reports = append(reports, Record{"id": format.ID, "name": format.Name, "note": format.Note, "supported": result.Count, "unit": "节点", "available": err == nil, "error": message, "skipped": result.Skipped, "url": "/convert/" + url.PathEscape(source.Slug) + "/" + format.ID})
+		unit := "节点"
+		if format.ID == "shadowrocket-config" {
+			unit = "主备组"
+		}
+		reports = append(reports, Record{"id": format.ID, "name": format.Name, "note": format.Note, "supported": result.Count, "unit": unit, "available": err == nil, "error": message, "skipped": result.Skipped, "url": "/convert/" + url.PathEscape(source.Slug) + "/" + format.ID})
 	}
 	return reports
 }

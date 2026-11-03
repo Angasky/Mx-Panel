@@ -17,6 +17,7 @@ type Subscription struct {
 	Raw        []byte
 	Traffic    Document
 	Userinfo   string
+	Managed    Document `json:"-"`
 }
 
 // PublicSubscription resolves capability tokens only. Profile IDs, old index
@@ -74,7 +75,25 @@ func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscri
 	if err != nil {
 		return Subscription{}, err
 	}
-	return Subscription{Name: p.Name, Slug: p.Slug, Document: cloneConfig(doc).(Document), Raw: raw, Traffic: info, Userinfo: header}, nil
+	managed := Document{}
+	for key, fields := range map[string][]string{"failovers": {"name", "status", "interval", "paths", "exit"}, "serverChains": {"name", "serverId", "inboundId", "exit"}, "remoteNodes": {"serverId", "inboundId", "status"}} {
+		list := []any{}
+		for _, v := range rows(record, key) {
+			source, ok := v.(map[string]any)
+			if !ok {
+				return Subscription{}, errors.New("主备元数据格式无效")
+			}
+			row := Document{}
+			for _, field := range fields {
+				if value, ok := source[field]; ok {
+					row[field] = cloneConfig(value)
+				}
+			}
+			list = append(list, row)
+		}
+		managed[key] = list
+	}
+	return Subscription{Name: p.Name, Slug: p.Slug, Document: cloneConfig(doc).(Document), Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available
