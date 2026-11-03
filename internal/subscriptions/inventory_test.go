@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
@@ -22,6 +23,10 @@ func TestMissingRemoteInboundRemovedEvenWithoutQuotaEnforcement(t *testing.T) {
 	snapshot, _ := c.Repository.Snapshot("clash")
 	if len(snapshot["nodes"].([]any)) != 1 || stateBinding(t, c)["status"] != "missing" {
 		t.Fatal("orphan node retained")
+	}
+	source, err := c.Repository.PublicSubscription(strings.Repeat("a", 50), c.Now())
+	if err != nil || len(source.Document["proxies"].([]any)) != 1 {
+		t.Fatal("public subscription still contains deleted node", err)
 	}
 	targets, err := c.Repository.ImportTargets("s", []int{1, 2})
 	if err != nil {
