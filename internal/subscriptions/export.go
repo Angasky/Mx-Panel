@@ -18,6 +18,8 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"v2rayn-ha", "电脑 v2rayN · Xray 主备配置", "每个主备组一份完整 JSON，固定优先顺序。", false, false},
+	{"v2rayng-ha", "安卓 v2rayNG · Xray 主备配置", "本地 SOCKS / HTTP 端口为 10808 / 10809。", false, false},
 	{"shadowrocket-ha", "小火箭主备 · 第一步：节点订阅", "先导入节点，再启用配套策略配置。", true, true},
 	{"shadowrocket-config", "小火箭主备 · 第二步：策略配置", "按入口优先顺序 fallback，勿开启全局回退。", true, true},
 	{"v2rayn", "电脑 v2rayN 节点订阅", "流量与到期信息使用独立信息节点展示。", false, true},
@@ -68,6 +70,9 @@ func usageNodes(info Record, now time.Time) []Record {
 	return out
 }
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "v2rayn-ha" || format == "v2rayng-ha" {
+		return convertXrayHA(source)
+	}
 	if format == "shadowrocket-ha" || format == "shadowrocket-config" {
 		return convertRocketHA(source, format == "shadowrocket-config")
 	}
@@ -122,7 +127,7 @@ func ConversionReport(source config.Subscription, now time.Time) []Record {
 			message = err.Error()
 		}
 		unit := "节点"
-		if format.ID == "shadowrocket-config" {
+		if format.ID == "shadowrocket-config" || format.ID == "v2rayn-ha" || format.ID == "v2rayng-ha" {
 			unit = "主备组"
 		}
 		reports = append(reports, Record{"id": format.ID, "name": format.Name, "note": format.Note, "supported": result.Count, "unit": unit, "available": err == nil, "error": message, "skipped": result.Skipped, "url": "/convert/" + url.PathEscape(source.Slug) + "/" + format.ID})

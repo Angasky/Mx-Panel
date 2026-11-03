@@ -24,7 +24,7 @@ func TestRocketPublicPairedConfigAndExpiredAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := "/convert/" + strings.Repeat("a", 50) + "/"
-	for _, format := range []string{"shadowrocket-ha", "shadowrocket-config"} {
+	for _, format := range []string{"shadowrocket-ha", "shadowrocket-config", "v2rayn-ha", "v2rayng-ha"} {
 		w := request(s, "GET", base+format, "", "", "", true)
 		if w.Code != 200 || strings.Contains(w.Body.String(), "must-not-leak") {
 			t.Fatal(w.Code, w.Body.String())
@@ -36,11 +36,14 @@ func TestRocketPublicPairedConfigAndExpiredAccess(t *testing.T) {
 		if format == "shadowrocket-config" && (!strings.Contains(w.Header().Get("Content-Disposition"), ".conf") || !strings.Contains(w.Body.String(), "FINAL,MX-Select")) {
 			t.Fatal("policy contract mismatch")
 		}
+		if strings.HasPrefix(format, "v2ray") && (!strings.Contains(w.Header().Get("Content-Type"), "application/json") || !strings.Contains(w.Header().Get("Content-Disposition"), ".json")) {
+			t.Fatal("advanced JSON response contract")
+		}
 	}
 	if err := s.repository.UpdateState("clash", func(p config.Document) error { p["accessRevoked"] = true; return nil }); err != nil {
 		t.Fatal(err)
 	}
-	for _, format := range []string{"shadowrocket-ha", "shadowrocket-config"} {
+	for _, format := range []string{"shadowrocket-ha", "shadowrocket-config", "v2rayn-ha", "v2rayng-ha"} {
 		if w := request(s, "GET", base+format, "", "", "", true); w.Code != 403 {
 			t.Fatal("revoked HA export allowed")
 		}

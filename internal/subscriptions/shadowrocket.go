@@ -40,6 +40,18 @@ type rocketGroup struct {
 }
 
 func rocketGroups(source config.Subscription) ([]rocketGroup, []Record) {
+	return managedHAGroups(source, func(node Record) error {
+		if node["type"] == "mieru" {
+			return errors.New("小火箭不支持 Mieru，请使用完整 Mihomo 订阅")
+		}
+		_, err := links.Export(node)
+		if err != nil {
+			return errors.New("路径协议或参数不支持小火箭无损导出")
+		}
+		return nil
+	})
+}
+func managedHAGroups(source config.Subscription, validate func(Record) error) ([]rocketGroup, []Record) {
 	result := []rocketGroup{}
 	skipped := []Record{}
 	index := func(values any, key string) (map[string]Record, bool) {
@@ -108,12 +120,8 @@ func rocketGroups(source config.Subscription) ([]rocketGroup, []Record) {
 				reason = "路径节点缺失或不是独立服务器转发"
 				break
 			}
-			if node["type"] == "mieru" {
-				reason = "小火箭不支持 Mieru，请使用完整 Mihomo 订阅"
-				break
-			}
-			if _, err := links.Export(node); err != nil {
-				reason = "路径协议或参数不支持小火箭无损导出"
+			if err := validate(node); err != nil {
+				reason = err.Error()
 				break
 			}
 			selected = append(selected, node)

@@ -64,6 +64,10 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if parts[2] == "shadowrocket-config" {
 			extension = "-shadowrocket.conf"
 		}
+		if parts[2] == "v2rayn-ha" || parts[2] == "v2rayng-ha" {
+			extension = "-" + parts[2] + ".json"
+			contentType = "application/json; charset=utf-8"
+		}
 		w.Header().Set("X-Mxioc-Skipped-Nodes", strconv.Itoa(len(result.Skipped)))
 	}
 	w.Header().Set("Profile-Update-Interval", "6")

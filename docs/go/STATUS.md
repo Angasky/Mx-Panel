@@ -231,6 +231,8 @@ go build -o mxioc-go ./cmd/mxioc
 
 ## 尚未完成，阻止替换正式后端
 
+v2rayn-ha / v2rayng-ha 现已导出完整 Xray 主备 JSON 数组，支持 VLESS / VMess / Trojan / Shadowsocks / SOCKS5 / HTTP 的明确参数范围及 TCP / WS / gRPC、TLS / Reality。复用受管主备关系核对；每级只有一个候选，按顺序经 loopback 回退，最终拒绝，避免降级为延迟均衡。扩展、跳过证书校验、显式关闭 UDP 等无法无损表示的选项拒绝整组；不向 JSON 填入新版 Xray 已移除的 allowInsecure:false。Python 样例对照保留了明确说明的此项差异；真实 Xray 26.10.31 配置检查通过。HTTP JSON 类型、下载扩展名、HEAD 与撤销保护已覆盖。尚未做真实客户端断线切换 / 恢复验收，不表示服务器主备创建已完成。
+
 小火箭高级主备转换已接入 shadowrocket-ha 与 shadowrocket-config：只导出活动受管主备组，核对路径顺序、固定出口、活动服务器绑定及独立路径节点，任一路径不兼容则整组跳过。配套节点和策略使用与 Python 一致的订阅隔离名称哈希，过滤配置分隔符；保持 fallback 顺序，不转换为延迟均衡。公开导出沿用订阅标识与到期 / 撤销限制，支持 HEAD 和 .conf 下载；内部仅传递主备核对需要的元数据字段，不携带 pendingUser。原生单元 / HTTP 测试通过，尚未在真实 Shadowrocket App 验证切换与恢复。服务器主备创建和 Xray 主备 JSON 尚未接完。
 
 完整缺口按模块汇总见 [REMAINING.md](REMAINING.md)。3x-ui 安装现已接入原生任务：无域名 XUI_AUTO、有域名 XUI_DOMAIN、账号密码设置、安装后预设凭据登录、API 入站读取和域名 HTTPS 检查。验证通过后保存面板地址，失败显示验证阶段和原因，不仅凭脚本退出码报告成功。安装脚本语法和参数转义测试通过；完整 SSH / HTTP 安装联调及真实远端验收仍未完成。X-ui / X-Panel 不执行安装，继续只接入已有面板。

@@ -1,0 +1,391 @@
+{
+  "nodes": [
+    {
+      "name": "vless",
+      "type": "vless",
+      "server": "one.example.com",
+      "port": 443,
+      "uuid": "11111111-1111-4111-8111-111111111111",
+      "tls": true,
+      "servername": "tls.example.com",
+      "network": "ws",
+      "ws-opts": {
+        "path": "/vpn",
+        "headers": {
+          "Host": "tls.example.com"
+        }
+      }
+    },
+    {
+      "name": "trojan",
+      "type": "trojan",
+      "server": "two.example.com",
+      "port": 443,
+      "password": "fixture-secret",
+      "tls": true,
+      "sni": "tls.example.com",
+      "alpn": [
+        "h2",
+        "http/1.1"
+      ],
+      "client-fingerprint": "chrome"
+    },
+    {
+      "name": "vmess",
+      "type": "vmess",
+      "server": "three.example.com",
+      "port": 24443,
+      "uuid": "22222222-2222-4222-8222-222222222222",
+      "alter-id": 0,
+      "network": "grpc",
+      "grpc-opts": {
+        "grpc-service-name": "vpn"
+      }
+    },
+    {
+      "name": "ss",
+      "type": "ss",
+      "server": "four.example.com",
+      "port": 24444,
+      "password": "fixture-secret",
+      "cipher": "aes-128-gcm"
+    },
+    {
+      "name": "socks",
+      "type": "socks5",
+      "server": "five.example.com",
+      "port": 1080,
+      "username": "fixture-user",
+      "password": "fixture-secret"
+    },
+    {
+      "name": "http",
+      "type": "http",
+      "server": "six.example.com",
+      "port": 8080,
+      "username": "fixture-user",
+      "password": "fixture-secret"
+    }
+  ],
+  "expected": {
+    "remarks": "fixture",
+    "log": {
+      "loglevel": "warning"
+    },
+    "inbounds": [
+      {
+        "tag": "socks",
+        "listen": "127.0.0.1",
+        "port": 10808,
+        "protocol": "socks",
+        "settings": {
+          "auth": "noauth",
+          "udp": true
+        }
+      },
+      {
+        "tag": "http",
+        "listen": "127.0.0.1",
+        "port": 10809,
+        "protocol": "http",
+        "settings": {}
+      }
+    ],
+    "outbounds": [
+      {
+        "tag": "mx-path-0/",
+        "protocol": "vless",
+        "settings": {
+          "address": "one.example.com",
+          "port": 443,
+          "id": "11111111-1111-4111-8111-111111111111",
+          "encryption": "none",
+          "flow": ""
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "tls.example.com",
+            "allowInsecure": false
+          },
+          "wsSettings": {
+            "path": "/vpn",
+            "headers": {
+              "Host": "tls.example.com"
+            }
+          }
+        }
+      },
+      {
+        "tag": "mx-path-1/",
+        "protocol": "trojan",
+        "settings": {
+          "servers": [
+            {
+              "address": "two.example.com",
+              "port": 443,
+              "password": "fixture-secret"
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "tls.example.com",
+            "allowInsecure": false,
+            "alpn": [
+              "h2",
+              "http/1.1"
+            ],
+            "fingerprint": "chrome"
+          }
+        }
+      },
+      {
+        "tag": "mx-path-2/",
+        "protocol": "vmess",
+        "settings": {
+          "vnext": [
+            {
+              "address": "three.example.com",
+              "port": 24443,
+              "users": [
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "security": "auto",
+                  "alterId": 0
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "grpc",
+          "security": "none",
+          "grpcSettings": {
+            "serviceName": "vpn"
+          }
+        }
+      },
+      {
+        "tag": "mx-path-3/",
+        "protocol": "shadowsocks",
+        "settings": {
+          "servers": [
+            {
+              "address": "four.example.com",
+              "port": 24444,
+              "password": "fixture-secret",
+              "method": "aes-128-gcm"
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "none"
+        }
+      },
+      {
+        "tag": "mx-path-4/",
+        "protocol": "socks",
+        "settings": {
+          "servers": [
+            {
+              "address": "five.example.com",
+              "port": 1080,
+              "users": [
+                {
+                  "user": "fixture-user",
+                  "pass": "fixture-secret"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "none"
+        }
+      },
+      {
+        "tag": "mx-path-5/",
+        "protocol": "http",
+        "settings": {
+          "servers": [
+            {
+              "address": "six.example.com",
+              "port": 8080,
+              "users": [
+                {
+                  "user": "fixture-user",
+                  "pass": "fixture-secret"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "none"
+        }
+      },
+      {
+        "tag": "mx-reject",
+        "protocol": "blackhole",
+        "settings": {}
+      },
+      {
+        "tag": "mx-next-1",
+        "protocol": "loopback",
+        "settings": {
+          "inboundTag": "mx-stage-1"
+        }
+      },
+      {
+        "tag": "mx-next-2",
+        "protocol": "loopback",
+        "settings": {
+          "inboundTag": "mx-stage-2"
+        }
+      },
+      {
+        "tag": "mx-next-3",
+        "protocol": "loopback",
+        "settings": {
+          "inboundTag": "mx-stage-3"
+        }
+      },
+      {
+        "tag": "mx-next-4",
+        "protocol": "loopback",
+        "settings": {
+          "inboundTag": "mx-stage-4"
+        }
+      },
+      {
+        "tag": "mx-next-5",
+        "protocol": "loopback",
+        "settings": {
+          "inboundTag": "mx-stage-5"
+        }
+      }
+    ],
+    "routing": {
+      "domainStrategy": "AsIs",
+      "rules": [
+        {
+          "type": "field",
+          "inboundTag": [
+            "mx-stage-1"
+          ],
+          "balancerTag": "mx-balance-1"
+        },
+        {
+          "type": "field",
+          "inboundTag": [
+            "mx-stage-2"
+          ],
+          "balancerTag": "mx-balance-2"
+        },
+        {
+          "type": "field",
+          "inboundTag": [
+            "mx-stage-3"
+          ],
+          "balancerTag": "mx-balance-3"
+        },
+        {
+          "type": "field",
+          "inboundTag": [
+            "mx-stage-4"
+          ],
+          "balancerTag": "mx-balance-4"
+        },
+        {
+          "type": "field",
+          "inboundTag": [
+            "mx-stage-5"
+          ],
+          "balancerTag": "mx-balance-5"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "balancerTag": "mx-balance-0"
+        }
+      ],
+      "balancers": [
+        {
+          "tag": "mx-balance-0",
+          "selector": [
+            "mx-path-0/"
+          ],
+          "fallbackTag": "mx-next-1",
+          "strategy": {
+            "type": "random"
+          }
+        },
+        {
+          "tag": "mx-balance-1",
+          "selector": [
+            "mx-path-1/"
+          ],
+          "fallbackTag": "mx-next-2",
+          "strategy": {
+            "type": "random"
+          }
+        },
+        {
+          "tag": "mx-balance-2",
+          "selector": [
+            "mx-path-2/"
+          ],
+          "fallbackTag": "mx-next-3",
+          "strategy": {
+            "type": "random"
+          }
+        },
+        {
+          "tag": "mx-balance-3",
+          "selector": [
+            "mx-path-3/"
+          ],
+          "fallbackTag": "mx-next-4",
+          "strategy": {
+            "type": "random"
+          }
+        },
+        {
+          "tag": "mx-balance-4",
+          "selector": [
+            "mx-path-4/"
+          ],
+          "fallbackTag": "mx-next-5",
+          "strategy": {
+            "type": "random"
+          }
+        },
+        {
+          "tag": "mx-balance-5",
+          "selector": [
+            "mx-path-5/"
+          ],
+          "fallbackTag": "mx-reject",
+          "strategy": {
+            "type": "random"
+          }
+        }
+      ]
+    },
+    "observatory": {
+      "subjectSelector": [
+        "mx-path-"
+      ],
+      "probeURL": "https://www.gstatic.com/generate_204",
+      "probeInterval": "30s",
+      "enableConcurrency": true
+    }
+  }
+}
