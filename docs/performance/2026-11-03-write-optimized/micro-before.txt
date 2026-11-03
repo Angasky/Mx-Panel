@@ -1,0 +1,8 @@
+goos: windows
+goarch: amd64
+pkg: github.com/Angasky/dingzhi-ban/internal/config
+cpu: AMD Ryzen 7 3800X 8-Core Processor             
+BenchmarkChangedSave/100-16         	      40	  13378875 ns/op	 2274402 B/op	   15051 allocs/op
+BenchmarkChangedSave/1000-16        	      40	  44578188 ns/op	25338257 B/op	  137500 allocs/op
+PASS
+ok  	github.com/Angasky/dingzhi-ban/internal/config	3.267s

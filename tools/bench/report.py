@@ -1,6 +1,7 @@
 """Render actual benchmark samples as portable HTML and an optional Canvas."""
 import argparse
 import hashlib
+import html
 import json
 import math
 import statistics
@@ -50,7 +51,7 @@ export default function PerformanceComparison(){
   <H1>Python / Go 后台性能实测</H1>
   <Text>{report.requests.toLocaleString()} 次本轮场景请求，失败 {report.errors} 次；同机、同配置、三轮交替测试。另含 {report.referenceRequests} 次优化前 Go 参考请求（独立运行）。</Text>
   <Text tone="secondary">{report.environment.os} · Python {report.environment.python} · {report.rows.find(r=>r.runtime==="Go")!.runtimeVersion} · {report.environment.logicalCPUs} 逻辑核 / {report.environment.memoryGiB.toFixed(1)} GiB</Text>
-  <div style={{padding:16,borderLeft:"3px solid "+theme.accent.primary,background:theme.fill.tertiary}}>__NOTE__</div>
+  <div style={{padding:16,borderLeft:"3px solid "+theme.accent.primary,background:theme.fill.tertiary}}>{report.note}</div>
   <Row gap={16} wrap>
    <label>节点规模 <select value={n} onChange={e=>setN(Number(e.target.value))} style={styles}><option value={1000}>1,000 节点</option><option value={100}>100 节点</option></select></label>
    <label>并发 <select value={c} onChange={e=>setC(Number(e.target.value))} style={styles}><option value={1}>1（读写）</option><option value={4}>4（仅读取）</option></select></label>
@@ -69,7 +70,7 @@ export default function PerformanceComparison(){
 '''
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('input',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--canvas',type=Path);p.add_argument('--baseline',type=Path);args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('input',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--canvas',type=Path);p.add_argument('--baseline',type=Path);p.add_argument('--note');args=p.parse_args()
     raw=args.input.read_bytes();source=json.loads(raw);summary=aggregate(source)
     summary['rawSha256']=hashlib.sha256(raw).hexdigest()
     summary.update(runtimes=['Python','Go'],referenceRows=[],referenceRequests=0,referenceSource='',referenceSha256='')
@@ -84,11 +85,14 @@ def main():
         summary['referenceRequests']=sum(r['requests'] for r in summary['referenceRows'])
         summary['referenceSource']=baseline['sourceRevision'];summary['referenceSha256']=hashlib.sha256(baseline_raw).hexdigest()
         summary['runtimes']=['Python','Go 优化前','Go']
+    note='Python 已有 YAML / 快照缓存与未变更跳过写入；本轮 Go 已加入有界内容缓存、快照 JSON 复用和未变更保存跳过，配置保存仍同步备份与镜像到磁盘。灰色参考线来自保留的优化前基线，分次运行会受机器负载影响。' if args.baseline else '测试保留所记录版本的缓存、备份、镜像和落盘策略；Go 的 fsync 与 Python 默认原子替换策略不同。具体实现以对应源码提交为准，差异不能全部归因于语言。'
+    note=args.note or note
+    summary['note']=note
     args.output.mkdir(parents=True,exist_ok=True)
     (args.output/'results.json').write_bytes(raw)
     (args.output/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
-    note='Python 已有 YAML / 快照缓存与未变更跳过写入；本轮 Go 已加入有界内容缓存、快照 JSON 复用和未变更保存跳过，配置保存仍同步备份与镜像到磁盘。灰色参考线来自保留的优化前基线，分次运行会受机器负载影响。' if args.baseline else '测试保留所记录版本的缓存、备份、镜像和落盘策略；Go 的 fsync 与 Python 默认原子替换策略不同。具体实现以对应源码提交为准，差异不能全部归因于语言。'
-    values={'__NOTE__':note,'__DATA__':json.dumps(summary,ensure_ascii=False).replace('<','\\u003c'),'__LABELS__':json.dumps(LABELS,ensure_ascii=False),'__ORDER__':json.dumps(ORDER)}
+
+    values={'__NOTE__':html.escape(note),'__DATA__':json.dumps(summary,ensure_ascii=False).replace('<','\\u003c'),'__LABELS__':json.dumps(LABELS,ensure_ascii=False),'__ORDER__':json.dumps(ORDER)}
     def expand(text):
         for key,value in values.items():text=text.replace(key,value)
         return text
