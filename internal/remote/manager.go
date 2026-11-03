@@ -27,6 +27,7 @@ type Manager struct {
 	operations       map[string]chan struct{}
 	panels           map[string]*cachedPanel
 	monitor          *hostMonitor
+	sni              *sniScanner
 	certificates     map[string]*certificateTask
 	certificateSlots chan struct{}
 	jobContext       context.Context
@@ -450,6 +451,9 @@ func (m *Manager) Connection(id string) (Connection, error) {
 	if err != nil {
 		return Connection{}, err
 	}
+	return m.connectionRecord(record)
+}
+func (m *Manager) connectionRecord(record Record) (Connection, error) {
 	password, err := m.Secret(record, "sshPassword")
 	if err != nil {
 		return Connection{}, err
