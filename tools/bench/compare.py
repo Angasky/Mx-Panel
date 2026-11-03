@@ -89,20 +89,26 @@ def run_one(runtime,root,binary,count,round_index,auth,args):
         cases=[('profiles','GET','/admin/api/profiles',None),('snapshot','GET','/admin/api/snapshot',None),('raw','GET','/admin/api/raw',None),('subscription','GET','/sub/'+SLUG,None),
                ('traffic-save','PUT','/admin/api/traffic',{'upload':12345,'download':67890,'enforce':False}),
                ('node-save','PUT','/admin/api/nodes',{'oldName':'Node-0000','config':doc['proxies'][0]}),
+               ('node-noop','PUT','/admin/api/nodes',{'oldName':'Node-0000','config':doc['proxies'][0]}),
                ('raw-save','PUT','/admin/api/raw',{'yaml':text})]
         metrics=[]
         for case,method,path,body in cases:
             concurrencies=[1,4] if method=='GET' else [1]
             for concurrency in concurrencies:
-                for _ in range(5):
-                    _,status,payload,_=request(port,method,path,body,token)
+                def request_body(tag):
+                    if case=='node-save':return {**body,'config':{**body['config'],'password':'benchmark-'+tag}}
+                    if case=='traffic-save':return {**body,'upload':12345+int(tag.split('-')[-1])+(100 if tag.startswith('request') else 0)}
+                    if case=='raw-save':return {'yaml':text+'benchmark-sequence: '+tag+'\n'}
+                    return body
+                for warmup in range(5):
+                    _,status,payload,_=request(port,method,path,request_body('warmup-'+str(warmup)),token)
                     if status!=200 or not validate(case,payload,count):raise RuntimeError(f'{runtime} {case} warmup invalid: {status} '+payload.decode(errors='replace')[:100])
                 cpu=proc.cpu_times();rss_before=proc.memory_info().rss
                 number=args.requests if method=='GET' else args.write_requests
                 start=time.perf_counter()
                 def one(i):
                     try:
-                        elapsed,status,payload,_=request(port,method,path,body,token)
+                        elapsed,status,payload,_=request(port,method,path,request_body('request-'+str(i)),token)
                         return {'ms':elapsed,'ok':status==200,'bytes':len(payload),'status':status,'payload':payload}
                     except Exception as e:return {'ms':None,'ok':False,'error':type(e).__name__}
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:samples=list(pool.map(one,range(number)))
