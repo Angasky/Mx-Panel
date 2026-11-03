@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/Angasky/dingzhi-ban/internal/managednodes"
 )
 
 // State returns an isolated JSON document; callers never retain references into
@@ -187,6 +188,7 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 	binding["status"] = "active"
 	binding["error"] = ""
 	binding["importedNames"] = []string{name}
+	binding["importedNodes"] = []any{Document{"name": name, "identity": managednodes.Identity(node)}}
 	delete(binding, "pendingUser")
 	if err = r.writeIndex(index); err != nil {
 		return nil, errors.New("节点文件已保存，归属标记待保存；请在同一入站重试")

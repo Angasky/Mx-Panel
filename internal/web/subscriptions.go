@@ -47,6 +47,23 @@ func (s *Server) RunBackground(ctx context.Context) error {
 }
 
 func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method == "POST" && r.URL.Path == "/admin/api/servers/users/targets" {
+		var input struct {
+			ServerID   string `json:"serverId"`
+			InboundIDs []int  `json:"inboundIds"`
+		}
+		if err := readJSON(w, r, &input); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		profiles, err := s.repository.ImportTargets(input.ServerID, input.InboundIDs)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"profiles": profiles})
+		}
+		return true
+	}
 	path := r.URL.Path
 	read := path == "/admin/api/traffic" && r.Method == "GET"
 	write := r.Method == "POST" && (path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")

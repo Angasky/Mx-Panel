@@ -282,6 +282,10 @@ func (r *Repository) Mutate(id string, change func(Document) error) error {
 }
 
 func (r *Repository) mutateLocked(id string, change func(Document) error) error {
+	return r.mutateGuardedLocked(id, change, true)
+}
+
+func (r *Repository) mutateGuardedLocked(id string, change func(Document) error, protect bool) error {
 	p, err := r.profile(id)
 	if err != nil {
 		return err
@@ -298,7 +302,7 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 	if err = validate(doc); err != nil {
 		return err
 	}
-	if protected != protectedComponents(doc, p) {
+	if protect && protected != protectedComponents(doc, p) {
 		return errors.New("节点或策略组被主备链路引用，请先删除对应主备组")
 	}
 	unchanged := equalConfig(original, doc)

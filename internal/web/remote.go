@@ -93,10 +93,27 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if path == "/admin/api/servers/inbounds" {
 			ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 			defer cancel()
-			result, err := manager.Inbounds(ctx, r.URL.Query().Get("id"))
+			serverID := r.URL.Query().Get("id")
+			observed, err := s.repository.BindingSnapshot(serverID)
+			if err != nil {
+				problem(w, 400, err.Error())
+				return true
+			}
+			result, err := manager.Inbounds(ctx, serverID)
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {
+				controller, e := s.subscriptionController()
+				if e == nil {
+					var cleanup map[string]any
+					cleanup, e = controller.ReconcileServer(ctx, serverID, result, observed)
+					if e == nil {
+						result["subscriptionCleanup"] = cleanup
+					}
+				}
+				if e != nil {
+					result["subscriptionCleanup"] = map[string]any{"errors": []string{"订阅同步未完成，稍后自动重试"}}
+				}
 				respond(w, 200, result)
 			}
 			return true

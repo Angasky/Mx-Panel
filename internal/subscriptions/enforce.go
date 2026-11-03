@@ -121,6 +121,7 @@ func (c *Controller) Sync(ctx context.Context, profile string) (Record, error) {
 }
 
 func (c *Controller) syncLocked(ctx context.Context, profile string, enforce bool) (Record, error) {
+	failures := c.reconcileProfileLocked(ctx, profile)
 	p, err := c.Repository.State(profile)
 	if err != nil {
 		return nil, err
@@ -130,7 +131,7 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 		return nil, err
 	}
 	if !u.Enabled || !u.Enforce {
-		return c.Info(profile)
+		return c.finishSync(profile, failures)
 	}
 	if err = c.Repository.UpdateState(profile, func(p Record) error { return resetCycle(p, c.Now().UTC()) }); err != nil {
 		return nil, err
@@ -139,7 +140,6 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 	if err != nil {
 		return nil, err
 	}
-	var failures []string
 	for _, b := range objects(p["remoteNodes"]) {
 		if b["status"] != "active" && b["status"] != "provisioning" {
 			continue
