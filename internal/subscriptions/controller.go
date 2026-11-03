@@ -16,6 +16,7 @@ import (
 
 	"github.com/Angasky/dingzhi-ban/internal/billing"
 	"github.com/Angasky/dingzhi-ban/internal/config"
+	"github.com/Angasky/dingzhi-ban/internal/links"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 )
 
@@ -453,6 +454,10 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 	result, err := c.Repository.ImportOwnedNode(profile, text(binding["operationId"]), nodes[0])
 	if err != nil {
 		return nil, err
+	}
+	result["shareLinks"] = []any{}
+	if uri, e := links.Export(nodes[0]); e == nil {
+		result["shareLinks"] = []any{uri}
 	}
 	if verified, present := response["runtimeVerified"]; present {
 		result["runtimeVerified"] = verified

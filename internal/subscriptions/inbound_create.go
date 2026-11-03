@@ -1,0 +1,71 @@
+package subscriptions
+
+import (
+	"context"
+	"errors"
+	"strconv"
+
+	"github.com/Angasky/dingzhi-ban/internal/remote"
+)
+
+type inboundCreator interface {
+	CreateInbound(context.Context, string, string, remote.Record) (remote.Record, error)
+}
+
+func (c *Controller) CreateInbound(ctx context.Context, profile, server string, payload Record) (Record, error) {
+	if !c.started.Load() {
+		return nil, errors.New("独立用户后台计量尚未启动")
+	}
+	if server == "" {
+		return nil, errors.New("请选择服务器")
+	}
+	if profile == "" {
+		profile = "clash"
+	}
+	backend, ok := c.Backend.(inboundCreator)
+	if !ok {
+		return nil, errors.New("服务器新建入站尚未适配")
+	}
+	release, err := c.lockServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	release, err = c.lock(ctx, profile)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	state, err := c.Repository.State(profile)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.preflight(state, server); err != nil {
+		return nil, err
+	}
+	// An empty inbound grants no access. The first usable user is created by the
+	// existing durable ownership workflow, with limits rechecked before granting.
+	created, err := backend.CreateInbound(ctx, server, profile, payload)
+	if err != nil {
+		return nil, err
+	}
+	row, ok := created["inbound"].(map[string]any)
+	if !ok {
+		return nil, errors.New("新增入站结果缺少配置，请刷新服务器列表核对")
+	}
+	id, e := strconv.Atoi(text(row["id"]))
+	if e != nil || id < 1 {
+		return nil, errors.New("新增入站缺少有效 ID，请刷新核对")
+	}
+	if err = c.Repository.CheckInboundAvailable(server, id); err != nil {
+		return nil, err
+	}
+	result, err := c.provision(ctx, profile, server, row)
+	if err != nil {
+		return nil, errors.New("入站 " + strconv.Itoa(id) + " 已创建，订阅独立用户导入待重试：" + err.Error() + "；请在同一窗口重试或从此入站导入，勿重复新建")
+	}
+	result["inbound"] = row
+	result["enforcementEnabled"] = true
+	result["reusedInbound"] = created["reused"]
+	return result, nil
+}
