@@ -284,6 +284,11 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 		return nil, errors.New("绑定入站 ID 无效")
 	}
 	result, err := m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
+		for _, relay := range anyRecords(record["relays"]) {
+			if value(relay["inboundId"]) == strconv.Itoa(inboundID) && relay["status"] != nil && relay["status"] != "active" && (operation == "add" || operation == "resume" || operation == "verify") {
+				return nil, errors.New("中转路由尚未确认，暂不创建或恢复用户")
+			}
+		}
 		readRows := func() ([]Record, error) {
 			result, err := panel.Request(ctx, "panel/api/inbounds/list", nil, "")
 			if err != nil {

@@ -95,7 +95,7 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	}
 	path := r.URL.Path
 	read := path == "/admin/api/traffic" && r.Method == "GET"
-	write := r.Method == "POST" && (path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
+	write := r.Method == "POST" && (path == "/admin/api/servers/relay" || path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
 	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier" || path == "/admin/api/traffic/bindings/cleanup" || path == "/admin/api/traffic/bindings/remove")
 	if !read && !write && !policy {
 		return false
@@ -123,7 +123,9 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 	var result map[string]any
-	if path == "/admin/api/servers/inbounds" {
+	if path == "/admin/api/servers/relay" {
+		result, err = c.CreateRelay(ctx, profile, stringField(payload, "serverId"), payload)
+	} else if path == "/admin/api/servers/inbounds" {
 		result, err = c.CreateInbound(ctx, profile, stringField(payload, "serverId"), payload)
 	} else if path == "/admin/api/traffic/bindings/cleanup" {
 		result, err = c.CleanupBindings(ctx, profile, payload["confirmed"] == true)

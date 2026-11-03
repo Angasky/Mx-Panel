@@ -2608,13 +2608,13 @@ function remoteNodeForm(relay) {
       }
       if(!form.isConnected || $('modal').classList.contains('hidden'))return;
       $('rnSave').textContent='正在创建节点…';$('remoteError').textContent='';
-      if(!relay && S.idempotentCreate){submittedPayload=structuredClone(payload);form.querySelectorAll('input,select,textarea,button').forEach(control=>{if(control.id!=='rnSave')control.disabled=true;});}
+      if(S.idempotentCreate){submittedPayload=structuredClone(payload);form.querySelectorAll('input,select,textarea,button').forEach(control=>{if(control.id!=='rnSave')control.disabled=true;});}
       const options=jsonOpt('POST',payload);options.headers={...(options.headers || {}),'X-Profile':profile};
       const data = await api(relay ? '/servers/relay' : '/servers/users',options);
       created = true;
       if(form.isConnected)closeModal(); S.remoteLoaded = false;
       if (S.page === 'serverNodes' && S.serverId === serverId) await serverNodes();
-      if (relay && autoImport && data.shareLinks?.length && S.profile === profile) {
+      if (relay && autoImport && data.bound!==true && data.shareLinks?.length && S.profile === profile) {
         try { await importRemoteLinks(data.shareLinks, {serverId, inboundId:data.inbound.id}); } catch (error) { return alert('远端节点已创建，但订阅导入失败：'+error.message+'。请从“链接 / 导入”重试导入，不要重复创建。'); }
       }
       notice('远端'+(relay ? '中转' : '节点')+'已创建'+(autoImport && S.profile !== profile ? '；当前订阅已切换，未自动导入' : autoImport && !data.shareLinks?.length ? '；未返回兼容链接，请在远端面板核对后导入' : ''));

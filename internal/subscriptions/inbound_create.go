@@ -11,8 +11,17 @@ import (
 type inboundCreator interface {
 	CreateInbound(context.Context, string, string, remote.Record) (remote.Record, error)
 }
+type relayCreator interface {
+	CreateRelay(context.Context, string, string, remote.Record) (remote.Record, error)
+}
 
 func (c *Controller) CreateInbound(ctx context.Context, profile, server string, payload Record) (Record, error) {
+	return c.createInbound(ctx, profile, server, payload, false)
+}
+func (c *Controller) CreateRelay(ctx context.Context, profile, server string, payload Record) (Record, error) {
+	return c.createInbound(ctx, profile, server, payload, true)
+}
+func (c *Controller) createInbound(ctx context.Context, profile, server string, payload Record, relay bool) (Record, error) {
 	if !c.started.Load() {
 		return nil, errors.New("独立用户后台计量尚未启动")
 	}
@@ -25,6 +34,14 @@ func (c *Controller) CreateInbound(ctx context.Context, profile, server string, 
 	backend, ok := c.Backend.(inboundCreator)
 	if !ok {
 		return nil, errors.New("服务器新建入站尚未适配")
+	}
+	create := backend.CreateInbound
+	if relay {
+		r, ok := c.Backend.(relayCreator)
+		if !ok {
+			return nil, errors.New("服务器中转创建尚未适配")
+		}
+		create = r.CreateRelay
 	}
 	release, err := c.lockServer(ctx, server)
 	if err != nil {
@@ -45,7 +62,7 @@ func (c *Controller) CreateInbound(ctx context.Context, profile, server string, 
 	}
 	// An empty inbound grants no access. The first usable user is created by the
 	// existing durable ownership workflow, with limits rechecked before granting.
-	created, err := backend.CreateInbound(ctx, server, profile, payload)
+	created, err := create(ctx, server, profile, payload)
 	if err != nil {
 		return nil, err
 	}
