@@ -2,6 +2,7 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
+	"github.com/Angasky/dingzhi-ban/internal/subsource"
 )
 
 type Options struct {
@@ -38,14 +40,16 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
-	options    Options
-	account    account
-	mu         sync.Mutex
-	sessions   map[[32]byte]session
-	failures   map[string]failure
-	hashSlots  chan struct{}
-	now        func() time.Time
-	repository *config.Repository
+	options           Options
+	account           account
+	mu                sync.Mutex
+	sessions          map[[32]byte]session
+	failures          map[string]failure
+	hashSlots         chan struct{}
+	sourceSlots       chan struct{}
+	fetchSubscription func(context.Context, string) (string, error)
+	now               func() time.Time
+	repository        *config.Repository
 }
 
 func New(options Options) (*Server, error) {
@@ -75,7 +79,7 @@ func New(options Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{options: options, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
+	return &Server{options: options, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -207,7 +211,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/admin/api/conversions" && s.publicRoutes(w, r) {
 		return
 	}
-	if s.linkRoutes(w, r) || s.editRoutes(w, r) {
+	if s.sourceImportRoutes(w, r) || s.linkRoutes(w, r) || s.editRoutes(w, r) {
 		return
 	}
 	if r.URL.Path == "/admin/api/logout" && r.Method == "POST" {

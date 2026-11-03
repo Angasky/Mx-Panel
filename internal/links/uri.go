@@ -3,6 +3,7 @@ package links
 
 import (
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"net"
@@ -40,6 +41,11 @@ func Parse(value string) (map[string]any, error) {
 	value = strings.TrimSpace(value)
 	if len(value) > 65536 {
 		return nil, ErrURI
+	}
+	if name, body, ok := strings.Cut(value, "="); ok && !strings.Contains(name, "://") {
+		if kind, _, ok := strings.Cut(body, ","); ok && strings.EqualFold(strings.TrimSpace(kind), "snell") {
+			return parseSnellPolicy(value)
+		}
 	}
 	scheme, body, ok := strings.Cut(value, "://")
 	if !ok {
@@ -260,6 +266,31 @@ func Parse(value string) (map[string]any, error) {
 		}
 	}
 	return node, nil
+}
+
+func parseSnellPolicy(value string) (map[string]any, error) {
+	name, body, _ := strings.Cut(value, "=")
+	reader := csv.NewReader(strings.NewReader(body))
+	reader.TrimLeadingSpace = true
+	reader.FieldsPerRecord = -1
+	fields, err := reader.Read()
+	if err != nil || len(fields) < 3 || !strings.EqualFold(strings.TrimSpace(fields[0]), "snell") {
+		return nil, ErrURI
+	}
+	allowed := map[string]bool{"psk": true, "version": true, "obfs": true, "obfs-host": true, "reuse": true, "udp": true}
+	query := url.Values{}
+	for _, field := range fields[3:] {
+		key, value, ok := strings.Cut(strings.TrimSpace(field), "=")
+		if !ok || !allowed[key] || query.Has(key) || strings.HasPrefix(value, "\"") || strings.HasSuffix(value, "\"") || strings.HasPrefix(value, "'") || strings.HasSuffix(value, "'") {
+			return nil, ErrURI
+		}
+		query.Set(key, value)
+	}
+	if query.Has("obfs-host") && !query.Has("obfs") {
+		return nil, ErrURI
+	}
+	u := url.URL{Scheme: "snell", Host: net.JoinHostPort(strings.Trim(strings.TrimSpace(fields[1]), "[]"), strings.TrimSpace(fields[2])), RawQuery: query.Encode(), Fragment: strings.TrimSpace(name)}
+	return Parse(u.String())
 }
 func parseVMess(body string) (map[string]any, error) {
 	raw, err := decode64(body)

@@ -15,6 +15,10 @@ func (r *Repository) GroupOptions(id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return groupOptions(doc, p), nil
+}
+
+func groupOptions(doc Document, p Profile) []string {
 	blocked := map[string]bool{}
 	for name := range excludedNodeGroups {
 		blocked[name] = true
@@ -29,7 +33,7 @@ func (r *Repository) GroupOptions(id string) ([]string, error) {
 			result = append(result, name)
 		}
 	}
-	return result, nil
+	return result
 }
 
 func EditMembership(doc Document, payload map[string]any, allowed []string) error {

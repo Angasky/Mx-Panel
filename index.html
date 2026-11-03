@@ -3607,7 +3607,7 @@ function inferChainExit(chain) {
   return found?.name || ordinaryNodes()[0]?.name || '';
 }
 
-function groupChecks(selected, klass = 'chainGroup') {
+function groupChecks(selected, klass = 'chainGroup', choices = S.data.groups) {
   let set = new Set(selected || []);
   return `
   <div class="toolbar" style="margin-bottom:8px;">
@@ -3615,7 +3615,7 @@ function groupChecks(selected, klass = 'chainGroup') {
     <button type="button" class="btn small" onclick="document.querySelectorAll('.${klass}').forEach(x=>x.checked=false)">清空</button>
   </div>
   <div class="checks">
-    ${S.data.groups.filter(g => !g.name.includes('广告拦截')).map(g => `
+    ${choices.filter(g => !g.name.includes('广告拦截')).map(g => `
       <label class="choice">
         <input class="${klass}" type="checkbox" value="${esc(g.name)}" ${set.has(g.name) ? 'checked' : ''}>
         <span>${esc(g.name)} <small class="muted">(${esc(optionLabel(g.type))})</small></span>
@@ -3831,6 +3831,11 @@ function dns() {
 }
 
 async function subscriptions() {
+  const profile = S.profile, generation = (S.sourceImportGeneration || 0) + 1;
+  S.sourceImportGeneration = generation;
+  const options = await api('/nodes/group-options');
+  if (S.profile !== profile || S.page !== 'subscriptions' || S.sourceImportGeneration !== generation) return;
+  const allowed = new Set(options.groups), choices = S.data.groups.filter(group => allowed.has(group.name));
   let p = S.profiles.find(x => x.id === S.profile) || S.data.profile;
   $('content').innerHTML = `
   <section class="panel">
@@ -3838,7 +3843,7 @@ async function subscriptions() {
       <h3>导入外部订阅</h3>
     </div>
     <div class="note">输入 Clash YAML 或 Base64 聚合分享链接，系统将自动过滤提取支持的节点协议并同步导入至当前“${esc(p.name)}”配置文件中。</div>
-    <form id="subImportForm">
+    <form id="subImportForm" data-profile="${esc(profile)}">
       <label>外部订阅地址</label>
       <input id="sourceSubUrl" type="url" required placeholder="https://example.com/api/v1/client/subscribe?token=...">
       <div class="grid">
@@ -3857,8 +3862,8 @@ async function subscriptions() {
       </div>
       <fieldset class="section">
         <legend>导入后加入策略组</legend>
-        <p class="hint">勾选需要归属的策略组（广告拦截组已默认过滤）。</p>
-        ${groupChecks(S.data.groups.filter(g => !g.name.includes('广告拦截')).map(g => g.name), 'importGroup')}
+        <p class="hint">勾选需要归属的策略组（广告拦截组和受保护主备组已过滤）。</p>
+        ${groupChecks(choices.map(g => g.name), 'importGroup', choices)}
       </fieldset>
       <div id="subPreview" class="note">// 请先输入订阅链接并点击“读取并预览订阅内容”。</div>
       <div id="formError" class="error"></div>
@@ -3866,48 +3871,59 @@ async function subscriptions() {
     </form>
   </section>`;
 
+  $('sourceSubUrl').oninput = () => { $('confirmSubImport').disabled = true; $('subImportForm').dataset.previewUrl = ''; };
   $('previewSub').onclick = previewSubscription;
   $('subImportForm').onsubmit = confirmSubscriptionImport;
 }
 
 async function previewSubscription() {
-  let box = $('subPreview'), button = $('previewSub');
+  const form = $('subImportForm'), profile = form?.dataset.profile, url = val('sourceSubUrl');
+  if (!form || profile !== S.profile) return;
+  const active = () => $('subImportForm') === form && S.profile === profile && S.page === 'subscriptions' && val('sourceSubUrl') === url;
+  const box = $('subPreview'), button = $('previewSub');
   $('formError').textContent = '';
-  if (!val('sourceSubUrl')) return $('formError').textContent = '请填写来源订阅链接';
+  $('confirmSubImport').disabled = true;
+  form.dataset.previewUrl = '';
+  if (!url) return $('formError').textContent = '请填写来源订阅链接';
   button.disabled = true;
   box.textContent = '>> 正在连接远端订阅服务器并解析数据包，请稍候...';
   try {
-    let d = await api('/import-subscription/preview', jsonOpt('POST', { url: val('sourceSubUrl') }));
-    let protocols = Object.entries(d.protocols).map(([k, v]) => `${optionLabel(k)} ${v} 个`).join('、');
+    const opt = jsonOpt('POST', { url }); opt.headers['X-Profile'] = profile;
+    const d = await api('/import-subscription/preview', opt);
+    if (!active()) return;
+    const protocols = Object.entries(d.protocols).map(([k, v]) => `${optionLabel(k)} ${v} 个`).join('、');
     box.innerHTML = `[SUCCESS] 成功解析 <b>${d.total}</b> 个有效节点：${esc(protocols)}。${d.skipped.length ? `（另有 ${d.skipped.length} 项格式不兼容已忽略）` : ''}`;
+    form.dataset.previewUrl = url;
     $('confirmSubImport').disabled = false;
-  } catch (e) {
+  } catch (error) {
+    if (!active()) return;
     box.textContent = '[ERROR] 读取订阅失败';
-    $('formError').textContent = e.message;
-    $('confirmSubImport').disabled = true;
+    $('formError').textContent = error.message;
   } finally {
-    button.disabled = false;
+    if ($('subImportForm') === form) button.disabled = false;
   }
 }
 
 async function confirmSubscriptionImport(e) {
   e.preventDefault();
-  if ($('confirmSubImport').disabled) return;
-  let button = $('confirmSubImport');
-  button.disabled = true;
+  const form = $('subImportForm'), profile = form?.dataset.profile, url = val('sourceSubUrl');
+  if (!form || profile !== S.profile || $('confirmSubImport').disabled || form.dataset.previewUrl !== url) return;
+  const active = () => $('subImportForm') === form && S.profile === profile && S.page === 'subscriptions' && val('sourceSubUrl') === url;
+  const button = $('confirmSubImport'); button.disabled = true;
   $('formError').textContent = '';
   try {
-    let d = await api('/import-subscription', jsonOpt('POST', {
-      url: val('sourceSubUrl'),
-      conflict: val('subConflict'),
-      groups: [...document.querySelectorAll('.importGroup:checked')].map(x => x.value)
-    }));
+    const opt = jsonOpt('POST', {
+      url, conflict: val('subConflict'), groups: [...form.querySelectorAll('.importGroup:checked')].map(x => x.value)
+    });
+    opt.headers['X-Profile'] = profile;
+    const d = await api('/import-subscription', opt);
+    if (!active()) return;
     await reload(false);
+    if (!active()) return;
     notice(`成功导入 ${d.added + d.replaced} 个节点`);
     await subscriptions();
-  } catch (err) {
-    $('formError').textContent = err.message;
-    button.disabled = false;
+  } catch (error) {
+    if (active()) { $('formError').textContent = error.message; button.disabled = false; }
   }
 }
 
