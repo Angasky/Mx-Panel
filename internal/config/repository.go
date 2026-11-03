@@ -330,8 +330,15 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 			return nil
 		}
 	}
-	// Any partial write or rollback must discard derived data as well.
-	defer r.invalidateConfig(p.Files[0])
+	// Publish only after every mirror is durable. Failure/rollback must discard
+	// derived data; never cache a callback's mutable document by reference.
+	committed := false
+	defer func() {
+		r.invalidateConfig(p.Files[0])
+		if committed {
+			r.rememberCommitted(p.Files[0], next, doc)
+		}
+	}()
 	backupDir := filepath.Join(r.Root, "backups")
 	if !regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`).MatchString(p.ID) {
 		return errors.New("订阅 ID 不适合生成备份")
@@ -370,6 +377,7 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 			return errors.Join(append([]error{errors.New("配置写入失败，已尝试恢复原文件")}, rollback...)...)
 		}
 	}
+	committed = true
 	return nil
 }
 

@@ -229,3 +229,83 @@ func TestJSONNodeNoopAndExactIntegerComparison(t *testing.T) {
 		t.Fatal("integer comparison lost precision or types")
 	}
 }
+
+func TestCommittedCacheIsIndependentAndMatchesDisk(t *testing.T) {
+	r, primary, _ := fixture(t)
+	var retained Document
+	input := node("A")
+	if err := r.Mutate("clash", func(doc Document) error {
+		retained = doc
+		doc["proxies"] = []any{input}
+		doc["extra"] = Document{"small": uint64(13), "big": uint64(^uint64(0)), "signed": int64(9007199254740993), "text": "true: #中文\nnext", "nil": nil, "empty": []any{}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	entry := r.cache[primary]
+	if entry == nil {
+		t.Fatal("successful commit did not warm cache")
+	}
+	raw, _ := os.ReadFile(primary)
+	parsed, _, err := parseConfig(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(entry.doc, parsed) {
+		t.Fatal("committed document differs from parsed durable YAML")
+	}
+	input["password"] = "poison"
+	retained["extra"].(Document)["small"] = "poison"
+	wire, err := r.SnapshotJSON("clash")
+	if err != nil || bytes.Contains(wire, []byte("poison")) {
+		t.Fatal("callback aliases poisoned commit cache", err)
+	}
+	if r.cache[primary] != entry {
+		t.Fatal("read reparsed a warm committed cache")
+	}
+}
+
+func TestCommittedCacheFallsBackForNoncanonicalTypes(t *testing.T) {
+	r, primary, _ := fixture(t)
+	for _, value := range []any{1.0, []string{"A", "B"}, json.Number("13")} {
+		if err := r.Mutate("clash", func(doc Document) error { doc["extra"] = value; return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if r.cache[primary] != nil {
+			t.Fatal("noncanonical Go value cached without parsing")
+		}
+		raw, err := r.Raw("clash")
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, _, err := parseConfig([]byte(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(r.cache[primary].doc, parsed) {
+			t.Fatal("fallback parse differs from disk")
+		}
+	}
+}
+
+func TestFailedCommitNeverPublishesWarmCache(t *testing.T) {
+	r, primary, _ := fixture(t)
+	if _, err := r.SnapshotJSON("clash"); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(primary)
+	index, _ := json.Marshal(Document{"profiles": []any{Document{"id": "clash", "files": []string{primary, filepath.Join(r.Root, "absent", "mirror.yaml")}}}})
+	if err := os.WriteFile(filepath.Join(r.Root, "profiles.json"), index, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Mutate("clash", func(d Document) error { d["proxies"] = []any{node("failed")}; return nil }); err == nil {
+		t.Fatal("mirror failure ignored")
+	}
+	if r.cache[primary] != nil {
+		t.Fatal("failed transaction published cache")
+	}
+	after, _ := r.Raw("clash")
+	if string(before) != after {
+		t.Fatal("rollback returned attempted config")
+	}
+}

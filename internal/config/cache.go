@@ -49,6 +49,11 @@ func (r *Repository) cachedEntry(p Profile) (*configEntry, []byte, error) {
 		return nil, nil, err
 	}
 	entry := &configEntry{digest: digest, doc: doc, weight: len(raw) * 8, used: r.cacheClock}
+	r.admitConfig(path, entry)
+	return entry, raw, nil
+}
+
+func (r *Repository) admitConfig(path string, entry *configEntry) {
 	// The raw-size multiplier is a conservative admission budget, not an RSS
 	// guarantee. Large documents are served uncached; there are at most 32 entries.
 	if entry.weight <= configCacheBudget {
@@ -61,7 +66,60 @@ func (r *Repository) cachedEntry(p Profile) (*configEntry, []byte, error) {
 		r.cache[path] = entry
 		r.cacheBytes += entry.weight
 	}
-	return entry, raw, nil
+}
+
+// A successful transaction already owns a validated document. Freeze a separate
+// copy of types whose YAML representation round-trips without custom marshalers;
+// unknown Go types fall back to the normal file parser on the next read.
+func committedConfig(value any) (any, bool) {
+	switch v := value.(type) {
+	case nil, bool, string, int:
+		return v, true
+	case uint64:
+		if v <= uint64(^uint(0)>>1) {
+			return int(v), true
+		}
+		return v, true
+	case int64:
+		if int64(int(v)) == v {
+			return int(v), true
+		}
+		return v, true
+	case map[string]any:
+		copy := make(map[string]any, len(v))
+		for key, item := range v {
+			next, ok := committedConfig(item)
+			if !ok {
+				return nil, false
+			}
+			copy[key] = next
+		}
+		return copy, true
+	case []any:
+		copy := make([]any, len(v))
+		for i, item := range v {
+			next, ok := committedConfig(item)
+			if !ok {
+				return nil, false
+			}
+			copy[i] = next
+		}
+		return copy, true
+	default:
+		return nil, false
+	}
+}
+
+func (r *Repository) rememberCommitted(path string, raw []byte, doc Document) {
+	if len(raw)*8 > configCacheBudget {
+		return
+	}
+	copy, ok := committedConfig(doc)
+	if !ok {
+		return
+	}
+	r.cacheClock++
+	r.admitConfig(filepath.Clean(path), &configEntry{digest: sha256.Sum256(raw), doc: copy.(Document), weight: len(raw) * 8, used: r.cacheClock})
 }
 
 func (r *Repository) cachedRead(p Profile) (Document, []byte, error) {

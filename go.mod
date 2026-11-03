@@ -10,3 +10,6 @@ require (
 )
 
 require golang.org/x/sys v0.49.0 // indirect
+
+// v3.0.6 with a bounded emitter event queue; see third_party/yaml/PATCHES.md.
+replace go.yaml.in/yaml/v3 => ./third_party/yaml
