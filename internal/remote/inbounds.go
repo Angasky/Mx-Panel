@@ -242,6 +242,11 @@ func (m *Manager) Inbounds(ctx context.Context, id string) (Record, error) {
 				return nil, err
 			}
 			row["shareLinks"] = []any{}
+			version, versionErr := InboundVersion(row)
+			if versionErr != nil {
+				return nil, versionErr
+			}
+			row["editToken"] = version
 			nodes, nodeErr := InboundNodes(row, record)
 			if nodeErr != nil {
 				row["shareError"] = nodeErr.Error()

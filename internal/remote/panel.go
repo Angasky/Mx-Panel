@@ -272,6 +272,14 @@ func (p *Panel) Request(ctx context.Context, path string, payload Record, method
 	return p.request(ctx, path, payload, method, true)
 }
 
+// Mutations do not replay even an explicit unauthenticated response. Refreshing
+// the list can recover authentication before another explicit user action.
+func (p *Panel) RequestOnce(ctx context.Context, path string, payload Record) (any, error) {
+	p.state.mu.Lock()
+	defer p.state.mu.Unlock()
+	return p.request(ctx, path, payload, "POST", false)
+}
+
 func (p *Panel) RequestJSON(ctx context.Context, path string, payload Record) (any, error) {
 	p.state.mu.Lock()
 	defer p.state.mu.Unlock()

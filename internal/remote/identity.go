@@ -164,3 +164,11 @@ func UserIdentity(user Record) (string, error) {
 	}
 	return identity(data)
 }
+
+func LegacyInboundIdentity(row Record) (string, error) {
+	settings, err := inboundObject(row["settings"])
+	if err != nil {
+		return "", err
+	}
+	return identity(Record{"port": row["port"], "protocol": row["protocol"], "settings": settings})
+}

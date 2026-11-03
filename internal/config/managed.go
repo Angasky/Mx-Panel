@@ -125,9 +125,10 @@ func (r *Repository) ReconcileInventory(profile, server string, live map[int]boo
 		if err != nil {
 			return 0, err
 		}
-		if !live[id] && (b["status"] == "active" || b["status"] == "provisioning") {
+		if !live[id] && (b["status"] == "active" || b["status"] == "provisioning" || b["inboundDeletePending"] != nil) {
 			b["status"] = "missing"
 			b["error"] = "远端入站已不存在"
+			delete(b, "inboundDeletePending")
 			changed = true
 		}
 	}

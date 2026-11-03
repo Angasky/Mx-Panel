@@ -2840,26 +2840,31 @@ document.addEventListener('visibilitychange', () => {
 
 function remoteNodeEdit(id) {
   const row = S.remoteRows.find(x => x.id === id); if (!row) return;
-  const {shareLinks,clientStats,...inbound} = row;
+  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
+  const {shareLinks,shareError,clientStats,editToken,...inbound} = row;
   openModal('编辑远端入站 JSON', '<form id="remoteEdit"><p class="muted">此处使用统一入站 JSON；后端会转换为对应内核配置并校验。独立内核端口不可直接修改。</p><textarea id="remoteJson" class="raw" spellcheck="false"></textarea><div id="remoteError" class="error"></div><button id="remoteSave" class="btn primary">保存到远端</button></form>');
   $('remoteJson').value = JSON.stringify(inbound,null,2);
-  $('remoteEdit').onsubmit = async e => {
-    e.preventDefault(); $('remoteSave').disabled = true;
-    try { await api('/servers/inbounds',jsonOpt('PUT',{serverId:S.serverId,inboundId:id,inbound:JSON.parse($('remoteJson').value)})); closeModal(); await serverNodes(true); notice('远端入站已保存'); }
-    catch (error) { if ($('remoteError')) { $('remoteError').textContent=error.message; $('remoteSave').disabled=false; } }
+  const form=$('remoteEdit'),save=$('remoteSave'),errorBox=$('remoteError'),editor=$('remoteJson');
+  form.onsubmit = async e => {
+    e.preventDefault(); if(save.disabled)return;save.disabled = true;
+    try { await api('/servers/inbounds',jsonOpt('PUT',{serverId,inboundId:id,expectedIdentity,inbound:JSON.parse(editor.value)})); if(form.isConnected)closeModal(); if(S.serverId===serverId && S.page===page)await serverNodes(true); notice('远端入站已保存'); }
+    catch (error) { if (form.isConnected) { errorBox.textContent=error.message; save.disabled=false; } }
   };
 }
 
 async function remoteNodeToggle(id) {
   const row = S.remoteRows.find(x => x.id === id); if (!row) return;
+  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
   if (!confirm('此操作会启停整个入站，影响其中全部订阅用户。仅调整一个订阅的权限请到流量与有效期操作。确定继续？')) return;
-  try { await api('/servers/inbounds',jsonOpt('PUT',{serverId:S.serverId,inboundId:id,inbound:{...row,enable:!row.enable}})); await serverNodes(true); }
+  try { await api('/servers/inbounds',jsonOpt('PUT',{serverId,inboundId:id,expectedIdentity,inbound:{...(expectedIdentity?{}:row),enable:!row.enable}})); if(S.serverId===serverId && S.page===page)await serverNodes(true); }
   catch (error) { alert(error.message); }
 }
 
 async function remoteNodeDelete(id) {
+  const row=S.remoteRows.find(x=>x.id===id);if(!row)return;
+  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
   if (!confirm('删除整个远端入站及其中全部用户？其他订阅也会断开。本面板为其创建的中转路由也会清理；仅删除本地绑定记录请到流量与有效期操作。')) return;
-  try { await api('/servers/inbounds',jsonOpt('DELETE',{serverId:S.serverId,inboundId:id})); await serverNodes(true); notice('远端入站已删除'); }
+  try { await api('/servers/inbounds',jsonOpt('DELETE',{serverId,inboundId:id,expectedIdentity})); if(S.serverId===serverId && S.page===page)await serverNodes(true); notice('远端入站已删除'); }
   catch (error) { alert(error.message); }
 }
 

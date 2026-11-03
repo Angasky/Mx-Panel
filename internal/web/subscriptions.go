@@ -47,6 +47,32 @@ func (s *Server) RunBackground(ctx context.Context) error {
 }
 
 func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/admin/api/servers/inbounds" && (r.Method == "PUT" || r.Method == "DELETE") {
+		var input struct {
+			ServerID  string         `json:"serverId"`
+			InboundID int            `json:"inboundId"`
+			Inbound   map[string]any `json:"inbound"`
+			Expected  string         `json:"expectedIdentity"`
+		}
+		if err := readJSON(w, r, &input); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		c, err := s.subscriptionController()
+		if err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		result, err := c.WriteInbound(ctx, input.ServerID, input.InboundID, input.Inbound, input.Expected, r.Method == "DELETE")
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
 	if r.Method == "POST" && r.URL.Path == "/admin/api/servers/users/targets" {
 		var input struct {
 			ServerID   string `json:"serverId"`

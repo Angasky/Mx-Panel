@@ -130,6 +130,15 @@ func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, 
 		return nil, err
 	}
 	defer client.Close()
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			client.Close()
+		case <-done:
+		}
+	}()
 	endpoint := value(record["panelAddress"])
 	if endpoint == "" {
 		endpoint = value(record["panelUrl"])

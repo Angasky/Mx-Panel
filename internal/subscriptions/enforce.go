@@ -226,6 +226,10 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 		if op == "" {
 			continue
 		}
+		if op == "resume" && b["inboundDeletePending"] != nil {
+			failures = append(failures, "入站删除结果待核对，暂停自动恢复用户")
+			continue
+		}
 		if op == "resume" && b["monthlyBaselinePending"] == true {
 			failures = append(failures, "跨月计数基线尚未确认，用户保持暂停")
 			continue

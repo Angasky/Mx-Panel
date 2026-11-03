@@ -28,12 +28,13 @@ type Backend interface {
 	OpenUser(string) (remote.Record, error)
 }
 type Controller struct {
-	Repository *config.Repository
-	Backend    Backend
-	mu         sync.Mutex
-	locks      map[string]chan struct{}
-	started    atomic.Bool
-	Now        func() time.Time
+	Repository  *config.Repository
+	Backend     Backend
+	mu          sync.Mutex
+	locks       map[string]chan struct{}
+	serverLocks map[string]chan struct{}
+	started     atomic.Bool
+	Now         func() time.Time
 }
 
 func New(repository *config.Repository, backend Backend) *Controller {
@@ -110,18 +111,33 @@ func usage(record Record) (billing.Usage, error) {
 	return u, nil
 }
 func (c *Controller) lock(ctx context.Context, id string) (func(), error) {
+	return c.operationLock(ctx, id, false)
+}
+func (c *Controller) lockServer(ctx context.Context, id string) (func(), error) {
+	return c.operationLock(ctx, id, true)
+}
+func (c *Controller) operationLock(ctx context.Context, id string, server bool) (func(), error) {
 	if id == "" {
 		id = "clash"
 	}
 	c.mu.Lock()
-	guard := c.locks[id]
+	guards := c.locks
+	limit := 256
+	if server {
+		if c.serverLocks == nil {
+			c.serverLocks = map[string]chan struct{}{}
+		}
+		guards = c.serverLocks
+		limit = 1024
+	}
+	guard := guards[id]
 	if guard == nil {
-		if len(c.locks) >= 256 {
+		if len(guards) >= limit {
 			c.mu.Unlock()
-			return nil, errors.New("订阅操作数量过多")
+			return nil, errors.New("操作对象数量过多")
 		}
 		guard = make(chan struct{}, 1)
-		c.locks[id] = guard
+		guards[id] = guard
 	}
 	c.mu.Unlock()
 	select {
@@ -172,6 +188,14 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 			return nil, errors.New("入站 ID 无效或重复")
 		}
 		seen[id] = true
+	}
+	serverUnlock, err := c.lockServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	defer serverUnlock()
+	if err = c.Repository.CheckInboundAvailable(server, ids...); err != nil {
+		return nil, err
 	}
 	unlock, err := c.lock(ctx, profile)
 	if err != nil {
