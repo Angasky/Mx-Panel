@@ -52,6 +52,16 @@ func Parse(value string) (map[string]any, error) {
 		return nil, ErrURI
 	}
 	scheme = strings.ToLower(scheme)
+	if scheme == "mierus" || scheme == "mieru" {
+		nodes, err := parseMieru(value)
+		if err != nil {
+			return nil, err
+		}
+		if len(nodes) != 1 {
+			return nil, errors.New("Mieru 多组端口链接请使用批量导入")
+		}
+		return nodes[0], nil
+	}
 	if scheme == "hy2" {
 		scheme = "hysteria2"
 		value = scheme + "://" + body
@@ -332,6 +342,9 @@ func parseVMess(body string) (map[string]any, error) {
 
 func Export(n map[string]any) (string, error) {
 	kind := text(n["type"])
+	if kind == "mieru" {
+		return exportMieru(n)
+	}
 	port := text(n["port"])
 	if port == "" || text(n["server"]) == "" {
 		return "", ErrURI

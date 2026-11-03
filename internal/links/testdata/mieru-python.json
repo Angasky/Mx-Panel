@@ -1,0 +1,98 @@
+{
+  "reference": "mieru_adapter.py",
+  "cases": [
+    {
+      "uri": "mierus://user:fixture-secret@example.com?profile=%E6%B5%8B%E8%AF%95+Mieru+%2B+%252F+%26&port=2999&protocol=TCP",
+      "nodes": [
+        {
+          "name": "测试 Mieru + %2F &",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "TCP",
+          "port": 2999
+        }
+      ]
+    },
+    {
+      "uri": "mierus://u%20%2B%25:p%40ss%3A%2F%3F%23%25%2B%26%20%E7%A9%BA@[2001:db8::1]?profile=%E6%B5%8B%E8%AF%95+Mieru+%2B+%252F+%26&port=2999-3002&protocol=UDP&multiplexing=MULTIPLEXING_HIGH&handshake-mode=HANDSHAKE_STANDARD&traffic-pattern=CgQIAhAC",
+      "nodes": [
+        {
+          "name": "测试 Mieru + %2F &",
+          "type": "mieru",
+          "server": "2001:db8::1",
+          "username": "u +%",
+          "password": "p@ss:/?#%+& 空",
+          "udp": true,
+          "multiplexing": "MULTIPLEXING_HIGH",
+          "handshake-mode": "HANDSHAKE_STANDARD",
+          "traffic-pattern": "CgQIAhAC",
+          "transport": "UDP",
+          "port-range": "2999-3002"
+        }
+      ]
+    },
+    {
+      "uri": "mierus://user:fixture-secret@example.com?profile=%E6%B5%8B%E8%AF%95+Mieru+%2B+%252F+%26&port=6666&port=9998-9999&port=6489&port=4896&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP&mtu=1400",
+      "nodes": [
+        {
+          "name": "测试 Mieru + %2F & · TCP 6666",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "TCP",
+          "port": 6666
+        },
+        {
+          "name": "测试 Mieru + %2F & · TCP 9998-9999",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "TCP",
+          "port-range": "9998-9999"
+        },
+        {
+          "name": "测试 Mieru + %2F & · UDP 6489",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "UDP",
+          "port": 6489
+        },
+        {
+          "name": "测试 Mieru + %2F & · UDP 4896",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "UDP",
+          "port": 4896
+        }
+      ]
+    },
+    {
+      "uri": "mierus://user:fixture-secret@example.com?profile=%E6%B5%8B%E8%AF%95+Mieru+%2B+%252F+%26&port=02999&protocol=tcp",
+      "nodes": [
+        {
+          "name": "测试 Mieru + %2F &",
+          "type": "mieru",
+          "server": "example.com",
+          "username": "user",
+          "password": "fixture-secret",
+          "udp": true,
+          "transport": "TCP",
+          "port": 2999
+        }
+      ]
+    }
+  ]
+}

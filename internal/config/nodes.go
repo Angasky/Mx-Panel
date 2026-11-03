@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Angasky/dingzhi-ban/internal/links"
 	"net"
 	"regexp"
 	"strconv"
@@ -46,6 +47,18 @@ func ValidateNode(node map[string]any) error {
 	}
 	if host == "" || len(host) > 253 || net.ParseIP(host) == nil && !domain.MatchString(host) {
 		return errors.New("服务器地址无效")
+	}
+	if kind == "mieru" {
+		normalized, err := links.NormalizeMieru(node)
+		if err != nil {
+			return err
+		}
+		for key := range node {
+			delete(node, key)
+		}
+		for key, v := range normalized {
+			node[key] = v
+		}
 	}
 	if kind != "mieru" || node["port-range"] == nil {
 		port, err := integer(node["port"])

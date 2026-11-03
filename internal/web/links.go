@@ -83,15 +83,24 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		total++
-		node, err := links.Parse(value)
+		parsed, err := links.ParseMany(value)
 		if err == nil {
-			err = config.ValidateNode(node)
+			for _, node := range parsed {
+				if e := config.ValidateNode(node); e != nil {
+					err = e
+					break
+				}
+			}
 		}
 		if err != nil {
 			failed = append(failed, map[string]any{"line": line + 1, "reason": "节点链接无效，或含暂未适配参数"})
 			continue
 		}
-		nodes = append(nodes, node)
+		if len(nodes)+len(parsed) > 20000 {
+			problem(w, 400, "导入节点数量超过 20000")
+			return
+		}
+		nodes = append(nodes, parsed...)
 	}
 	if total == 0 {
 		problem(w, 400, "没有节点链接")

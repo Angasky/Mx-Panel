@@ -116,15 +116,20 @@ func Parse(text string) (Batch, error) {
 		if line == "" || strings.EqualFold(line, "[proxy]") {
 			continue
 		}
-		node, err := links.Parse(line)
+		parsed, err := links.ParseMany(line)
 		if err == nil {
-			err = normalize(node)
+			for _, node := range parsed {
+				if e := normalize(node); e != nil {
+					err = e
+					break
+				}
+			}
 		}
 		if err != nil {
 			batch.skip("节点链接无效，或包含暂未适配参数")
 			continue
 		}
-		batch.Nodes = append(batch.Nodes, node)
+		batch.Nodes = append(batch.Nodes, parsed...)
 		if len(batch.Nodes) > MaxNodes {
 			return Batch{}, errors.New("订阅节点数量超过 20000")
 		}
