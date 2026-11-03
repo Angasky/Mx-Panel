@@ -4,6 +4,7 @@
 
 ```powershell
 $env:GOCACHE=Join-Path (Get-Location) 'work/go-cache-recovery'
+New-Item -ItemType Directory -Force work/bench-runtime | Out-Null
 & ./work/go-runtime/go/bin/go.exe build -trimpath -ldflags '-s -w' -o work/bench-runtime/mxioc-perf.exe tools/bench/server.go
 python -X utf8 tools/bench/compare.py --go-bin work/bench-runtime/mxioc-perf.exe --output work/python-go-performance.json
 ```
@@ -16,4 +17,5 @@ python -X utf8 tools/bench/compare.py --go-bin work/bench-runtime/mxioc-perf.exe
 - 请求均建立新连接并读取完整响应，客户端语义验证在计时区间之外；核对节点数量、返回结构与主文件 / 镜像一致性。失败响应不当作成功测速。
 - 原始输出包含逐请求耗时、失败率、P50 / P95、吞吐、服务进程 CPU 时间和采样 RSS。RSS 为场景前后的采样最大值，不是精确峰值；低耗时场景的 CPU 计数受系统计时分辨率限制。
 - 保留两版当前实现的缓存、备份、文件镜像与持久化策略。Go 配置写入对备份和镜像执行 fsync，Python 使用缓存与原子替换但未执行同等 fsync；写入延迟不能简单归因于语言性能。结果是当前实现的对比，不是语言本身的跑分。
+- Go 仍在迁移，完整协议校验覆盖还没有对齐；这里只测相同有效数据在已支持共有接口上的成功路径，不能把结果视为完整功能对等的最终性能结论。
 - 临时数据在结束时删除，结果 JSON 可用于复核分布及重新绘图。配置路径、机器负载与操作系统都会影响结果；Windows 本机结果不能直接推断 Linux 线上表现。
