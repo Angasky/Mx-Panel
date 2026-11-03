@@ -19,3 +19,12 @@ python -X utf8 tools/bench/compare.py --go-bin work/bench-runtime/mxioc-perf.exe
 - 保留两版当前实现的缓存、备份、文件镜像与持久化策略。Go 配置写入对备份和镜像执行 fsync，Python 使用缓存与原子替换但未执行同等 fsync；写入延迟不能简单归因于语言性能。结果是当前实现的对比，不是语言本身的跑分。
 - Go 仍在迁移，完整协议校验覆盖还没有对齐；这里只测相同有效数据在已支持共有接口上的成功路径，不能把结果视为完整功能对等的最终性能结论。
 - 临时数据在结束时删除，结果 JSON 可用于复核分布及重新绘图。配置路径、机器负载与操作系统都会影响结果；Windows 本机结果不能直接推断 Linux 线上表现。
+
+
+带优化前参考数据重建报告：
+
+```sh
+python tools/bench/report.py docs/performance/2026-11-03-optimized/results.json --baseline docs/performance/2026-11-03/results.json --output work/rebuilt-optimized-report
+```
+
+报告分别标明本轮请求与优化前 Go 参考请求。基线和本轮的运行环境、测试方法、配置 SHA-256 必须一致；两轮独立运行，不把系统负载变化视为必然优化效果。可选 `--canvas` 输出嵌入真实数据的交互画布。
