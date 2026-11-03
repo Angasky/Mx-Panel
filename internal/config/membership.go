@@ -11,7 +11,7 @@ func (r *Repository) GroupOptions(id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	doc, _, err := read(p)
+	doc, _, err := r.cachedRead(p)
 	if err != nil {
 		return nil, err
 	}

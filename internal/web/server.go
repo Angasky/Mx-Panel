@@ -71,7 +71,11 @@ func New(options Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{options: options, account: auth, sessions: sessions, failures: make(map[string]failure), hashSlots: make(chan struct{}, 2), now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
+	failures, err := readLoginFailures(doc, auth, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	return &Server{options: options, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -238,12 +242,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			respond(w, 200, map[string]any{"profiles": profiles})
 			return
 		case "/admin/api/snapshot":
-			value, err := s.repository.Snapshot(id)
+			value, err := s.repository.SnapshotJSON(id)
 			if err != nil {
 				problem(w, 400, err.Error())
 				return
 			}
-			respond(w, 200, value)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(200)
+			_, _ = w.Write(value)
 			return
 		case "/admin/api/raw":
 			value, err := s.repository.Raw(id)
@@ -301,34 +308,41 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	keys := []string{"ip:" + host, "account:" + strings.ToLower(input.Username)}
+	keys := []string{failureKey("ip:" + host), failureKey("account:" + strings.ToLower(input.Username))}
 	now := s.now()
 	s.mu.Lock()
-	for key, v := range s.failures {
-		if now.Sub(v.Since) >= 15*time.Minute {
-			delete(s.failures, key)
-		}
-	}
+	nextFailures := copyLoginFailures(s.failures, now)
 	for _, key := range keys {
-		if s.failures[key].Count >= 5 {
+		if nextFailures[key].Count >= 5 {
 			s.mu.Unlock()
 			w.Header().Set("Retry-After", "900")
 			problem(w, 429, "登录失败次数过多，请稍后再试")
 			return
 		}
 	}
-	if len(s.failures) > 4096 {
+	newKeys := 0
+	for _, key := range keys {
+		if _, ok := nextFailures[key]; !ok {
+			newKeys++
+		}
+	}
+	if len(nextFailures)+newKeys > loginFailureLimit {
 		s.mu.Unlock()
 		problem(w, 429, "登录请求过多，请稍后重试")
 		return
 	}
 	for _, key := range keys {
-		v := s.failures[key]
+		v := nextFailures[key]
 		if v.Since.IsZero() {
 			v.Since = now
 		}
 		v.Count++
-		s.failures[key] = v
+		nextFailures[key] = v
+	}
+	if err := s.persistLoginFailures(nextFailures); err != nil {
+		s.mu.Unlock()
+		problem(w, 500, "登录限流保存失败，请重试")
+		return
 	}
 	s.mu.Unlock()
 	select {
@@ -359,13 +373,19 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "账号已变更，请重新登录")
 		return
 	}
+	nextFailures = copyLoginFailures(s.failures, s.now())
+	for _, key := range keys {
+		delete(nextFailures, key)
+	}
+	if err := s.persistLoginFailures(nextFailures); err != nil {
+		s.mu.Unlock()
+		problem(w, 500, "登录限流保存失败，请重试")
+		return
+	}
 	if err := s.updateSessions(func(entries map[[32]byte]session) { addSession(entries, sha256.Sum256([]byte(token)), s.now()) }); err != nil {
 		s.mu.Unlock()
 		problem(w, 500, "登录会话保存失败，请重试")
 		return
-	}
-	for _, key := range keys {
-		delete(s.failures, key)
 	}
 	s.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{Name: "mxioc_session", Value: token, Path: "/admin", MaxAge: 12 * 3600, HttpOnly: true, Secure: r.TLS != nil || !s.options.LocalDevelopment, SameSite: http.SameSiteStrictMode})

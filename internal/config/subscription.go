@@ -44,10 +44,10 @@ func (r *Repository) PublicSubscription(slug string, now time.Time) (Subscriptio
 	if record == nil {
 		return Subscription{}, ErrSubscriptionMissing
 	}
-	return subscriptionRecord(record, now)
+	return r.subscriptionRecord(record, now)
 }
 
-func subscriptionRecord(record Document, now time.Time) (Subscription, error) {
+func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscription, error) {
 	info, err := TrafficInfo(record, now)
 	if err != nil {
 		return Subscription{}, err
@@ -59,7 +59,7 @@ func subscriptionRecord(record Document, now time.Time) (Subscription, error) {
 	if err != nil || len(p.Files) == 0 {
 		return Subscription{}, ErrSubscriptionMissing
 	}
-	doc, raw, err := read(p)
+	doc, raw, err := r.cachedRead(p)
 	if err != nil {
 		return Subscription{}, err
 	}
@@ -74,7 +74,7 @@ func subscriptionRecord(record Document, now time.Time) (Subscription, error) {
 	if err != nil {
 		return Subscription{}, err
 	}
-	return Subscription{Name: p.Name, Slug: p.Slug, Document: doc, Raw: raw, Traffic: info, Userinfo: header}, nil
+	return Subscription{Name: p.Name, Slug: p.Slug, Document: cloneConfig(doc).(Document), Raw: raw, Traffic: info, Userinfo: header}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available
@@ -103,5 +103,5 @@ func (r *Repository) ConversionSource(id string, now time.Time) (Subscription, e
 		next["enforce"] = false
 		copy["traffic"] = next
 	}
-	return subscriptionRecord(copy, now)
+	return r.subscriptionRecord(copy, now)
 }

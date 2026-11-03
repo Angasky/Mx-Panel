@@ -141,7 +141,10 @@ func (r *Repository) CreateProfile(payload map[string]any) (map[string]any, erro
 		if err != nil {
 			return nil, err
 		}
-		doc, _, err = read(p)
+		doc, _, err = r.cachedRead(p)
+		if err == nil {
+			doc = cloneConfig(doc).(Document)
+		}
 		if err != nil {
 			return nil, err
 		}

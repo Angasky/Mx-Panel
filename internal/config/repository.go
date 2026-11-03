@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,8 +18,11 @@ import (
 )
 
 type Repository struct {
-	Root string
-	mu   sync.Mutex
+	Root       string
+	mu         sync.Mutex
+	cache      map[string]*configEntry
+	cacheBytes int
+	cacheClock uint64
 }
 type Profile struct {
 	ID               string           `json:"id"`
@@ -119,6 +123,10 @@ func read(p Profile) (Document, []byte, error) {
 	if err != nil || len(raw) > 8<<20 {
 		return nil, nil, errors.New("订阅配置超过限制")
 	}
+	return parseConfig(raw)
+}
+func parseConfig(raw []byte) (Document, []byte, error) {
+	var err error
 	var doc Document
 	decoder := yaml.NewDecoder(strings.NewReader(string(raw)))
 	if err = decoder.Decode(&doc); err != nil || doc == nil {
@@ -181,7 +189,7 @@ func (r *Repository) Raw(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, raw, err := read(p)
+	_, raw, err := r.cachedRead(p)
 	return string(raw), err
 }
 func (r *Repository) Snapshot(id string) (map[string]any, error) {
@@ -191,10 +199,22 @@ func (r *Repository) Snapshot(id string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	doc, _, err := read(p)
+	doc, _, err := r.cachedRead(p)
 	if err != nil {
 		return nil, err
 	}
+	base := snapshotBase(cloneConfig(doc).(Document))
+	info, _ := os.Stat(p.Files[0])
+	updated := ""
+	if info != nil {
+		updated = info.ModTime().Format("2006-01-02 15:04:05")
+	}
+	base["profile"] = public(p)
+	base["updated"] = updated
+	return base, nil
+}
+
+func snapshotBase(doc Document) Document {
 	nodes := []any{}
 	groups := []any{}
 	rules := []any{}
@@ -228,12 +248,7 @@ func (r *Repository) Snapshot(id string) (map[string]any, error) {
 			}
 		}
 	}
-	info, _ := os.Stat(p.Files[0])
-	updated := ""
-	if info != nil {
-		updated = info.ModTime().Format("2006-01-02 15:04:05")
-	}
-	return map[string]any{"nodes": nodes, "groups": groups, "rules": rules, "dnsPolicies": policies, "profile": public(p), "updated": updated}, nil
+	return Document{"nodes": nodes, "groups": groups, "rules": rules, "dnsPolicies": policies}
 }
 
 func atomic(path string, data []byte) error {
@@ -271,10 +286,11 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 	if err != nil {
 		return err
 	}
-	doc, _, err := read(p)
+	original, raw, err := r.cachedRead(p)
 	if err != nil {
 		return err
 	}
+	doc := cloneConfig(original).(Document)
 	protected := protectedComponents(doc, p)
 	if err = change(doc); err != nil {
 		return err
@@ -285,9 +301,13 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 	if protected != protectedComponents(doc, p) {
 		return errors.New("节点或策略组被主备链路引用，请先删除对应主备组")
 	}
-	next, err := yaml.Marshal(doc)
-	if err != nil {
-		return errors.New("配置序列化失败")
+	unchanged := equalConfig(original, doc)
+	next := raw
+	if !unchanged {
+		next, err = yaml.Marshal(doc)
+		if err != nil {
+			return errors.New("配置序列化失败")
+		}
 	}
 	originals := make([][]byte, len(p.Files))
 	exists := make([]bool, len(p.Files))
@@ -298,6 +318,20 @@ func (r *Repository) mutateLocked(id string, change func(Document) error) error 
 			return errors.New("配置镜像读取失败")
 		}
 	}
+	if unchanged {
+		healthy := true
+		for i := range originals {
+			if !exists[i] || !bytes.Equal(originals[i], raw) {
+				healthy = false
+				break
+			}
+		}
+		if healthy {
+			return nil
+		}
+	}
+	// Any partial write or rollback must discard derived data as well.
+	defer r.invalidateConfig(p.Files[0])
 	backupDir := filepath.Join(r.Root, "backups")
 	if !regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`).MatchString(p.ID) {
 		return errors.New("订阅 ID 不适合生成备份")
