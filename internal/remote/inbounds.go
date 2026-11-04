@@ -226,12 +226,21 @@ func InboundNodes(row, record Record) ([]Record, error) {
 	return result, nil
 }
 func (m *Manager) Inbounds(ctx context.Context, id string) (Record, error) {
+	return m.inbounds(ctx, id, false)
+}
+
+// InboundsWithStats includes display counters for the interactive server view.
+func (m *Manager) InboundsWithStats(ctx context.Context, id string) (Record, error) {
+	return m.inbounds(ctx, id, true)
+}
+
+func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Record, error) {
 	record, err := m.Record(id)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := corePath(value(record["installType"])); err == nil {
-		return m.standaloneInbounds(ctx, id)
+		return m.standaloneInbounds(ctx, id, withStats)
 	}
 	value, err := m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
 		result, err := panel.Request(ctx, "panel/api/inbounds/list", nil, "")

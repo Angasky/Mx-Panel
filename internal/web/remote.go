@@ -105,7 +105,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 				problem(w, 400, err.Error())
 				return true
 			}
-			result, err := manager.Inbounds(ctx, serverID)
+			result, err := manager.InboundsWithStats(ctx, serverID)
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {

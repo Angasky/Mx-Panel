@@ -37,7 +37,8 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 	}
 
 	var state struct {
-		Inbounds []Record
+		Inbounds  []Record
+		UserStats Record
 	}
 	if saved != "" {
 		decoder := json.NewDecoder(strings.NewReader(saved))
@@ -97,10 +98,10 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 			"enable": status == "present" || status == "unverified", "coreStatus": status, "shareLinks": shares,
 		})
 	}
-	return Record{"server": publicServer(record), "inbounds": rows, "readOnly": true}, nil
+	return Record{"server": publicServer(record), "inbounds": rows, "readOnly": true, "coreStatsConfig": state.UserStats}, nil
 }
 
-func (m *Manager) standaloneInbounds(ctx context.Context, id string) (Record, error) {
+func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats bool) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
 		_, doc, err := readCore(ctx, kind, run)
 		if err != nil {
@@ -113,6 +114,17 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string) (Record, er
 				return nil, err
 			}
 		}
-		return coreInventory(kind, record, doc, saved)
+		inventory, err := coreInventory(kind, record, doc, saved)
+		if err != nil {
+			return nil, err
+		}
+		stats, _ := inventory["coreStatsConfig"].(Record)
+		delete(inventory, "coreStatsConfig")
+		if withStats && len(stats) != 0 {
+			if err := readCoreCounters(ctx, kind, doc, stats, inventory, run); err != nil {
+				inventory["coreStatsError"] = err.Error()
+			}
+		}
+		return inventory, nil
 	})
 }
