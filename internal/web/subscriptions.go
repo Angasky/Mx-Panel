@@ -103,7 +103,7 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	path := r.URL.Path
 	read := path == "/admin/api/traffic" && r.Method == "GET"
 	write := r.Method == "POST" && (path == "/admin/api/servers/relay" || path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
-	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier" || path == "/admin/api/traffic/bindings/cleanup" || path == "/admin/api/traffic/bindings/remove" || path == "/admin/api/traffic/bindings/migrate")
+	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier" || path == "/admin/api/servers/bandwidth" || path == "/admin/api/traffic/bindings/cleanup" || path == "/admin/api/traffic/bindings/remove" || path == "/admin/api/traffic/bindings/migrate")
 	if !read && !write && !policy {
 		return false
 	}
@@ -150,6 +150,13 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 			} else {
 				result, err = c.RemoveBinding(ctx, profile, n, stringField(payload, "recordToken"), payload["confirmed"] == true)
 			}
+		}
+	} else if path == "/admin/api/servers/bandwidth" {
+		id, e := strconv.Atoi(anyText(payload["inboundId"]))
+		if e != nil || id < 1 || payload["uploadMbps"] != nil || payload["downloadMbps"] != nil {
+			err = errors.New("Go 版当前仅支持清理旧限速")
+		} else {
+			result, err = c.ClearLegacyBandwidth(ctx, profile, stringField(payload, "serverId"), id)
 		}
 	} else if policy && path != "/admin/api/servers/multiplier" {
 		if path == "/admin/api/traffic" {

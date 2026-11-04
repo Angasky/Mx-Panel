@@ -386,7 +386,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 		return nil, errors.New("独立内核用户变更待核对，暂不能更换服务器身份")
 	}
 	if kind != previousKind {
-		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "coreUserPending", "meters", "bandwidths", "relays"} {
+		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "coreUserPending", "meters", "bandwidths", "goBandwidthCleared", "relays"} {
 			delete(record, key)
 		}
 	}
