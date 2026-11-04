@@ -2570,7 +2570,10 @@ function remoteNodeForm(relay) {
     ${relay ? '<div class="span2"><label for="rnLanding">落地节点分享链接</label><textarea id="rnLanding" required placeholder="vless://、vmess://、trojan://、ss://、socks5:// 或 http://"></textarea><div class="note">将创建 Reality 入口、落地出站和最高优先级路由。失败时尝试撤回本次创建，并保留配置备份。</div></div>' : ''}
   </div>${standalone ? '<p class="note">创建会重启内核。统计接口验证通过后，后台才会为当前订阅创建独立用户。</p>' : ''}<label class="inlinecheck"><input id="rnImport" type="checkbox" checked disabled>创建后添加到当前订阅</label><div id="remoteError" class="error" role="alert"></div><button id="rnSave" class="btn primary">创建${relay ? '中转' : '节点'}</button></form>`);
   if (standalone) {
-    $('rnTemplate').replaceChildren(new Option('VMess + TCP', 'vmess-tcp'));
+    if (S.remoteServer.installType === 'sing-box') {
+      $('rnTemplate').querySelector('[value="vless-reality"]').remove();
+      $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
+    }
   } else if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
   }

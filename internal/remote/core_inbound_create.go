@@ -27,8 +27,10 @@ func (m *Manager) createStandaloneInbound(ctx context.Context, server, key, requ
 }
 
 func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requestHash string, record, payload Record, run coreRunner) (Record, error) {
-	if templateName(payload) != "vmess-tcp" || payload["inbound"] != nil || payload["landingLink"] != nil {
-		return nil, errors.New("独立内核托管入站目前支持 VMess TCP 模板")
+	template := templateName(payload)
+	protocol := standaloneTemplateProtocol(kind, template)
+	if protocol == "" || payload["inbound"] != nil || payload["landingLink"] != nil {
+		return nil, errors.New("当前独立内核不支持此托管入站模板")
 	}
 	stateToken, pending := value(record["coreState"]), value(record["coreUserPending"])
 	stateDoc := Record{"inbounds": []any{}, "outbounds": []any{}, "routing": Record{"rules": []any{}}}
@@ -109,16 +111,26 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 				return nil, err
 			}
 		} else {
-			if !coreCanProvision(kind, doc, stats, "vmess") {
-				return nil, errors.New("现有统计配置不支持独立 VMess 用户")
+			if !coreCanProvision(kind, doc, stats, protocol) {
+				return nil, errors.New("现有统计配置不支持此模板的独立用户")
 			}
 			if _, err := queryCoreCounters(ctx, kind, doc, stats, run); err != nil {
 				return nil, err
 			}
 		}
-		row, err = buildInboundTemplate(payload, "")
+		prepared, address, err := m.templatePayload(server, record, payload)
 		if err != nil {
 			return nil, err
+		}
+		row, err = buildInboundTemplate(prepared, address)
+		if err != nil {
+			return nil, err
+		}
+		if template == "hysteria2" {
+			row["protocol"] = "hysteria2"
+			stream := row["streamSettings"].(Record)
+			stream["network"] = "tcp"
+			delete(stream, "hysteriaSettings")
 		}
 		port, _ := strconv.Atoi(value(row["port"]))
 		if value(payload["port"]) == "" {
@@ -142,6 +154,24 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		}
 		row["id"], row["port"], row["tag"] = id, port, "mxioc-inbound-"+strconv.Itoa(id)
 		row["goCreateKey"], row["goCreateHash"] = key, requestHash
+	}
+	if tlsTemplate(template) {
+		stream, err := inboundObject(row["streamSettings"])
+		if err != nil {
+			return nil, err
+		}
+		tls, err := inboundObject(stream["tlsSettings"])
+		if err != nil {
+			return nil, err
+		}
+		certs := anyRecords(tls["certificates"])
+		if len(certs) != 1 {
+			return nil, errors.New("独立内核 TLS 证书记录无效")
+		}
+		cert := Record{"certFile": certs[0]["certificateFile"], "keyFile": certs[0]["keyFile"], "serverName": tls["serverName"]}
+		if err := verifyTemplateCertificate(ctx, run, cert); err != nil {
+			return nil, err
+		}
 	}
 	for _, item := range rows {
 		existing := item.(Record)
@@ -195,4 +225,24 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		return nil, errors.New("远端入站已创建，总控保存待重试")
 	}
 	return Record{"inbound": row, "reused": false}, nil
+}
+
+func standaloneTemplateProtocol(kind, template string) string {
+	switch template {
+	case "vmess-tcp":
+		return "vmess"
+	case "trojan-tls":
+		return "trojan"
+	case "vless-ws-tls":
+		return "vless"
+	case "vless-reality":
+		if kind == "xray" {
+			return "vless"
+		}
+	case "hysteria2":
+		if kind == "sing-box" {
+			return "hysteria2"
+		}
+	}
+	return ""
 }

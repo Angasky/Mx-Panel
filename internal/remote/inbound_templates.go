@@ -178,7 +178,11 @@ func validateTemplateCertificate(ctx context.Context, panel *Panel, payload Reco
 	if !tlsTemplate(templateName(payload)) {
 		return nil
 	}
-	if panel.run == nil {
+	return verifyTemplateCertificate(ctx, panel.run, payload)
+}
+
+func verifyTemplateCertificate(ctx context.Context, run coreRunner, payload Record) error {
+	if run == nil {
 		return errors.New("证书验证通道未就绪，尚未创建节点")
 	}
 	script := "set -eu\ncert=" + quote(value(payload["certFile"])) + "\nkey=" + quote(value(payload["keyFile"])) + "\ndomain=" + quote(value(payload["serverName"])) + "\n" + `test -r "$cert" && test -r "$key"
@@ -189,7 +193,7 @@ key_pub=$(openssl pkey -in "$key" -passin pass: -pubout)
 test "$cert_pub" = "$key_pub"
 printf 'MXIOC_CERTIFICATE_OK\n'
 `
-	output, err := panel.run(ctx, script, 16<<10)
+	output, err := run(ctx, script, 16<<10)
 	if err != nil || !strings.Contains(output, "MXIOC_CERTIFICATE_OK") {
 		return errors.New("证书文件、有效期、域名或私钥匹配验证失败；请检查 OpenSSL 和证书路径，尚未创建节点")
 	}
