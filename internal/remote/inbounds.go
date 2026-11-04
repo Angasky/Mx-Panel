@@ -226,6 +226,13 @@ func InboundNodes(row, record Record) ([]Record, error) {
 	return result, nil
 }
 func (m *Manager) Inbounds(ctx context.Context, id string) (Record, error) {
+	record, err := m.Record(id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := corePath(value(record["installType"])); err == nil {
+		return m.standaloneInbounds(ctx, id)
+	}
 	value, err := m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
 		result, err := panel.Request(ctx, "panel/api/inbounds/list", nil, "")
 		if err != nil {

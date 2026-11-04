@@ -31,6 +31,9 @@ func inventoryRows(snapshot Record) ([]Record, map[int]bool, error) {
 }
 
 func (c *Controller) ReconcileServer(ctx context.Context, server string, snapshot Record, observed map[string]bool) (Record, error) {
+	if snapshot["readOnly"] == true {
+		return Record{"removed": 0, "errors": []string{}}, nil
+	}
 	_, live, err := inventoryRows(snapshot)
 	if err != nil {
 		return nil, err
@@ -82,6 +85,9 @@ func (c *Controller) reconcileProfileLocked(ctx context.Context, profile string)
 		snapshot, err := c.Backend.Inbounds(ctx, server)
 		if err != nil {
 			failures = append(failures, "服务器不可达，已保留订阅节点")
+			continue
+		}
+		if snapshot["readOnly"] == true {
 			continue
 		}
 		rows, live, err := inventoryRows(snapshot)

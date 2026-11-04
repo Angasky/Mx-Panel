@@ -214,6 +214,9 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 	if err != nil {
 		return nil, err
 	}
+	if snapshot["readOnly"] == true {
+		return nil, errors.New("独立内核入站暂仅支持查看")
+	}
 	rows := map[int]Record{}
 	for _, row := range objects(snapshot["inbounds"]) {
 		id, _ := strconv.Atoi(text(row["id"]))

@@ -89,6 +89,14 @@ func coreOperation(ctx context.Context, kind, expected string, next Record, run 
 // CoreConfig uses the same per-server exclusion gate as panel writes, server
 // removal and credential edits. Each call owns its SSH connection.
 func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Record) (Record, error) {
+	return m.withCore(ctx, id, func(ctx context.Context, kind string, _ Record, run coreRunner) (Record, error) {
+		return coreOperation(ctx, kind, expected, next, run)
+	})
+}
+
+type coreRunner func(context.Context, string, int) (string, error)
+
+func (m *Manager) withCore(ctx context.Context, id string, action func(context.Context, string, Record, coreRunner) (Record, error)) (Record, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	m.mu.Lock()
@@ -152,7 +160,7 @@ func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Reco
 		case <-done:
 		}
 	}()
-	return coreOperation(ctx, kind, expected, next, func(ctx context.Context, script string, limit int) (string, error) {
+	return action(ctx, kind, record, func(ctx context.Context, script string, limit int) (string, error) {
 		return executeClient(ctx, client, connection, script, limit)
 	})
 }
