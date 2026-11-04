@@ -302,44 +302,6 @@ func parseSnellPolicy(value string) (map[string]any, error) {
 	u := url.URL{Scheme: "snell", Host: net.JoinHostPort(strings.Trim(strings.TrimSpace(fields[1]), "[]"), strings.TrimSpace(fields[2])), RawQuery: query.Encode(), Fragment: strings.TrimSpace(name)}
 	return Parse(u.String())
 }
-func parseVMess(body string) (map[string]any, error) {
-	raw, err := decode64(body)
-	if err != nil {
-		return nil, ErrURI
-	}
-	var v map[string]any
-	if json.Unmarshal([]byte(raw), &v) != nil {
-		return nil, ErrURI
-	}
-	port, err := strconv.Atoi(text(v["port"]))
-	if err != nil || port < 1 || port > 65535 {
-		return nil, ErrURI
-	}
-	n := map[string]any{"name": text(v["ps"]), "type": "vmess", "server": text(v["add"]), "port": port, "uuid": text(v["id"]), "cipher": text(v["scy"]), "alterId": v["aid"]}
-	if n["name"] == "" {
-		n["name"] = n["server"]
-	}
-	if n["cipher"] == "" {
-		n["cipher"] = "auto"
-	}
-	if n["alterId"] == nil {
-		n["alterId"] = 0
-	}
-	if v["tls"] == "tls" {
-		n["tls"] = true
-		n["servername"] = v["sni"]
-	}
-	if network := text(v["net"]); network != "" && network != "tcp" {
-		n["network"] = network
-		if network == "ws" {
-			n["ws-opts"] = map[string]any{"path": text(v["path"]), "headers": map[string]any{"Host": text(v["host"])}}
-		} else {
-			return nil, ErrURI
-		}
-	}
-	return n, nil
-}
-
 func Export(n map[string]any) (string, error) {
 	kind := text(n["type"])
 	if kind == "mieru" {
@@ -404,28 +366,7 @@ func Export(n map[string]any) (string, error) {
 		}
 		return "snell://" + base64.RawStdEncoding.EncodeToString([]byte(auth)) + "?" + q.Encode() + fragment, nil
 	case "vmess":
-		v := map[string]any{"v": "2", "ps": n["name"], "add": n["server"], "port": port, "id": n["uuid"], "aid": n["alterId"], "scy": n["cipher"], "net": "tcp", "type": "none", "tls": ""}
-		if n["tls"] == true {
-			v["tls"] = "tls"
-			v["sni"] = n["servername"]
-		}
-		if network := text(n["network"]); network != "" {
-			v["net"] = network
-			if network != "ws" && network != "tcp" {
-				return "", ErrURI
-			}
-			if ws, ok := n["ws-opts"].(map[string]any); ok {
-				v["path"] = ws["path"]
-				if headers, ok := ws["headers"].(map[string]any); ok {
-					v["host"] = headers["Host"]
-				}
-			}
-		}
-		raw, err := json.Marshal(v)
-		if err != nil {
-			return "", ErrURI
-		}
-		return "vmess://" + base64.StdEncoding.EncodeToString(raw), nil
+		return exportVMess(n, port)
 	default:
 		return "", errors.New("此协议请使用完整 Mihomo 订阅")
 	}
@@ -470,16 +411,16 @@ func Export(n map[string]any) (string, error) {
 	if network := text(n["network"]); network != "" && network != "tcp" {
 		q.Set("type", network)
 		switch network {
-		case "ws":
-			if ws, ok := n["ws-opts"].(map[string]any); ok {
-				q.Set("path", text(ws["path"]))
-				if headers, ok := ws["headers"].(map[string]any); ok {
-					q.Set("host", text(headers["Host"]))
-				}
+		case "ws", "grpc":
+			path, host, err := shareTransport(n, network)
+			if err != nil {
+				return "", err
 			}
-		case "grpc":
-			if grpc, ok := n["grpc-opts"].(map[string]any); ok {
-				q.Set("serviceName", text(grpc["grpc-service-name"]))
+			if network == "grpc" {
+				q.Set("serviceName", path)
+			} else {
+				q.Set("path", path)
+				q.Set("host", host)
 			}
 		default:
 			return "", ErrURI
