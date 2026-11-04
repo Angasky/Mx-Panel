@@ -7,7 +7,6 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"strings"
 )
 
 const coreInboundDelete = "core-inbound-delete"
@@ -67,29 +66,7 @@ func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind str
 	}
 	status := anyRecords(inventory["inbounds"])[index]["coreStatus"]
 	if deleteGuard == nil {
-		name, ok := payload["remark"].(string)
-		name = strings.TrimSpace(name)
-		if !ok || len(payload) != 1 || name == "" || len([]rune(name)) > 100 {
-			return nil, errors.New("请填写 1–100 字符的托管入站名称")
-		}
-		if pending != "" || (status != "present" && status != "disabled") {
-			return nil, errors.New("托管入站配置尚未核对，暂不能修改")
-		}
-		next := maps.Clone(row)
-		next["remark"] = name
-		if err := editGuard(row, next); err != nil {
-			return nil, err
-		}
-		state.Inbounds[index] = next
-		stateDoc["inbounds"] = state.Inbounds
-		sealed, err := m.SealUser(stateDoc)
-		if err != nil {
-			return nil, err
-		}
-		if err := m.updateCoreUserState(server, stateToken, "", sealed, ""); err != nil {
-			return nil, err
-		}
-		return Record{"updated": true}, nil
+		return m.editManagedCoreInbound(ctx, server, kind, record, stateDoc, state.Inbounds, index, value(status), expected, payload, raw, doc, editGuard, run)
 	}
 
 	if dependentInbound(record, id) {

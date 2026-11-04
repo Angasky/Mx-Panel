@@ -145,4 +145,15 @@ func TestInboundEditChecksBindingsInOtherProfilesAndLegacyIdentity(t *testing.T)
 	if err := r.GuardInboundEdit("s", 1, old, next); err == nil {
 		t.Fatal("ignored other profile's legacy binding")
 	}
+	old["tag"], next["tag"] = "mxioc-inbound-1", "mxioc-inbound-1"
+	next["settings"] = old["settings"]
+	next["streamSettings"] = Document{"network": "ws", "wsSettings": Document{"path": "/changed"}}
+	if err := r.GuardInboundEdit("s", 1, old, next); err == nil {
+		t.Fatal("accepted transport change while another profile still uses the old endpoint")
+	}
+	next["streamSettings"] = old["streamSettings"]
+	next["remark"] = "renamed"
+	if err := r.GuardInboundEdit("s", 1, old, next); err != nil {
+		t.Fatal("name-only change should preserve the binding", err)
+	}
 }

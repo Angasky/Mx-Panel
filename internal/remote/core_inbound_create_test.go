@@ -53,6 +53,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			writes, checks := 0, 0
 			validCertificate := false
 			interruptWrite := false
+			rejectWrite := false
 			run := func(_ context.Context, command string, _ int) (string, error) {
 				if strings.HasPrefix(command, "base64 < ") {
 					return base64.StdEncoding.EncodeToString(raw), nil
@@ -66,6 +67,9 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 						return "", errors.New("certificate check failed")
 					}
 					return "MXIOC_CERTIFICATE_OK", nil
+				}
+				if rejectWrite {
+					return "MXIOC_CORE_VALIDATION_FAILED", errors.New("invalid candidate")
 				}
 				_, tail, ok := strings.Cut(command, "printf '%s' '")
 				if !ok {
@@ -145,6 +149,57 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			port, err := parsedPort(row["port"], 0)
 			if err != nil || port < 20001 || value(row["id"]) != value(replayed["inbound"].(Record)["id"]) {
 				t.Fatal("automatic port or ID changed", err)
+			}
+			if template == "vless-ws-tls" {
+				id, _ := strconv.Atoi(value(row["id"]))
+				version, err := InboundVersion(row)
+				if err != nil {
+					t.Fatal(err)
+				}
+				edit := func(payload Record) (Record, error) {
+					record, err := m.Record(serverID)
+					if err != nil {
+						return nil, err
+					}
+					return m.changeManagedCoreInbound(context.Background(), serverID, kind, record, id, version, payload,
+						func(old, next Record) error {
+							if !sameCoreInbound(old["settings"].(Record), next["settings"].(Record)) {
+								t.Fatal("edit changed client credentials")
+							}
+							return nil
+						}, nil, run)
+				}
+				if _, err := edit(Record{"port": 443}); err == nil || writes != 2 {
+					t.Fatal("occupied port was accepted")
+				}
+				patch := Record{"port": 19998, "wsPath": "/go-updated"}
+				rejectWrite = true
+				if _, err := edit(patch); !errors.Is(err, errCoreValidation) || writes != 2 {
+					t.Fatal("rejected candidate should leave remote unchanged", err)
+				}
+				rejectWrite = false
+				interruptWrite = true
+				if _, err := edit(patch); err == nil || writes != 3 {
+					t.Fatal("expected interrupted edit")
+				}
+				m, err = Open(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := edit(Record{"wsPath": "/different"}); err == nil || writes != 3 {
+					t.Fatal("different payload accepted during recovery")
+				}
+				if _, err := edit(patch); err != nil || writes != 4 {
+					t.Fatal("could not resume edit", err)
+				}
+				replay, err := create(hash, payload)
+				if err != nil || replay["reused"] != true || writes != 4 {
+					t.Fatal("create replay did not recognize edited node", err)
+				}
+				fields := managedCoreFields(replay["inbound"].(Record))
+				if fields["wsPath"] != "/go-updated" || value(fields["port"]) != "19998" {
+					t.Fatal("updated settings were not persisted")
+				}
 			}
 			if template != "vmess-tcp" {
 				return

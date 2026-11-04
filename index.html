@@ -2521,8 +2521,8 @@ function renderRemoteNodes() {
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
     <div class="toolbar"><button id="remoteBatchImport" class="btn" onclick="remoteNodeBatchLinks()">批量导入订阅</button><button id="remoteSelectionClear" class="btn small">取消节点选择</button><input id="search" aria-label="搜索远端节点" placeholder="搜索节点名称、协议、端口…" value="${esc(q)}"></div>
     <div class="tablewrap"><table><thead><tr><th><input id="remoteNodesAll" type="checkbox" aria-label="全选本页可导入节点"></th><th>ID</th><th>名称</th><th>协议 / 端口</th><th>状态</th><th>上传 / 下载</th><th>订阅联动</th><th>操作</th></tr></thead><tbody>
-    ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
-      ${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeRename(${x.id})">改名</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(x.protocol) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
+    ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : x.editPending ? '编辑待核对' : coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
+      ${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(x.protocol) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
     </tbody></table></div>${pagination(page)}</section>`;
   const updateSelection=()=>{const selected=S.remoteNodeSelection.size,available=page.rows.filter(canImport);$('remoteBatchImport').disabled=!selected;$('remoteBatchImport').textContent=`将所选 ${selected} 个节点导入订阅`;$('remoteSelectionClear').disabled=!selected;$('remoteNodesAll').checked=!!available.length&&available.every(row=>S.remoteNodeSelection.has(row.id));$('remoteNodesAll').indeterminate=available.some(row=>S.remoteNodeSelection.has(row.id))&&!$('remoteNodesAll').checked;};
   document.querySelectorAll('.remoteNodeChoice').forEach(input=>input.onchange=()=>{const id=Number(input.value);if(input.checked&&S.remoteNodeSelection.size>=50){input.checked=false;return notice('一次最多选择 50 个节点');}input.checked?S.remoteNodeSelection.add(id):S.remoteNodeSelection.delete(id);updateSelection();});
@@ -2949,21 +2949,32 @@ async function remoteNodeToggle(id) {
   catch (error) { alert(error.message); }
 }
 
-function remoteNodeRename(id) {
-  const row=S.remoteRows.find(x=>x.id===id);if(!row?.editToken)return;
-  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
-  openModal('修改托管入站名称', '<form id="coreRename"><label>入站名称<input id="coreRemark" required maxlength="100"></label><div class="error" role="alert"></div><button class="btn primary">保存</button></form>');
-  const form=$('coreRename'), input=$('coreRemark'), save=form.querySelector('button'), errorBox=form.querySelector('.error');
-  input.value=row.remark;
+function remoteNodeEditManaged(id) {
+  const row=S.remoteRows.find(x=>x.id===id);if(!row?.editToken || !row.editFields)return;
+  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken, fields=row.editFields;
+  const transport=Object.hasOwn(fields,'wsPath') ? ['wsPath','WebSocket 路径'] : Object.hasOwn(fields,'grpcService') ? ['grpcService','gRPC 服务名'] : null;
+  openModal(row.editPending ? '重试保存托管入站' : '编辑托管入站', `<form id="coreInboundEdit">
+    <p class="muted">${row.editPending ? '继续核对并保存上次提交的配置。' : '修改端口或传输参数前需解除订阅绑定。应用连接配置时会重启内核。'}</p>
+    <label>入站名称<input name="remark" required maxlength="100"></label>
+    <label>监听端口<input name="port" required type="number" min="1" max="65535"></label>
+    ${transport ? `<label>${transport[1]}<input name="${transport[0]}" maxlength="256"></label>` : ''}
+    <div class="error" role="alert"></div><button class="btn primary">保存</button></form>`);
+  const form=$('coreInboundEdit'), save=form.querySelector('button'), errorBox=form.querySelector('.error');
+  for(const input of form.querySelectorAll('input')){
+    input.value=fields[input.name];
+    input.readOnly=!!row.editPending;
+  }
   form.onsubmit=async event=>{
     event.preventDefault();
     if(save.disabled)return;
+    const patch=row.editPatch || Object.fromEntries([...new FormData(form)].filter(([key,value])=>value!==String(fields[key])));
+    if(!Object.keys(patch).length){closeModal();return;}
     save.disabled=true;
     try {
-      await api('/servers/inbounds',jsonOpt('PUT',{serverId,inboundId:id,expectedIdentity,inbound:{remark:input.value}}));
+      await api('/servers/inbounds',jsonOpt('PUT',{serverId,inboundId:id,expectedIdentity,inbound:patch}));
       if(form.isConnected)closeModal();
       if(S.serverId===serverId && S.page===page)await serverNodes(true);
-      notice('托管入站名称已保存');
+      notice('托管入站已保存');
     } catch(error) {
       if(form.isConnected){errorBox.textContent=error.message;save.disabled=false;}
     }

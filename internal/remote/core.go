@@ -72,6 +72,7 @@ func editCore(ctx context.Context, kind, expected string, run coreRunner, edit f
 }
 
 var errCoreRolledBack = errors.New("内核应用失败，原配置和服务已恢复")
+var errCoreValidation = errors.New("内核拒绝了候选配置，远端配置未修改")
 
 func applyCore(ctx context.Context, kind string, raw []byte, next Record, managedTag string, run coreRunner) (Record, error) {
 	return applyCoreVerified(ctx, kind, raw, next, managedTag, "", run)
@@ -84,6 +85,9 @@ func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record
 	}
 	output, err := run(ctx, script, 64<<10)
 	if err != nil {
+		if strings.Contains(output, "MXIOC_CORE_VALIDATION_FAILED") {
+			return nil, errCoreValidation
+		}
 		if strings.Contains(output, "MXIOC_CORE_ROLLBACK_FAILED") {
 			return nil, errors.New("内核应用失败且回滚未确认，请检查服务器服务状态")
 		}

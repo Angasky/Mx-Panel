@@ -113,6 +113,7 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		delete(inventory, "coreStatsConfig")
 		var retryID string
 		var deleteRetryID, deleteRetryToken string
+		var editPending, editRetry Record
 		var statsPending bool
 		if token := value(record["coreUserPending"]); token != "" {
 			pending, err := m.OpenUser(token)
@@ -123,6 +124,12 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 			}
 			if err == nil && pending["operation"] == coreInboundDelete && (pending["before"] == hash || pending["after"] == hash) {
 				deleteRetryID, deleteRetryToken = value(pending["inboundId"]), value(pending["key"])
+			}
+			if err == nil && pending["operation"] == coreInboundEdit {
+				editPending = pending
+				if pending["before"] == hash || pending["after"] == hash {
+					editRetry = pending
+				}
 			}
 		}
 		state, err := parseLegacyCoreState(saved)
@@ -146,14 +153,20 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 				case id == deleteRetryID:
 					row["deleteToken"] = deleteRetryToken
 					row["deletePending"] = true
+				case id == value(editPending["inboundId"]):
+					row["editPending"] = true
+					if editRetry != nil {
+						row["editToken"], row["editFields"], row["editPatch"] = editRetry["key"], editRetry["fields"], editRetry["patch"]
+					}
 				case value(record["coreUserPending"]) == "" && (row["coreStatus"] == "present" || row["coreStatus"] == "disabled"):
 					if version, err := InboundVersion(byID[id]); err == nil {
 						row["editToken"], row["deleteToken"] = version, version
+						row["editFields"] = managedCoreFields(byID[id])
 					}
 				}
 			}
 			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
-			available = available && id != deleteRetryID
+			available = available && id != deleteRetryID && id != value(editPending["inboundId"])
 			needsStats := len(stats) == 0 && canInitialize && row["coreStatus"] == "present" &&
 				coreProvisionProtocol(kind, value(row["protocol"]))
 			row["provisionable"] = available || needsStats

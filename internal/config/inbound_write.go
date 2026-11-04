@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/remote"
@@ -58,6 +59,18 @@ func (r *Repository) GuardInboundEdit(server string, id int, old, next Document)
 	if err != nil {
 		return err
 	}
+	endpointChanged := false
+	if strings.HasPrefix(stringValue(old["tag"]), "mxioc-inbound-") {
+		before, err := remote.EndpointIdentity(old)
+		if err != nil {
+			return err
+		}
+		after, err := remote.EndpointIdentity(next)
+		if err != nil {
+			return err
+		}
+		endpointChanged = before != after
+	}
 	for _, v := range rows(index, "profiles") {
 		for _, v := range rows(v.(map[string]any), "remoteNodes") {
 			b := v.(map[string]any)
@@ -72,6 +85,9 @@ func (r *Repository) GuardInboundEdit(server string, id int, old, next Document)
 			}
 			if b["status"] != "active" {
 				continue
+			}
+			if endpointChanged {
+				return errors.New("该入站仍有订阅绑定，请先解除绑定再修改端口或传输参数")
 			}
 			if err = checkInboundBinding(old, b); err != nil {
 				return err

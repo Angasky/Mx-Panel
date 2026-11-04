@@ -77,7 +77,10 @@ trap cleanup EXIT
 cp -p "$config" "$backup"
 chmod 0600 "$candidate" "$backup"
 printf '%s' ` + quote(base64.StdEncoding.EncodeToString(raw)) + ` | base64 -d > "$candidate"
-` + binary + ` ` + check + ` "$candidate" >/dev/null 2>&1
+if ! ` + binary + ` ` + check + ` "$candidate" >/dev/null 2>&1; then
+ printf 'MXIOC_CORE_VALIDATION_FAILED\n'
+ exit 1
+fi
 sync -f "$candidate"
 actual=$(sha256sum "$config")
 test "${actual%% *}" = "$expected" || exit 76
