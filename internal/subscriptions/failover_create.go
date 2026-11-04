@@ -78,8 +78,7 @@ func (c *Controller) CreateFailover(ctx context.Context, profile string, input R
 		}
 		seen[entryName] = true
 		path := fmt.Sprintf("%s / %d", name, i+1)
-		identity := sha256.Sum256([]byte(fmt.Sprintf("failover/%s/%d", operation, i)))
-		requestID := hex.EncodeToString(identity[:16])
+		requestID := config.FailoverPathRequest(operation, i)
 		request := Record{"name": path, "entry": entryName, "exit": exit, "operationId": requestID,
 			"groups": []any{}, "port": plan["port"], "serverName": plan["serverName"]}
 		entry, landing, err := c.Repository.ServerChainSources(profile, &config.ServerChainImport{

@@ -1,12 +1,19 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/Angasky/dingzhi-ban/internal/managednodes"
 )
+
+func FailoverPathRequest(operation string, index int) string {
+	digest := sha256.Sum256([]byte(fmt.Sprintf("failover/%s/%d", operation, index)))
+	return hex.EncodeToString(digest[:16])
+}
 
 func (r *Repository) BeginFailover(profile string, plan Document) error {
 	return r.UpdateState(profile, func(p Document) error {
@@ -17,6 +24,9 @@ func (r *Repository) BeginFailover(profile string, plan Document) error {
 					return errors.New("主备记录无效")
 				}
 				if row["name"] == plan["name"] {
+					if row["status"] == "deleting" {
+						return errors.New("主备组正在清理，不能继续创建")
+					}
 					if row["requestId"] == plan["requestId"] && row["requestHash"] == plan["requestHash"] {
 						return nil
 					}
@@ -63,7 +73,7 @@ func (r *Repository) ActivateFailover(profile string, plan Document) (Document, 
 	}
 	for _, item := range rows(record, "failovers") {
 		row, ok := item.(Document)
-		if ok && row["name"] == plan["name"] && row["requestId"] == plan["requestId"] {
+		if ok && row["name"] == plan["name"] && row["requestId"] == plan["requestId"] && row["status"] == "active" {
 			return row, nil
 		}
 	}

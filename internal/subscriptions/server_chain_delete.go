@@ -13,6 +13,10 @@ type namedRelayDeleter interface {
 }
 
 func (c *Controller) DeleteServerChain(ctx context.Context, profile, name string) (Record, error) {
+	return c.deleteServerChain(ctx, profile, name, "")
+}
+
+func (c *Controller) deleteServerChain(ctx context.Context, profile, name, deletingGroup string) (Record, error) {
 	if strings.TrimSpace(name) == "" {
 		return nil, errors.New("请选择服务器链路")
 	}
@@ -23,7 +27,7 @@ func (c *Controller) DeleteServerChain(ctx context.Context, profile, name string
 	if !ok {
 		return nil, errors.New("服务器链路删除尚未适配")
 	}
-	server, id, err := c.Repository.ServerChainTarget(profile, name)
+	server, id, err := c.Repository.ServerChainDeleteTarget(profile, name, deletingGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -60,10 +64,7 @@ func (c *Controller) DeleteServerChain(ctx context.Context, profile, name string
 		return nil, err
 	}
 	result, err := backend.DeleteNamedRelay(ctx, server, id, expected, func(old Record) error {
-		if err := c.Repository.GuardServerChainDelete(profile, name, server, id, old); err != nil {
-			return err
-		}
-		return c.Repository.BeginInboundDelete(server, id, expected, old, observed)
+		return c.Repository.BeginServerChainDelete(profile, name, server, id, old, deletingGroup, expected, observed)
 	})
 	if err != nil {
 		return nil, err
@@ -72,7 +73,7 @@ func (c *Controller) DeleteServerChain(ctx context.Context, profile, name string
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Repository.FinishServerChainDelete(profile, name, server, id); err != nil {
+	if err := c.Repository.FinishServerChainDelete(profile, name, server, id, deletingGroup); err != nil {
 		return nil, err
 	}
 	result["removedLocalNodes"] = removed

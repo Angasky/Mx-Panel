@@ -64,7 +64,7 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 400, err.Error())
 		return true
 	}
-	if method == "DELETE" && path == "/admin/api/server-chains" {
+	if method == "DELETE" && (path == "/admin/api/server-chains" || path == "/admin/api/failovers") {
 		var input struct {
 			Name string `json:"name"`
 		}
@@ -75,7 +75,13 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		controller, err := s.subscriptionController()
 		if err == nil {
 			var result config.Document
-			result, err = controller.DeleteServerChain(r.Context(), r.Header.Get("X-Profile"), input.Name)
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+			defer cancel()
+			if path == "/admin/api/failovers" {
+				result, err = controller.DeleteFailover(ctx, r.Header.Get("X-Profile"), input.Name)
+			} else {
+				result, err = controller.DeleteServerChain(ctx, r.Header.Get("X-Profile"), input.Name)
+			}
 			if err == nil {
 				respond(w, 200, result)
 				return true

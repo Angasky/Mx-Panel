@@ -41,15 +41,15 @@ func LegacyUserBinding(row, binding Record) (Record, error) {
 	return proposed, nil
 }
 
-func VerifyDedicatedBinding(row, binding Record) error {
+func VerifyDedicatedBinding(row, binding Record, revoked bool) error {
 	settings, err := inboundObject(row["settings"])
 	if err != nil {
 		return err
 	}
 	clients, ok := settings["clients"].([]any)
-	if !ok || len(clients) != 1 {
+	if !ok || len(clients) > 1 || (len(clients) == 0 && !revoked) {
 		return errors.New("链路入站不是独占单用户入站")
 	}
-	_, err = FindUser(row, binding, false)
+	_, err = FindUser(row, binding, revoked)
 	return err
 }

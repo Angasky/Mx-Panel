@@ -2,11 +2,13 @@ package config
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 )
 
-func namedServerChain(record Document, name string) (Document, error) {
+func namedServerChain(record Document, name, deletingGroup string) (Document, error) {
+	var parent Document
 	for _, item := range append(append([]any{}, rows(record, "failovers")...), rows(record, "failoverDrafts")...) {
 		f, ok := item.(Document)
 		if !ok {
@@ -17,9 +19,15 @@ func namedServerChain(record Document, name string) (Document, error) {
 		}
 		for _, path := range rows(f, "paths") {
 			if path == name {
-				return nil, errors.New("该链路由主备组管理")
+				if deletingGroup == "" || f["name"] != deletingGroup || f["status"] != "deleting" {
+					return nil, errors.New("该链路由主备组管理")
+				}
+				parent = f
 			}
 		}
+	}
+	if deletingGroup != "" && parent == nil {
+		return nil, errors.New("链路不属于待删除主备组")
 	}
 	var result Document
 	for _, item := range rows(record, "serverChains") {
@@ -37,15 +45,36 @@ func namedServerChain(record Document, name string) (Document, error) {
 	if result == nil {
 		return nil, errors.New("服务器链路不存在")
 	}
+	if parent != nil {
+		if result["exit"] != parent["exit"] {
+			return nil, errors.New("链路出口与主备组归属不一致")
+		}
+		if operation := stringValue(parent["requestId"]); operation != "" {
+			matched := false
+			for i, entry := range rows(parent, "entries") {
+				if entry == result["entry"] && result["requestId"] == FailoverPathRequest(operation, i) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return nil, errors.New("链路创建记录与主备组归属不一致")
+			}
+		}
+	}
 	return result, nil
 }
 
 func (r *Repository) ServerChainTarget(profile, name string) (string, int, error) {
+	return r.ServerChainDeleteTarget(profile, name, "")
+}
+
+func (r *Repository) ServerChainDeleteTarget(profile, name, deletingGroup string) (string, int, error) {
 	state, err := r.State(profile)
 	if err != nil {
 		return "", 0, err
 	}
-	chain, err := namedServerChain(state, name)
+	chain, err := namedServerChain(state, name, deletingGroup)
 	if err != nil {
 		return "", 0, err
 	}
@@ -57,7 +86,7 @@ func (r *Repository) ServerChainTarget(profile, name string) (string, int, error
 	return server, id, nil
 }
 
-func (r *Repository) GuardServerChainDelete(profile, name, server string, id int, inbound Document) error {
+func (r *Repository) BeginServerChainDelete(profile, name, server string, id int, inbound Document, deletingGroup, expected string, observed map[string]bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	index, err := r.index()
@@ -68,7 +97,7 @@ func (r *Repository) GuardServerChainDelete(profile, name, server string, id int
 	if err != nil {
 		return err
 	}
-	chain, err := namedServerChain(record, name)
+	chain, err := namedServerChain(record, name, deletingGroup)
 	if err != nil {
 		return err
 	}
@@ -87,7 +116,7 @@ func (r *Repository) GuardServerChainDelete(profile, name, server string, id int
 			if active && owner["id"] != record["id"] {
 				return errors.New("入站仍被其他订阅使用")
 			}
-			if owner["id"] != record["id"] || (!active && !(inbound == nil && candidate["status"] == "missing")) {
+			if owner["id"] != record["id"] || (!active && candidate["status"] != "missing" && candidate["status"] != "revoked") {
 				continue
 			}
 			if binding != nil {
@@ -98,6 +127,9 @@ func (r *Repository) GuardServerChainDelete(profile, name, server string, id int
 	}
 	if binding == nil {
 		return errors.New("服务器链路缺少对应订阅绑定")
+	}
+	if request := stringValue(chain["requestId"]); request != "" && binding["chainRequest"] != request {
+		return errors.New("链路与订阅绑定的创建记录不一致")
 	}
 	if binding["scope"] != "user" {
 		return errors.New("旧链路需要先核对并迁移为独立用户绑定")
@@ -113,16 +145,20 @@ func (r *Repository) GuardServerChainDelete(profile, name, server string, id int
 		return errors.New("链路名称与已导入的订阅节点不匹配")
 	}
 	if inbound != nil {
-		if err := remote.VerifyDedicatedBinding(inbound, binding); err != nil {
+		if err := remote.VerifyDedicatedBinding(inbound, binding, binding["status"] == "revoked" || binding["status"] == "missing"); err != nil {
 			return err
 		}
 	}
-	return nil
+	if !observed[BindingToken(stringValue(record["id"]), binding)] {
+		return errors.New("订阅绑定代次已变化，请刷新")
+	}
+	binding["inboundDeletePending"] = Document{"expected": expected, "at": time.Now().Unix()}
+	return r.writeIndex(index)
 }
 
-func (r *Repository) FinishServerChainDelete(profile, name, server string, id int) error {
+func (r *Repository) FinishServerChainDelete(profile, name, server string, id int, deletingGroup string) error {
 	return r.UpdateState(profile, func(state Document) error {
-		chain, err := namedServerChain(state, name)
+		chain, err := namedServerChain(state, name, deletingGroup)
 		if err != nil {
 			return err
 		}
@@ -136,6 +172,20 @@ func (r *Repository) FinishServerChainDelete(profile, name, server string, id in
 			}
 		}
 		state["serverChains"] = keep
+		if deletingGroup != "" {
+			for _, item := range rows(state, "failovers") {
+				group := item.(Document)
+				if group["name"] == deletingGroup && group["status"] == "deleting" {
+					paths := []any{}
+					for _, path := range rows(group, "paths") {
+						if path != name {
+							paths = append(paths, path)
+						}
+					}
+					group["paths"] = paths
+				}
+			}
+		}
 		return nil
 	})
 }
