@@ -214,11 +214,12 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 	if err != nil {
 		return nil, err
 	}
+	rawRows := snapshot["inbounds"]
 	if snapshot["readOnly"] == true {
-		return nil, errors.New("独立内核入站暂仅支持查看")
+		rawRows = snapshot["provisionInbounds"]
 	}
 	rows := map[int]Record{}
-	for _, row := range objects(snapshot["inbounds"]) {
+	for _, row := range objects(rawRows) {
 		id, _ := strconv.Atoi(text(row["id"]))
 		rows[id] = row
 	}
@@ -283,8 +284,8 @@ func (c *Controller) preflight(record Record, server string) error {
 	if kind == "" {
 		kind = "3x-ui"
 	}
-	if kind != "3x-ui" && kind != "x-ui" && kind != "x-panel" {
-		return errors.New("独立内核的用户创建尚待迁移")
+	if kind != "3x-ui" && kind != "x-ui" && kind != "x-panel" && kind != "xray" && kind != "sing-box" {
+		return errors.New("服务器类型不支持独立用户创建")
 	}
 	return nil
 }

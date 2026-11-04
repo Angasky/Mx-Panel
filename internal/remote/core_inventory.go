@@ -94,7 +94,7 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 
 func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats bool) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
-		_, doc, err := readCore(ctx, kind, run)
+		raw, doc, err := readCore(ctx, kind, run)
 		if err != nil {
 			return nil, err
 		}
@@ -111,6 +111,34 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		}
 		stats, _ := inventory["coreStatsConfig"].(Record)
 		delete(inventory, "coreStatsConfig")
+		var retryID string
+		if token := value(record["coreUserPending"]); token != "" {
+			pending, err := m.OpenUser(token)
+			hash := coreConfigHash(raw)
+			if err == nil && pending["operation"] == "add" && (pending["before"] == hash || pending["after"] == hash) {
+				retryID = value(pending["inboundId"])
+			}
+		}
+		state, err := parseLegacyCoreState(saved)
+		if err != nil {
+			return nil, err
+		}
+		byID := map[string]Record{}
+		for _, row := range state.Inbounds {
+			byID[value(row["id"])] = row
+		}
+		provision := []any{}
+		for _, row := range anyRecords(inventory["inbounds"]) {
+			id := value(row["id"])
+			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
+			row["provisionable"] = available
+			if available && !withStats {
+				provision = append(provision, byID[id])
+			}
+		}
+		if !withStats {
+			inventory["provisionInbounds"] = provision
+		}
 		if withStats && len(stats) != 0 {
 			if err := readCoreCounters(ctx, kind, doc, stats, inventory, run); err != nil {
 				inventory["coreStatsError"] = err.Error()

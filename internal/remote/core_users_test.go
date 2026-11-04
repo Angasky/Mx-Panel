@@ -143,3 +143,59 @@ func TestCoreUserPauseAndResumePreserveIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestCoreAddUsersKeepSeparateCredentialsAndStats(t *testing.T) {
+	const listen = "127.0.0.1:10085"
+	for _, kind := range []string{"xray", "sing-box"} {
+		t.Run(kind, func(t *testing.T) {
+			row := Record{"id": 17, "tag": "mxioc-inbound-17", "port": 443, "protocol": "vless",
+				"settings": Record{"clients": []any{}}}
+			native, err := legacyNativeInbound(kind, row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := Record{"inbounds": []any{native},
+				"api":   Record{"tag": "mxioc-user-stats", "listen": listen, "services": []any{"StatsService"}},
+				"stats": Record{}, "policy": Record{"levels": Record{"0": Record{"statsUserUplink": true, "statsUserDownlink": true}}},
+				"experimental": Record{"v2ray_api": Record{"listen": listen, "stats": Record{"enabled": true, "users": []any{}}}},
+			}
+			state := legacyCoreState{Inbounds: []Record{row}, UserStats: Record{
+				"listen": listen, "binary": "/usr/local/bin/xray", "users": []any{},
+			}}
+			var first Record
+			for i := 0; i < 2; i++ {
+				user, err := NewUser(state.Inbounds[0])
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding := bindingFor(t, state.Inbounds[0], user)
+				binding["inboundId"] = 17
+				next, rows, err := planCoreUserChange(kind, "add", state, doc, binding, false, user)
+				if err != nil {
+					t.Fatal(err)
+				}
+				stats, err := extendCoreStats(kind, doc, next, state.UserStats, binding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				retry, _, err := planCoreUserChange(kind, "add", state, next, binding, true, user)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := extendCoreStats(kind, next, retry, state.UserStats, binding); err != nil || !sameCoreInbound(next, retry) {
+					t.Fatal("retry changed provisioned identity or counters")
+				}
+				state, doc = legacyCoreState{Inbounds: rows, UserStats: stats}, next
+				if i == 0 {
+					first = user
+				} else if first["id"] == user["id"] || first["email"] == user["email"] {
+					t.Fatal("credentials reused across users")
+				}
+			}
+			groups, _ := coreCounterIndex(kind, doc, state.UserStats)
+			if len(groups["mxioc-inbound-17"].emails) != 2 {
+				t.Fatal("both independent users must have accounting")
+			}
+		})
+	}
+}
