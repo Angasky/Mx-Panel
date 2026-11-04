@@ -3079,14 +3079,13 @@ function nodeBandwidthModal(encoded, id) {
   const binding = (S.data?.profile?.traffic?.bindings || []).find(b=>b.serverId===serverId && b.inboundId===id && b.status==='active');
   if (!binding) return alert('请先绑定当前订阅');
   if (binding.scope === 'user') return alert('共用入站暂不支持单用户带宽限制，不能限制整个端口');
-  const value = binding.bandwidth || {}, clearOnly = S.idempotentCreate === true;
+  const value = binding.bandwidth || {};
   openModal('订阅节点带宽限制', `<form id="nodeBandwidthForm"><p>当前订阅：${esc(S.data.profile.name)}<br>专属入站：${esc(binding.name || '')} · ${esc(serverId)} / ${id} · 端口 ${esc(binding.port)}</p>
-    <div class="grid ${clearOnly ? 'hidden' : ''}"><div><label for="bandwidthUpload">客户端上传上限（Mbps）</label><input id="bandwidthUpload" type="number" min="0.1" max="10000" step="0.001" value="${value.uploadKbps ? value.uploadKbps/1000 : ''}" placeholder="留空不限"></div>
+    <div class="grid"><div><label for="bandwidthUpload">客户端上传上限（Mbps）</label><input id="bandwidthUpload" type="number" min="0.1" max="10000" step="0.001" value="${value.uploadKbps ? value.uploadKbps/1000 : ''}" placeholder="留空不限"></div>
     <div><label for="bandwidthDownload">客户端下载上限（Mbps）</label><input id="bandwidthDownload" type="number" min="0.1" max="10000" step="0.001" value="${value.downloadKbps ? value.downloadKbps/1000 : ''}" placeholder="留空不限"></div></div>
-    ${clearOnly ? '<p class="hint">当前可清理此入站已有的旧限速规则。</p>' : ''}<p class="hint ${clearOnly ? 'hidden' : ''}">只限制这个专属入站，Mbps 与 MB/s 不同（8 Mbps 约为 1 MB/s）。需要服务器已安装 nftables、使用 systemd 且有 root 权限。超速流量会丢包，TCP 可能重传；允许短时突发，实际吞吐可能低于上限。独占端口，不支持共用入站内按单个用户分开限速。</p>
-    <div id="bandwidthError" class="error"></div><div class="toolbar"><button id="bandwidthSave" class="btn primary ${clearOnly ? 'hidden' : ''}">应用到服务器</button><button id="bandwidthClear" type="button" class="btn">取消此节点限速</button></div></form>`);
+    <p class="hint">只限制这个专属入站，Mbps 与 MB/s 不同（8 Mbps 约为 1 MB/s）。需要服务器已安装 nftables、使用 systemd 且有 root 权限。超速流量会丢包，TCP 可能重传；允许短时突发，实际吞吐可能低于上限。独占端口，不支持共用入站内按单个用户分开限速。</p>
+    <div id="bandwidthError" class="error"></div><div class="toolbar"><button id="bandwidthSave" class="btn primary">应用到服务器</button><button id="bandwidthClear" type="button" class="btn">取消此节点限速</button></div></form>`);
   const apply = async clear => {
-    if (clearOnly && !clear) return;
     const save = $('bandwidthSave'), remove = $('bandwidthClear');save.disabled=remove.disabled=true;
     try {
       if (S.profile !== profile) throw Error('订阅已切换，请重新打开设置');

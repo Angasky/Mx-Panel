@@ -79,3 +79,52 @@ func TestLegacyBandwidthRendererMatchesPythonAndClearRetries(t *testing.T) {
 		t.Fatal("unrelated bandwidth policy was lost")
 	}
 }
+
+func TestLegacyBandwidthApplyPreservesOtherPolicyAndRequiresConfirmation(t *testing.T) {
+	m, server := installFixture(t)
+	record, err := m.Record(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := Record{"port": 24012, "protocols": []any{"tcp"}, "uploadKbps": 1000, "downloadKbps": 0}
+	calls := 0
+	run := func(_ context.Context, script string, _ int) (string, error) {
+		calls++
+		if strings.Contains(script, "flush ruleset") || !strings.Contains(script, "nft -c -f") {
+			t.Fatal("unexpected firewall operation")
+		}
+		if calls == 1 {
+			return "", errors.New("simulated lost SSH response")
+		}
+		return "MXIOC_LEGACY_BANDWIDTH_APPLIED\n", nil
+	}
+	ctx := context.Background()
+	if err := m.applyLegacyBandwidth(ctx, record, 12, policy, run); err == nil {
+		t.Fatal("unconfirmed write accepted")
+	}
+	record, err = m.Record(server)
+	if err != nil || record["bandwidths"] != nil {
+		t.Fatal("unconfirmed write recorded locally", err)
+	}
+	if err := m.applyLegacyBandwidth(ctx, record, 12, policy, run); err != nil {
+		t.Fatal(err)
+	}
+	record, err = m.Record(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := Record{"port": 24013, "protocols": []any{"udp"}, "uploadKbps": 0, "downloadKbps": 2000}
+	if err := m.applyLegacyBandwidth(ctx, record, 13, other, run); err != nil {
+		t.Fatal(err)
+	}
+	record, err = m.Record(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(record["bandwidths"].(Record)) != 2 {
+		t.Fatal("applying another policy removed the first")
+	}
+	if err := m.applyLegacyBandwidth(ctx, record, 14, other, run); err == nil || calls != 3 {
+		t.Fatal("duplicate port should fail before remote execution")
+	}
+}

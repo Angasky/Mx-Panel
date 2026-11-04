@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,11 +153,13 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 			}
 		}
 	} else if path == "/admin/api/servers/bandwidth" {
-		id, e := strconv.Atoi(anyText(payload["inboundId"]))
-		if e != nil || id < 1 || payload["uploadMbps"] != nil || payload["downloadMbps"] != nil {
-			err = errors.New("Go 版当前仅支持清理旧限速")
+		id, idErr := strconv.Atoi(anyText(payload["inboundId"]))
+		up, upErr := bandwidthRate(payload["uploadMbps"])
+		down, downErr := bandwidthRate(payload["downloadMbps"])
+		if idErr != nil || id < 1 || upErr != nil || downErr != nil {
+			err = errors.New("请选择入站并填写 0.1–10000 Mbps，最多三位小数；留空或零表示不限")
 		} else {
-			result, err = c.ClearLegacyBandwidth(ctx, profile, stringField(payload, "serverId"), id)
+			result, err = c.SetBandwidth(ctx, profile, stringField(payload, "serverId"), id, up, down)
 		}
 	} else if policy && path != "/admin/api/servers/multiplier" {
 		if path == "/admin/api/traffic" {
@@ -273,4 +276,26 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 		respond(w, 200, result)
 	}
 	return true
+}
+
+func bandwidthRate(raw any) (int, error) {
+	if raw == nil {
+		return 0, nil
+	}
+	value, ok := raw.(json.Number)
+	if !ok {
+		return 0, errors.New("带宽格式无效")
+	}
+	whole, fraction, _ := strings.Cut(string(value), ".")
+	if len(whole) < 1 || len(whole) > 5 || len(fraction) > 3 ||
+		strings.Trim(whole+fraction, "0123456789") != "" {
+		return 0, errors.New("带宽格式无效")
+	}
+	mbps, _ := strconv.Atoi(whole)
+	thousandths, _ := strconv.Atoi(fraction + strings.Repeat("0", 3-len(fraction)))
+	rate := mbps*1000 + thousandths
+	if rate > 10_000_000 || (rate != 0 && rate < 100) {
+		return 0, errors.New("带宽超出范围")
+	}
+	return rate, nil
 }

@@ -28,7 +28,7 @@ func TestClearLegacyBandwidthOnlyUpdatesConfirmedDedicatedBinding(t *testing.T) 
 	}
 	b := &bandwidthCleanupBackend{fakeBackend: base}
 	c.Backend = b
-	if _, err := c.ClearLegacyBandwidth(ctx, "clash", "s", 1); err == nil || b.calls != 0 {
+	if _, err := c.SetBandwidth(ctx, "clash", "s", 1, 0, 0); err == nil || b.calls != 0 {
 		t.Fatal("shared user must never trigger legacy port cleanup")
 	}
 	if err := c.Repository.UpdateState("clash", func(p Record) error {
@@ -40,14 +40,14 @@ func TestClearLegacyBandwidthOnlyUpdatesConfirmedDedicatedBinding(t *testing.T) 
 		t.Fatal(err)
 	}
 	b.fail = true
-	if _, err := c.ClearLegacyBandwidth(ctx, "clash", "s", 1); err == nil || b.calls != 1 {
+	if _, err := c.SetBandwidth(ctx, "clash", "s", 1, 0, 0); err == nil || b.calls != 1 {
 		t.Fatal("uncertain remote cleanup accepted")
 	}
 	if text(stateBinding(t, c)["bandwidth"].(Record)["uploadKbps"]) != "1000" {
 		t.Fatal("unconfirmed cleanup changed local binding")
 	}
 	b.fail = false
-	if _, err := c.ClearLegacyBandwidth(ctx, "clash", "s", 1); err != nil {
+	if _, err := c.SetBandwidth(ctx, "clash", "s", 1, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if text(stateBinding(t, c)["bandwidth"].(Record)["uploadKbps"]) != "0" {
