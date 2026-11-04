@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"maps"
 	"strings"
 )
 
@@ -37,6 +38,9 @@ func CoreWriteScript(kind string, previous []byte, next Record) (string, error) 
 				return "", errors.New("内核入站和出站必须为数组")
 			}
 		}
+	}
+	if err := protectCoreInbounds(original, next); err != nil {
+		return "", err
 	}
 	raw, err := json.Marshal(next)
 	if err != nil || len(raw) > 2<<20 {
@@ -81,4 +85,41 @@ systemctl is-active --quiet ` + kind + `
 printf 'MXIOC_CORE_APPLIED\n'
 `
 	return script, nil
+}
+
+// Reserve the legacy and Go managed inbound namespace in the full-config
+// editor. Check both sides so a manually added tag cannot claim an identity.
+func protectCoreInbounds(previous, next Record) error {
+	protected := func(doc Record) (map[string]string, error) {
+		rows, _ := doc["inbounds"].([]any)
+		result := map[string]string{}
+		for _, entry := range rows {
+			row, _ := entry.(map[string]any)
+			tag := value(row["tag"])
+			if !strings.HasPrefix(tag, "mxioc-inbound-") {
+				continue
+			}
+			if _, exists := result[tag]; exists {
+				return nil, errors.New("内核配置中有重复的总控托管入站标签")
+			}
+			data, err := json.Marshal(row)
+			if err != nil {
+				return nil, err
+			}
+			result[tag] = string(data)
+		}
+		return result, nil
+	}
+	before, err := protected(previous)
+	if err != nil {
+		return err
+	}
+	after, err := protected(next)
+	if err != nil {
+		return err
+	}
+	if !maps.Equal(before, after) {
+		return errors.New("整配置编辑不允许新增、修改或删除总控托管入站")
+	}
+	return nil
 }
