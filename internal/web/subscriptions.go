@@ -96,7 +96,7 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 	path := r.URL.Path
 	read := path == "/admin/api/traffic" && r.Method == "GET"
 	write := r.Method == "POST" && (path == "/admin/api/servers/relay" || path == "/admin/api/servers/inbounds" || path == "/admin/api/servers/users/batch" || path == "/admin/api/servers/users" || path == "/admin/api/traffic/sync" || path == "/admin/api/servers/multiplier")
-	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier" || path == "/admin/api/traffic/bindings/cleanup" || path == "/admin/api/traffic/bindings/remove")
+	policy := r.Method == "PUT" && (path == "/admin/api/traffic" || path == "/admin/api/traffic/plan" || path == "/admin/api/traffic/plans" || path == "/admin/api/traffic/plans/delete" || path == "/admin/api/servers/multiplier" || path == "/admin/api/traffic/bindings/cleanup" || path == "/admin/api/traffic/bindings/remove" || path == "/admin/api/traffic/bindings/migrate")
 	if !read && !write && !policy {
 		return false
 	}
@@ -129,7 +129,7 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 		result, err = c.CreateInbound(ctx, profile, stringField(payload, "serverId"), payload)
 	} else if path == "/admin/api/traffic/bindings/cleanup" {
 		result, err = c.CleanupBindings(ctx, profile, payload["confirmed"] == true)
-	} else if path == "/admin/api/traffic/bindings/remove" {
+	} else if path == "/admin/api/traffic/bindings/remove" || path == "/admin/api/traffic/bindings/migrate" {
 		index, ok := payload["recordIndex"].(json.Number)
 		var n int
 		if ok {
@@ -138,7 +138,11 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 			err = errors.New("绑定记录索引必须为整数")
 		}
 		if err == nil {
-			result, err = c.RemoveBinding(ctx, profile, n, stringField(payload, "recordToken"), payload["confirmed"] == true)
+			if path == "/admin/api/traffic/bindings/migrate" {
+				result, err = c.MigrateLegacyBinding(ctx, profile, n, stringField(payload, "recordToken"), payload["confirmed"] == true)
+			} else {
+				result, err = c.RemoveBinding(ctx, profile, n, stringField(payload, "recordToken"), payload["confirmed"] == true)
+			}
 		}
 	} else if policy && path != "/admin/api/servers/multiplier" {
 		if path == "/admin/api/traffic" {

@@ -299,6 +299,12 @@ func (c *Controller) finishSync(profile string, failures []string) (Record, erro
 }
 func expired(u billing.Usage, now time.Time) bool { return u.Expire != nil && *u.Expire <= now.Unix() }
 func (c *Controller) applyReading(profile string, b, reading Record) error {
+	return c.updateBinding(profile, b, func(p, current Record) error {
+		return c.applyReadingToBinding(p, current, reading)
+	})
+}
+
+func (c *Controller) applyReadingToBinding(p, current, reading Record) error {
 	up, err := number(reading["up"], -1)
 	if err != nil || up < 0 {
 		return errors.New("认证用户上传计数无效")
@@ -310,77 +316,76 @@ func (c *Controller) applyReading(profile string, b, reading Record) error {
 	if reading["source"] != "authenticated-client" {
 		return errors.New("计数来源不属于独立用户，停止计费")
 	}
-	return c.updateBinding(profile, b, func(p, current Record) error {
-		t := traffic(p)
-		oldUp, e := number(current["up"], 0)
+
+	t := traffic(p)
+	oldUp, e := number(current["up"], 0)
+	if e != nil {
+		return e
+	}
+	oldDown, e := number(current["down"], 0)
+	if e != nil {
+		return e
+	}
+	defaultUnits, e := number(t["multiplierUnits"], 1000)
+	if e != nil {
+		return e
+	}
+	units, e := number(current["multiplierUnits"], defaultUnits)
+	if e != nil {
+		return e
+	}
+	ur, e := number(current["uploadRemainder"], 0)
+	if e != nil {
+		return e
+	}
+	dr, e := number(current["downloadRemainder"], 0)
+	if e != nil {
+		return e
+	}
+	source := text(current["counterSource"])
+	if source == "pending" {
+		source = ""
+	}
+	previous := billing.Binding{Up: oldUp, Down: oldDown, UpRemainder: ur, DownRemainder: dr, MultiplierUnits: units, Source: source}
+	if current["monthlyBaselinePending"] == true {
+		previous.Up = up
+		previous.Down = down
+		previous.Source = "authenticated-client"
+		previous.UpRemainder = 0
+		previous.DownRemainder = 0
+	}
+	delta, e := billing.Compute(previous, billing.Counter{Up: up, Down: down, Source: "authenticated-client"})
+	if e != nil {
+		return e
+	}
+	for _, pair := range []struct {
+		key   string
+		delta int64
+	}{{"upload", delta.BilledUp}, {"download", delta.BilledDown}, {"rawUpload", delta.RawUp}, {"rawDownload", delta.RawDown}} {
+		n, e := number(t[pair.key], 0)
 		if e != nil {
 			return e
 		}
-		oldDown, e := number(current["down"], 0)
+		next, e := billing.Add(n, pair.delta)
 		if e != nil {
 			return e
 		}
-		defaultUnits, e := number(t["multiplierUnits"], 1000)
-		if e != nil {
-			return e
-		}
-		units, e := number(current["multiplierUnits"], defaultUnits)
-		if e != nil {
-			return e
-		}
-		ur, e := number(current["uploadRemainder"], 0)
-		if e != nil {
-			return e
-		}
-		dr, e := number(current["downloadRemainder"], 0)
-		if e != nil {
-			return e
-		}
-		source := text(current["counterSource"])
-		if source == "pending" {
-			source = ""
-		}
-		previous := billing.Binding{Up: oldUp, Down: oldDown, UpRemainder: ur, DownRemainder: dr, MultiplierUnits: units, Source: source}
-		if current["monthlyBaselinePending"] == true {
-			previous.Up = up
-			previous.Down = down
-			previous.Source = "authenticated-client"
-			previous.UpRemainder = 0
-			previous.DownRemainder = 0
-		}
-		delta, e := billing.Compute(previous, billing.Counter{Up: up, Down: down, Source: "authenticated-client"})
-		if e != nil {
-			return e
-		}
-		for _, pair := range []struct {
-			key   string
-			delta int64
-		}{{"upload", delta.BilledUp}, {"download", delta.BilledDown}, {"rawUpload", delta.RawUp}, {"rawDownload", delta.RawDown}} {
-			n, e := number(t[pair.key], 0)
-			if e != nil {
-				return e
-			}
-			next, e := billing.Add(n, pair.delta)
-			if e != nil {
-				return e
-			}
-			t[pair.key] = next
-		}
-		current["up"] = up
-		current["down"] = down
-		current["uploadRemainder"] = delta.Next.UpRemainder
-		current["downloadRemainder"] = delta.Next.DownRemainder
-		current["counterSource"] = "authenticated-client"
-		current["lastSampleAt"] = c.Now().Unix()
-		current["error"] = ""
-		delete(current, "monthlyBaselinePending")
-		if current["status"] == "provisioning" {
-			current["status"] = "active"
-		}
-		t["updatedAt"] = c.Now().Unix()
-		p["traffic"] = t
-		return nil
-	})
+		t[pair.key] = next
+	}
+	current["up"] = up
+	current["down"] = down
+	current["uploadRemainder"] = delta.Next.UpRemainder
+	current["downloadRemainder"] = delta.Next.DownRemainder
+	current["counterSource"] = "authenticated-client"
+	current["lastSampleAt"] = c.Now().Unix()
+	current["error"] = ""
+	delete(current, "monthlyBaselinePending")
+	if current["status"] == "provisioning" {
+		current["status"] = "active"
+	}
+	t["updatedAt"] = c.Now().Unix()
+	p["traffic"] = t
+	return nil
 }
 
 func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, inbound int, units int64) (Record, error) {
