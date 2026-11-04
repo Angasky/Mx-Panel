@@ -25,6 +25,7 @@ jobs:
       - name: Build and verify both release archives
         run: |
           version="${GITHUB_REF_NAME#go-}"
+          [[ "$version" =~ ^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]
           out=$(bash deploy/build-go-release.sh "$version")
           (cd "$out" && sha256sum --strict -c SHA256SUMS)
           stage=$(mktemp -d)

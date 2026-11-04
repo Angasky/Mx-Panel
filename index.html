@@ -1798,7 +1798,7 @@ async function checkUpdateNotice(force = false) {
     let status = force
       ? await api('/updates/check', jsonOpt('POST', {}))
       : await api('/updates');
-    if (status.available && !status.updating && S.updatePrompted !== status.latestSha) showUpdatePrompt(status);
+    if (!status.manual && status.available && !status.updating && S.updatePrompted !== status.latestSha) showUpdatePrompt(status);
     return status;
   } catch (_) {
     return null;
@@ -4118,10 +4118,26 @@ async function maintenance() {
   if (S.page !== 'maintenance' || S.profile !== profile) return;
   if (update.manual) {
     $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>Go 版本维护</h3><span class="pill">${esc(update.version)}</span></div>
+      <p id="goUpdateStatus" aria-live="polite">${esc(update.checkError || (update.checking ? '正在检查…' : update.latestVersion ? '最新发布：' + update.latestVersion + (update.dismissed ? '（已忽略）' : update.available ? '（可更新）' : '') : update.checked ? '暂无可下载的 Go 发布包' : '尚未检查发布版本'))}</p>
+      <div class="toolbar"><button id="goUpdateCheck" class="btn">检查更新</button>${update.available ? '<button id="goUpdateDismiss" class="btn">忽略此版本</button>' : ''}</div>
       <p>下载与服务器架构对应的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。</p>
       <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>
-      <a class="btn" href="https://github.com/Angasky/dingzhi-ban/releases" target="_blank" rel="noopener noreferrer">查看发布包</a>
+      <a class="btn" href="${esc(update.releaseUrl || 'https://github.com/Angasky/dingzhi-ban/releases')}" target="_blank" rel="noopener noreferrer">查看发布包</a>
     </section>`;
+    const check = $('goUpdateCheck'), dismiss = $('goUpdateDismiss'), status = $('goUpdateStatus');
+    const run = async (button, path, payload) => {
+      button.disabled = true;
+      try {
+        await api(path, jsonOpt('POST', payload));
+        if (button.isConnected) await maintenance();
+      } catch (error) {
+        if (button.isConnected) status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    };
+    check.onclick = () => run(check, '/updates/check', {});
+    if (dismiss) dismiss.onclick = () => run(dismiss, '/updates/dismiss', {version:update.latestVersion});
     return;
   }
   $('content').innerHTML = `

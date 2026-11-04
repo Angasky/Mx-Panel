@@ -42,6 +42,7 @@ type failure struct {
 }
 type Server struct {
 	options           Options
+	updates           goUpdates
 	account           account
 	mu                sync.Mutex
 	sessions          map[[32]byte]session
@@ -81,7 +82,8 @@ func New(options Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{options: options, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
+	ignored, _ := doc["goIgnoredRelease"].(string)
+	return &Server{options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -234,12 +236,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"ok": true})
 		return
 	}
-	if r.URL.Path == "/admin/api/updates" && r.Method == "GET" {
-		version := s.options.Version
-		if version == "" {
-			version = "dev"
-		}
-		respond(w, 200, map[string]any{"manual": true, "version": version, "available": false})
+	if s.goUpdateRoutes(w, r) {
 		return
 	}
 	if r.URL.Path == "/admin/api/account" && r.Method == "GET" {
