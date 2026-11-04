@@ -1,0 +1,105 @@
+package remote
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+)
+
+func TestEnableCoreStatsRecoversAfterInterruptedWrite(t *testing.T) {
+	for _, kind := range []string{"xray", "sing-box"} {
+		t.Run(kind, func(t *testing.T) {
+			root := t.TempDir()
+			m, err := Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			server := serverPayload()
+			server["installType"] = kind
+			delete(server, "panelAddress")
+			result, err := m.Save(server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := value(result["id"])
+			row := Record{"id": 17, "tag": "mxioc-inbound-17", "port": 443, "protocol": "vless",
+				"settings": Record{"clients": []any{}}}
+			state, err := m.SealUser(Record{"inbounds": []any{row}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := m.updateCoreUserState(id, "", "", state, ""); err != nil {
+				t.Fatal(err)
+			}
+			native, err := legacyNativeInbound(kind, row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(Record{"inbounds": []any{native}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			writes := 0
+			run := func(_ context.Context, script string, _ int) (string, error) {
+				switch {
+				case strings.HasPrefix(script, "base64 < "):
+					return base64.StdEncoding.EncodeToString(raw), nil
+				case strings.HasPrefix(script, "test -x"), strings.HasPrefix(script, "command -v timeout"):
+					return "with_v2ray_api", nil
+				case strings.HasPrefix(script, "/usr/local/bin/xray api"):
+					return "{}", nil
+				}
+				_, tail, ok := strings.Cut(script, "printf '%s' '")
+				if !ok || !strings.Contains(script, "timeout 2 /usr/local/bin/xray api statsquery") {
+					t.Fatal("write must verify the running stats service")
+				}
+				encoded, _, _ := strings.Cut(tail, "'")
+				var err error
+				raw, err = base64.StdEncoding.DecodeString(encoded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writes++
+				if writes == 1 {
+					return "", errors.New("SSH connection lost")
+				}
+				return "MXIOC_CORE_APPLIED", nil
+			}
+			enable := func() error {
+				record, err := m.Record(id)
+				if err != nil {
+					return err
+				}
+				_, err = m.enableCoreStats(context.Background(), id, kind, record, run)
+				return err
+			}
+			if err := enable(); err == nil || writes != 1 {
+				t.Fatal("unexpected first result", err)
+			}
+			m, err = Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := enable(); err != nil || writes != 2 {
+				t.Fatal("retry did not finalize", err)
+			}
+			if err := enable(); err != nil || writes != 2 {
+				t.Fatal("already enabled should only check service", err)
+			}
+		})
+	}
+}
+
+func TestPlanCoreStatsRefusesForeignAPIs(t *testing.T) {
+	for kind, doc := range map[string]Record{
+		"xray":     {"api": Record{"listen": "127.0.0.1:1234"}},
+		"sing-box": {"experimental": Record{"v2ray_api": Record{}}},
+	} {
+		if _, err := planCoreStats(kind, doc); err == nil {
+			t.Errorf("%s: existing API overwritten", kind)
+		}
+	}
+}

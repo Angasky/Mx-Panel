@@ -7,6 +7,31 @@ import (
 )
 
 func (s *Server) coreRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/admin/api/servers/core/stats" {
+		if r.Method != "POST" {
+			w.Header().Set("Allow", "POST")
+			problem(w, 405, "请求方法不支持")
+			return true
+		}
+		var input struct {
+			ServerID string `json:"serverId"`
+		}
+		if readJSON(w, r, &input) != nil || input.ServerID == "" {
+			problem(w, 400, "请选择服务器")
+			return true
+		}
+		manager, err := s.remoteManager()
+		if err == nil {
+			var result map[string]any
+			result, err = manager.EnableCoreStats(r.Context(), input.ServerID)
+			if err == nil {
+				respond(w, 200, result)
+				return true
+			}
+		}
+		problem(w, 400, err.Error())
+		return true
+	}
 	scoped := r.URL.Path == "/admin/api/servers/core/inbound"
 	if !scoped && r.URL.Path != "/admin/api/servers/core" {
 		return false

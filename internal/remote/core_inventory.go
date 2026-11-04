@@ -112,9 +112,11 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		stats, _ := inventory["coreStatsConfig"].(Record)
 		delete(inventory, "coreStatsConfig")
 		var retryID string
+		var statsPending bool
 		if token := value(record["coreUserPending"]); token != "" {
 			pending, err := m.OpenUser(token)
 			hash := coreConfigHash(raw)
+			statsPending = err == nil && pending["operation"] == coreStatsInit
 			if err == nil && pending["operation"] == "add" && (pending["before"] == hash || pending["after"] == hash) {
 				retryID = value(pending["inboundId"])
 			}
@@ -132,9 +134,15 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 			id := value(row["id"])
 			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
 			row["provisionable"] = available
+			if withStats && len(stats) == 0 && row["coreStatus"] == "present" && value(record["coreUserPending"]) == "" {
+				inventory["canEnableCoreStats"] = true
+			}
 			if available && !withStats {
 				provision = append(provision, byID[id])
 			}
+		}
+		if withStats && statsPending {
+			inventory["canEnableCoreStats"] = true
 		}
 		if !withStats {
 			inventory["provisionInbounds"] = provision

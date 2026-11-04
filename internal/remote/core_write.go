@@ -13,10 +13,10 @@ import (
 // CoreWriteScript applies a complete validated candidate with an optimistic
 // content check and remote rollback. It never interpolates user supplied paths.
 func CoreWriteScript(kind string, previous []byte, next Record) (string, error) {
-	return coreWriteScript(kind, previous, next, "")
+	return coreWriteScript(kind, previous, next, "", "")
 }
 
-func coreWriteScript(kind string, previous []byte, next Record, managedTag string) (string, error) {
+func coreWriteScript(kind string, previous []byte, next Record, managedTag, verify string) (string, error) {
 	var path, binary, check string
 	switch kind {
 	case "xray":
@@ -86,6 +86,7 @@ mv -f -- "$candidate" "$config"
 sync -f "$config"
 systemctl restart ` + kind + `
 systemctl is-active --quiet ` + kind + `
+` + verify + `
 printf 'MXIOC_CORE_APPLIED\n'
 `
 	return script, nil

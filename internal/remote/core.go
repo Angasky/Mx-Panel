@@ -74,7 +74,11 @@ func editCore(ctx context.Context, kind, expected string, run coreRunner, edit f
 var errCoreRolledBack = errors.New("内核应用失败，原配置和服务已恢复")
 
 func applyCore(ctx context.Context, kind string, raw []byte, next Record, managedTag string, run coreRunner) (Record, error) {
-	script, err := coreWriteScript(kind, raw, next, managedTag)
+	return applyCoreVerified(ctx, kind, raw, next, managedTag, "", run)
+}
+
+func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record, managedTag, verify string, run coreRunner) (Record, error) {
+	script, err := coreWriteScript(kind, raw, next, managedTag, verify)
 	if err != nil {
 		return nil, err
 	}
