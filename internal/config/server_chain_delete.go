@@ -7,7 +7,7 @@ import (
 )
 
 func namedServerChain(record Document, name string) (Document, error) {
-	for _, item := range rows(record, "failovers") {
+	for _, item := range append(append([]any{}, rows(record, "failovers")...), rows(record, "failoverDrafts")...) {
 		f, ok := item.(Document)
 		if !ok {
 			return nil, errors.New("主备归属记录无效")

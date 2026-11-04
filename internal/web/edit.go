@@ -44,6 +44,26 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
+	if method == "POST" && path == "/admin/api/failovers" {
+		var payload config.Document
+		if readJSON(w, r, &payload) != nil || payload == nil {
+			problem(w, 400, "请提交主备组配置")
+			return true
+		}
+		controller, err := s.subscriptionController()
+		if err == nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+			defer cancel()
+			var result config.Document
+			result, err = controller.CreateFailover(ctx, r.Header.Get("X-Profile"), payload)
+			if err == nil {
+				respond(w, 200, config.Document{"ok": true, "failover": result})
+				return true
+			}
+		}
+		problem(w, 400, err.Error())
+		return true
+	}
 	if method == "DELETE" && path == "/admin/api/server-chains" {
 		var input struct {
 			Name string `json:"name"`
@@ -81,6 +101,11 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 			if !ok {
 				problem(w, 400, "链路记录格式无效")
 				return true
+			}
+		}
+		if key == "failovers" {
+			if drafts, ok := state["failoverDrafts"].([]any); ok {
+				values = append(values, drafts...)
 			}
 		}
 		respond(w, 200, map[string]any{responseKey: values})
