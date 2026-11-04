@@ -2,14 +2,46 @@ name: Go preview release
 
 on:
   push:
+    branches:
+      - go-rewrite
     tags:
       - 'go-v*'
+    paths:
+      - '.github/workflows/go-release.yml'
+      - 'cmd/**'
+      - 'deploy/**'
+      - 'internal/**'
+      - 'templates/**'
+      - 'index.html'
+      - 'go.mod'
+      - 'go.sum'
 
 permissions:
   contents: read
 
 jobs:
+  systemd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build two lifecycle fixtures
+        run: |
+          CGO_ENABLED=0 go build -trimpath -ldflags '-X main.releaseVersion=v0.0.1' -o "$RUNNER_TEMP/mxioc-old" ./cmd/mxioc
+          CGO_ENABLED=0 go build -trimpath -ldflags '-X main.releaseVersion=v0.0.2' -o "$RUNNER_TEMP/mxioc-new" ./cmd/mxioc
+      - name: Verify systemd install, upgrade, rollback and uninstall
+        run: |
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            bash deploy/test-go-systemd.sh "$RUNNER_TEMP/mxioc-old" "$RUNNER_TEMP/mxioc-new"
   release:
+    if: startsWith(github.ref, 'refs/tags/go-v')
+    needs: systemd
     runs-on: ubuntu-latest
     permissions:
       contents: write
