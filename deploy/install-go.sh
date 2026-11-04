@@ -66,8 +66,26 @@ fi
 install -d -m 0755 "$base" "$base/releases"
 stage=$(mktemp -d "$base/releases/.stage.XXXXXXXX")
 old=$(readlink -- "$base/current" || true)
+if [[ "$action" == update && -n "${MXIOC_GO_EXPECT_CURRENT:-}" && "$old" != "$MXIOC_GO_EXPECT_CURRENT" ]]; then
+    rmdir -- "$stage"
+    die "Current release changed while the update was downloading."
+fi
 switched=0
 unit_created=0
+wait_healthy() {
+    local expected="${1:-}" health attempt
+    for ((attempt=0; attempt<20; attempt++)); do
+        if systemctl is-active --quiet "$service" &&
+            health=$(curl -fsS --max-time 2 http://127.0.0.1:62578/healthz) &&
+            grep -Fq '"runtime":"go"' <<< "$health" &&
+            { [[ -z "$expected" ]] || grep -Fq "\"version\":\"$expected\"" <<< "$health"; } &&
+            curl -fsS --max-time 2 --head http://127.0.0.1:62578/admin/ >/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
 rollback() {
     rc=$?
     trap - EXIT
@@ -76,7 +94,7 @@ rollback() {
     if ((rc != 0 && switched)); then
         if [[ -n "$old" ]]; then
             if ln -s -- "$old" "$base/.current-new" && mv -Tf -- "$base/.current-new" "$base/current" &&
-                systemctl restart "$service"; then
+                systemctl restart "$service" && wait_healthy; then
                 printf 'Previous Go release restored.\n' >&2
             else
                 printf 'Previous Go release could not be restarted. Check systemctl status.\n' >&2
@@ -121,17 +139,7 @@ ln -s -- "$release" "$base/.current-new"
 switched=1
 mv -Tf -- "$base/.current-new" "$base/current"
 systemctl restart "$service"
-healthy=0
-for ((attempt=0; attempt<20; attempt++)); do
-    if systemctl is-active --quiet "$service" &&
-        curl -fsS --max-time 2 http://127.0.0.1:62578/healthz | grep -q '"runtime":"go"' &&
-        curl -fsS --max-time 2 --head http://127.0.0.1:62578/admin/ >/dev/null; then
-        healthy=1
-        break
-    fi
-    sleep 1
-done
-((healthy)) || die "Go service did not pass HTTP checks."
+wait_healthy "${MXIOC_GO_EXPECT_CURRENT:+$version}" || die "Go service did not pass HTTP checks."
 if [[ "$action" != update ]]; then
     systemctl enable "$service"
 fi

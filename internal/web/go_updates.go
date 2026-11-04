@@ -7,18 +7,16 @@ import (
 	"go/version"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
 	"github.com/Angasky/dingzhi-ban/internal/storage"
 )
 
-const goReleaseRepo = "Angasky/dingzhi-ban"
+const goReleaseRepo = releaseupdate.Repository
 const goUpdateCheckInterval = 6 * time.Hour
-
-var goReleaseVersion = regexp.MustCompile(`^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$`)
 
 type goRelease struct {
 	Tag   string `json:"tag_name"`
@@ -31,16 +29,18 @@ type goRelease struct {
 }
 
 type goUpdateStatus struct {
-	Manual     bool   `json:"manual"`
-	Version    string `json:"version"`
-	Latest     string `json:"latestVersion,omitempty"`
-	ReleaseURL string `json:"releaseUrl,omitempty"`
-	Available  bool   `json:"available"`
-	Dismissed  bool   `json:"dismissed"`
-	Checking   bool   `json:"checking"`
-	Checked    bool   `json:"checked"`
-	CheckedAt  int64  `json:"checkedAt,omitempty"`
-	CheckError string `json:"checkError,omitempty"`
+	Manual         bool               `json:"manual"`
+	Version        string             `json:"version"`
+	Latest         string             `json:"latestVersion,omitempty"`
+	ReleaseURL     string             `json:"releaseUrl,omitempty"`
+	Available      bool               `json:"available"`
+	Dismissed      bool               `json:"dismissed"`
+	Checking       bool               `json:"checking"`
+	Checked        bool               `json:"checked"`
+	CheckedAt      int64              `json:"checkedAt,omitempty"`
+	CheckError     string             `json:"checkError,omitempty"`
+	ApplySupported bool               `json:"applySupported"`
+	Job            *releaseupdate.Job `json:"job,omitempty"`
 }
 
 type goUpdates struct {
@@ -57,7 +57,7 @@ func newestGoRelease(releases []goRelease) string {
 	var latest string
 	for _, release := range releases {
 		candidate, ok := strings.CutPrefix(release.Tag, "go-")
-		if release.Draft || !ok || !goReleaseVersion.MatchString(candidate) {
+		if release.Draft || !ok || !releaseupdate.ValidVersion(candidate) {
 			continue
 		}
 		files := map[string]bool{}
@@ -151,8 +151,7 @@ func (u *goUpdates) status(current string) goUpdateStatus {
 	if u.latest != "" {
 		status.ReleaseURL = "https://github.com/" + goReleaseRepo + "/releases/tag/go-" + u.latest
 		status.Dismissed = u.latest == u.ignored
-		status.Available = !status.Dismissed && goReleaseVersion.MatchString(current) &&
-			version.Compare("go"+u.latest[1:], "go"+current[1:]) > 0
+		status.Available = !status.Dismissed && releaseupdate.Newer(u.latest, current)
 	}
 	return status
 }
@@ -162,11 +161,37 @@ func (s *Server) goUpdateRoutes(w http.ResponseWriter, r *http.Request) bool {
 	case r.URL.Path == "/admin/api/updates" && r.Method == "GET":
 	case r.URL.Path == "/admin/api/updates/check" && r.Method == "POST":
 		s.updates.check(r.Context(), s.now(), fetchGoRelease)
+	case r.URL.Path == "/admin/api/updates/apply" && r.Method == "POST":
+		var input struct {
+			Version   string `json:"version"`
+			Confirmed bool   `json:"confirmed"`
+		}
+		if err := readJSON(w, r, &input); err != nil || !input.Confirmed || !releaseupdate.ValidVersion(input.Version) {
+			problem(w, 400, "请确认要安装的 Go 版本")
+			return true
+		}
+		updater := s.options.ReleaseUpdater
+		status := s.updates.status(s.options.Version)
+		if updater == nil || !status.Available || status.Latest != input.Version {
+			problem(w, 409, "当前安装方式或所选版本暂不可应用，请重新检查")
+			return true
+		}
+		job, err := updater.Start(r.Context(), status.Version, input.Version)
+		if err != nil {
+			code := 503
+			if errors.Is(err, releaseupdate.ErrBusy) {
+				code = 409
+			}
+			problem(w, code, err.Error())
+		} else {
+			respond(w, http.StatusAccepted, job)
+		}
+		return true
 	case r.URL.Path == "/admin/api/updates/dismiss" && r.Method == "POST":
 		var input struct {
 			Version string `json:"version"`
 		}
-		if readJSON(w, r, &input) != nil || !goReleaseVersion.MatchString(input.Version) {
+		if readJSON(w, r, &input) != nil || !releaseupdate.ValidVersion(input.Version) {
 			problem(w, 400, "请选择要忽略的 Go 版本")
 			return true
 		}
@@ -192,6 +217,13 @@ func (s *Server) goUpdateRoutes(w http.ResponseWriter, r *http.Request) bool {
 	default:
 		return false
 	}
-	respond(w, 200, s.updates.status(s.options.Version))
+	status := s.updates.status(s.options.Version)
+	if updater := s.options.ReleaseUpdater; updater != nil {
+		job, err := updater.Status()
+		if err == nil {
+			status.ApplySupported, status.Job = true, job
+		}
+	}
+	respond(w, 200, status)
 	return true
 }

@@ -4230,19 +4230,31 @@ async function system() {
 }
 
 async function maintenance() {
+  clearTimeout(S.goUpdatePoll);
   const profile = S.profile;
   let [update, account] = await Promise.all([api('/updates'), api('/account')]);
   if (S.page !== 'maintenance' || S.profile !== profile) return;
   if (update.manual) {
+    const job = update.job, busy = ['queued','running'].includes(job?.status);
+    const phases = {queued:'等待后台启动',download:'下载发布包',verify:'校验发布包',install:'检查数据、切换版本和验证服务',complete:'已完成'};
+    const jobStatus = {queued:'排队中',running:'更新中',succeeded:'更新成功',rolledBack:'已恢复旧版本',failed:'更新失败',interrupted:'结果待核对'};
     $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>Go 版本维护</h3><span class="pill">${esc(update.version)}</span></div>
       <p id="goUpdateStatus" aria-live="polite">${esc(update.checkError || (update.checking ? '正在检查…' : update.latestVersion ? '最新发布：' + update.latestVersion + (update.dismissed ? '（已忽略）' : update.available ? '（可更新）' : '') : update.checked ? '暂无可下载的 Go 发布包' : '尚未检查发布版本'))}</p>
       ${update.checkedAt ? `<p class="hint">上次成功检查：${esc(new Date(update.checkedAt * 1000).toLocaleString())}</p>` : ''}
-      <div class="toolbar"><button id="goUpdateCheck" class="btn">检查更新</button>${update.available ? '<button id="goUpdateDismiss" class="btn">忽略此版本</button>' : ''}</div>
-      <p>下载与服务器架构对应的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。</p>
+      <div class="toolbar"><button id="goUpdateCheck" class="btn">检查更新</button>${update.available && !busy ? '<button id="goUpdateDismiss" class="btn">忽略此版本</button>' : ''}${update.applySupported && update.available && !busy ? '<button id="goUpdateApply" class="btn primary">应用更新</button>' : ''}</div>
+      ${job ? `<p role="status">${esc(job.version)} · ${esc(jobStatus[job.status] || job.status)} · ${esc(phases[job.stage] || job.stage)}</p>${job.error ? `<p class="error">${esc(job.error)}</p>` : ''}` : ''}
+      <p>${update.applySupported ? '更新会先校验发布包，再短暂重启后台。页面将自动查询任务结果。' : '下载对应架构的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。'}</p>
       <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>
       <a class="btn" href="${esc(update.releaseUrl || 'https://github.com/Angasky/dingzhi-ban/releases')}" target="_blank" rel="noopener noreferrer">查看发布包</a>
     </section>`;
-    const check = $('goUpdateCheck'), dismiss = $('goUpdateDismiss'), status = $('goUpdateStatus');
+    const check = $('goUpdateCheck'), dismiss = $('goUpdateDismiss'), apply = $('goUpdateApply'), status = $('goUpdateStatus');
+    const poll = () => {
+      clearTimeout(S.goUpdatePoll);
+      S.goUpdatePoll = setTimeout(async () => {
+        if (S.page !== 'maintenance' || S.profile !== profile) return;
+        try { await maintenance(); } catch (_) { poll(); }
+      }, 3000);
+    };
     const run = async (button, path, payload) => {
       button.disabled = true;
       try {
@@ -4250,12 +4262,17 @@ async function maintenance() {
         if (button.isConnected) await maintenance();
       } catch (error) {
         if (button.isConnected) status.textContent = error.message;
+        if (button === apply && S.page === 'maintenance') poll();
       } finally {
         button.disabled = false;
       }
     };
     check.onclick = () => run(check, '/updates/check', {});
     if (dismiss) dismiss.onclick = () => run(dismiss, '/updates/dismiss', {version:update.latestVersion});
+    if (apply) apply.onclick = () => {
+      if (confirm(`应用 ${update.latestVersion} 并重启 Go 管理后台？`)) run(apply, '/updates/apply', {version:update.latestVersion, confirmed:true});
+    };
+    if (busy) poll();
     return;
   }
   $('content').innerHTML = `

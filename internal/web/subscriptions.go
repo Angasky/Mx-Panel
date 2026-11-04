@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/billing"
+	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
 	"github.com/Angasky/dingzhi-ban/internal/subscriptions"
 )
 
@@ -49,7 +50,7 @@ func (s *Server) RunBackground(ctx context.Context) error {
 	if err := c.Start(ctx); err != nil {
 		return err
 	}
-	if goReleaseVersion.MatchString(s.options.Version) {
+	if releaseupdate.ValidVersion(s.options.Version) {
 		go s.updates.watch(ctx, goUpdateCheckInterval, s.now, fetchGoRelease)
 	}
 	return nil

@@ -3,13 +3,15 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/Angasky/dingzhi-ban/internal/web"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
+	"github.com/Angasky/dingzhi-ban/internal/web"
 )
 
 var releaseVersion = "dev"
@@ -23,7 +25,22 @@ func main() {
 	check := flag.Bool("check-data", false, "validate existing credentials and every subscription without starting services")
 	adminHTML := flag.String("admin-html", "", "optional release-specific administrator HTML path")
 	bootstrapUser := flag.String("bootstrap-user", "", "initialize a fresh data directory and account using a password read from stdin")
+	applyRelease := flag.String("apply-release", "", "run the queued systemd release update")
+	updateJob := flag.String("update-job", "", "queued release update identifier")
 	flag.Parse()
+	var updater *releaseupdate.Manager
+	if !*local && *root == "/opt/mxioc-rule-manager" && *auth == "/etc/mxioc-rule-manager.auth.json" && releaseupdate.ValidVersion(releaseVersion) {
+		updater = releaseupdate.Managed()
+	}
+	if *applyRelease != "" || *updateJob != "" {
+		if updater == nil || *check || *bootstrapUser != "" {
+			log.Fatal("release update requires the packaged Linux installation")
+		}
+		if err := updater.Run(releaseVersion, *applyRelease, *updateJob); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if *bootstrapUser != "" {
 		if *check {
 			log.Fatal("--bootstrap-user and --check-data are mutually exclusive")
@@ -33,7 +50,7 @@ func main() {
 		}
 		return
 	}
-	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local})
+	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local, ReleaseUpdater: updater})
 	if err != nil {
 		log.Fatal("startup validation failed: ", err)
 	}

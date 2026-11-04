@@ -22,12 +22,14 @@ import (
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/geo"
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
+	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
 	"github.com/Angasky/dingzhi-ban/internal/subsource"
 )
 
 type Options struct {
 	Root, AuthFile, AdminHTML, Version   string
 	TrustLoopbackProxy, LocalDevelopment bool
+	ReleaseUpdater                       *releaseupdate.Manager
 }
 type account struct {
 	Username   string `json:"username"`
@@ -178,7 +180,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("X-Frame-Options", "DENY")
 	if r.URL.Path == "/healthz" && (r.Method == "GET" || r.Method == "HEAD") {
-		respond(w, 200, map[string]any{"ok": true, "runtime": "go"})
+		respond(w, 200, map[string]any{"ok": true, "runtime": "go", "version": s.options.Version})
 		return
 	}
 	if r.URL.Path == "/admin" || r.URL.Path == "/admin/" {

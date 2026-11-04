@@ -91,3 +91,21 @@ func TestGoUpdateWatcherChecksImmediatelyAndStops(t *testing.T) {
 		t.Fatal("failed check replaced the last successful release", status)
 	}
 }
+
+func TestGoUpdateApplyRequiresOriginConfirmationAndPackagedInstallation(t *testing.T) {
+	s := fixture(t)
+	token := login(t, s)
+	s.options.Version = "v1.0.0"
+	s.updates.latest = "v1.2.0"
+	const path = "/admin/api/updates/apply"
+	const confirmed = `{"version":"v1.2.0","confirmed":true}`
+	if w := request(s, "POST", path, confirmed, token, "https://foreign.test", true); w.Code != 403 {
+		t.Fatal(w.Code)
+	}
+	if w := request(s, "POST", path, `{"version":"v1.2.0"}`, token, "https://panel.test", true); w.Code != 400 {
+		t.Fatal(w.Code)
+	}
+	if w := request(s, "POST", path, confirmed, token, "https://panel.test", true); w.Code != 409 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
