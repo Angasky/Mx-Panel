@@ -30,7 +30,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	template := templateName(payload)
 	protocol := standaloneTemplateProtocol(kind, template)
 	if protocol == "" || payload["inbound"] != nil || (payload["landingLink"] != nil && outbound == nil) ||
-		(outbound != nil && (kind != "xray" || template != "vless-reality")) {
+		(outbound != nil && ((kind == "xray" && template != "vless-reality") || (kind == "sing-box" && template != "vmess-tcp"))) {
 		return nil, errors.New("当前独立内核不支持此托管入站模板")
 	}
 	stateToken, pending := value(record["coreState"]), value(record["coreUserPending"])
@@ -204,7 +204,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 			}
 		}
 		if outbound != nil {
-			next, err = patchCoreRelay(doc, row, outbound)
+			next, err = patchCoreRelay(kind, doc, row, outbound)
 			if err != nil {
 				return nil, err
 			}

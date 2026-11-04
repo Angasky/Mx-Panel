@@ -23,6 +23,7 @@ func TestStandaloneRealityUsesVerifiedSNI(t *testing.T) {
 
 func TestStandaloneRelayLifecycle(t *testing.T) {
 	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"}, true)
+	testStandaloneInboundCreate(t, "vmess-tcp", []string{"sing-box"}, true)
 }
 
 func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) {
@@ -54,7 +55,10 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				payload["serverName"], payload["certFile"], payload["keyFile"] = "node.example.net", "/etc/test.crt", "/etc/test.key"
 			}
 			if relay {
-				payload["landingLink"] = "socks5://127.0.0.1:1080"
+				payload["landingLink"] = "vless://3c5827c6-2f92-4861-a1f8-562d5388bca7@landing.example.net:443"
+				if kind == "sing-box" {
+					payload["landingLink"] = "hysteria2://fixture-password@landing.example.net:443?sni=landing.example.net&upmbps=50"
+				}
 			}
 			key, hash, err := createRequestIdentity("clash", payload)
 			if err != nil {
@@ -106,8 +110,19 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				}
 				var outbound Record
 				if relay && request["landingLink"] != nil {
-					outbound = Record{"tag": "mxioc-relay-" + key[:16], "protocol": "socks",
-						"settings": Record{"servers": []any{Record{"address": "127.0.0.1", "port": 1080}}}}
+					tag := "mxioc-relay-" + key[:16]
+					node, err := links.Parse(value(request["landingLink"]))
+					if err != nil {
+						return nil, err
+					}
+					if kind == "sing-box" {
+						outbound, err = singRelayOutbound(node, tag)
+					} else {
+						outbound, err = NodeOutbound(node, tag)
+					}
+					if err != nil {
+						return nil, err
+					}
 				}
 				return m.createCoreInbound(context.Background(), serverID, kind, key, requestHash, record, request, outbound, run)
 			}
@@ -138,7 +153,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				scanner.cache[sniCacheKey{serverID, certificateRevision(record), "example.net", "1.1.1.1"}] = sniCached{scanner.now(), true}
 			}
 			if _, err := create(hash, payload); err == nil || writes != 1 {
-				t.Fatal("interrupted request should be pending")
+				t.Fatal("interrupted request should be pending", err, writes)
 			}
 			m, err = Open(root)
 			if err != nil {
@@ -175,6 +190,14 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				if err != nil || proof == nil || verifyCoreRelay(doc, row) != nil || len(anyRecords(doc["outbounds"])) != 2 {
 					t.Fatal("relay route and outbound were not committed together with the ingress")
 				}
+				if kind == "sing-box" {
+					outbound := anyRecords(doc["outbounds"])[1]
+					tls, _ := outbound["tls"].(Record)
+					if outbound["type"] != "hysteria2" || value(outbound["up_mbps"]) != "50" ||
+						tls["enabled"] != true || tls["server_name"] != "landing.example.net" {
+						t.Fatal("sing-box Hysteria2 landing lost its TLS or bandwidth settings")
+					}
+				}
 				id, _ := strconv.Atoi(value(row["id"]))
 				version, err := InboundVersion(row)
 				if err != nil {
@@ -190,7 +213,8 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 						nil, nil, guard, run, true)
 				}
 				original := raw
-				routing := doc["routing"].(Record)
+				section, _, _ := relayRoutingFields(kind)
+				routing := doc[section].(Record)
 				rules := routing["rules"].([]any)
 				routing["rules"] = append([]any{Record{"type": "field", "network": "tcp", "outboundTag": "direct"}}, rules...)
 				raw, _ = json.Marshal(doc)

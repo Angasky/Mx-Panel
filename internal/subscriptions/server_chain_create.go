@@ -113,16 +113,22 @@ func (c *Controller) createServerChain(ctx context.Context, profile string, inpu
 	if ingress["id"] == egress["id"] {
 		return nil, errors.New("入口与出口需要选择不同的服务器")
 	}
+	template := "vless-reality"
 	switch ingress["installType"] {
 	case "3x-ui", "x-ui", "x-panel":
 	case "xray":
 		if failover {
 			return nil, errors.New("独立 Xray 入口暂未接入主备组")
 		}
+	case "sing-box":
+		if failover {
+			return nil, errors.New("独立 sing-box 入口暂未接入主备组")
+		}
+		template = "vmess-tcp"
 	default:
-		return nil, errors.New("服务器中转入口需要已接入的 Web 面板或独立 Xray")
+		return nil, errors.New("服务器中转入口需要已接入的 Web 面板或独立内核")
 	}
-	payload := Record{"operationId": chain.Request, "remark": chain.Name, "template": "vless-reality",
+	payload := Record{"operationId": chain.Request, "remark": chain.Name, "template": template,
 		"port": input["port"], "serverName": input["serverName"], "sniVerified": input["sniVerified"],
 		"sniAddress": input["sniAddress"], "chainEntry": chain.Entry, "chainExit": chain.Exit, "chainGroups": chain.Groups}
 	prepare := func() error {

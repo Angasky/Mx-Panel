@@ -304,7 +304,7 @@ func (m *Manager) DeleteNamedRelay(ctx context.Context, server string, id int, e
 	if err != nil {
 		return nil, err
 	}
-	if value(record["installType"]) == "xray" {
+	if _, err := corePath(value(record["installType"])); err == nil {
 		return m.writeManagedCoreInbound(ctx, server, id, expected, nil, nil, guard, true)
 	}
 	return m.deleteInbound(ctx, server, id, expected, guard, true)

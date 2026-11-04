@@ -249,6 +249,21 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 		return nil, err
 	}
 	tag := "mxioc-relay-" + key[:16]
+	record, err := m.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	kind := value(record["installType"])
+	if kind == "sing-box" {
+		if templateName(payload) != "vmess-tcp" {
+			return nil, errors.New("独立 sing-box 中转入口需要 VMess TCP 模板")
+		}
+		outbound, err := singRelayOutbound(landing, tag)
+		if err != nil {
+			return nil, err
+		}
+		return m.createStandaloneInbound(ctx, server, key, hash, payload, outbound)
+	}
 	outbound, err := NodeOutbound(landing, tag)
 	if err != nil {
 		return nil, err
@@ -256,15 +271,8 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	if templateName(payload) != "vless-reality" {
 		return nil, errors.New("中转入口仅支持 Reality 模板")
 	}
-	record, err := m.Record(server)
-	if err != nil {
-		return nil, err
-	}
-	if value(record["installType"]) == "xray" {
+	if kind == "xray" {
 		return m.createStandaloneInbound(ctx, server, key, hash, payload, outbound)
-	}
-	if value(record["installType"]) == "sing-box" {
-		return nil, errors.New("独立 sing-box 中转暂未适配")
 	}
 	created, err := m.CreateInbound(ctx, server, scope, payload)
 	if err != nil {

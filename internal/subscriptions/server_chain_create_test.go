@@ -14,6 +14,7 @@ type namedChainBackend struct {
 	registry []Record
 	readings map[string]Record
 	landing  string
+	template string
 }
 
 func (b *namedChainBackend) List() ([]remote.Record, error) { return b.registry, nil }
@@ -22,6 +23,7 @@ func (b *namedChainBackend) Inbounds(_ context.Context, server string) (Record, 
 }
 func (b *namedChainBackend) CreateRelay(ctx context.Context, server, profile string, payload Record) (Record, error) {
 	b.landing = text(payload["landingLink"])
+	b.template = text(payload["template"])
 	return b.relayBackend.CreateRelay(ctx, server, profile, payload)
 }
 
@@ -41,7 +43,7 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 		}
 		kind := "3x-ui"
 		if id == "entry" {
-			kind = "xray"
+			kind = "sing-box"
 		}
 		registry = append(registry, Record{"id": id, "nodeAddress": node["server"], "installType": kind})
 		readings[id] = Record{"inbounds": []any{Record{"id": 1, "port": 443, "enable": true, "shareLinks": []any{uri}}}}
@@ -75,6 +77,9 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 	}
 	if !strings.Contains(backend.landing, "exit.example.net") {
 		t.Fatal("used the wrong landing link")
+	}
+	if backend.template != "vmess-tcp" {
+		t.Fatal("sing-box chain must use the supported VMess TCP ingress")
 	}
 	state, err := c.Repository.State("clash")
 	if err != nil || len(objects(state["serverChains"])) != 1 {

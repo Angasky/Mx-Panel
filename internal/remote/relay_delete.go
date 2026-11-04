@@ -36,6 +36,18 @@ func relayRecords(record Record) ([]Record, error) {
 
 // Proofs are derived from the durable creation snapshot, never browser input.
 func relayOwnership(doc Record, tag, inTag string) (Record, error) {
+	return relayOwnershipFor(doc, tag, inTag, "")
+}
+
+func relayRoutingFields(kind string) (section, input, output string) {
+	if kind == "sing-box" {
+		return "route", "inbound", "outbound"
+	}
+	return "routing", "inboundTag", "outboundTag"
+}
+
+func relayOwnershipFor(doc Record, tag, inTag, kind string) (Record, error) {
+	section, _, output := relayRoutingFields(kind)
 	proof := Record{"inboundTag": inTag}
 	outs, ok := doc["outbounds"].([]any)
 	if !ok {
@@ -57,12 +69,12 @@ func relayOwnership(doc Record, tag, inTag string) (Record, error) {
 			proof["outboundHash"] = hash
 		}
 	}
-	routing, e := inboundObject(doc["routing"])
+	routing, e := inboundObject(doc[section])
 	if e != nil {
 		return nil, e
 	}
 	for _, v := range anyRecords(routing["rules"]) {
-		if v["outboundTag"] == tag {
+		if v[output] == tag {
 			hash, e := identity(v)
 			if e != nil {
 				return nil, e
@@ -81,6 +93,7 @@ func relayOwnership(doc Record, tag, inTag string) (Record, error) {
 
 func stripOwnedRelay(doc, proof Record) (Record, bool, error) {
 	tag := value(proof["outboundTag"])
+	section, input, output := relayRoutingFields(value(proof["kind"]))
 	if !strings.HasPrefix(tag, "mxioc-relay-") || len(value(proof["outboundHash"])) != 64 || len(value(proof["routeHash"])) != 64 || value(proof["inboundTag"]) == "" {
 		return nil, false, errors.New("旧中转缺少资源身份，未猜测删除远端配置")
 	}
@@ -116,7 +129,7 @@ func stripOwnedRelay(doc, proof Record) (Record, bool, error) {
 		changed = true
 	}
 	next["outbounds"] = kept
-	routing, e := inboundObject(next["routing"])
+	routing, e := inboundObject(next[section])
 	if e != nil {
 		return nil, false, e
 	}
@@ -134,12 +147,12 @@ func stripOwnedRelay(doc, proof Record) (Record, bool, error) {
 		if !ok {
 			return nil, false, errors.New("路由格式无效")
 		}
-		if row["outboundTag"] != tag {
+		if row[output] != tag {
 			remaining = append(remaining, v)
 			continue
 		}
 		hash, e := identity(row)
-		tags := anyStrings(row["inboundTag"])
+		tags := anyStrings(row[input])
 		if e != nil || hash != proof["routeHash"] || len(tags) != 1 || tags[0] != proof["inboundTag"] || seen {
 			return nil, false, errors.New("中转路由身份变化或被其他入站引用，未删除")
 		}
@@ -147,7 +160,7 @@ func stripOwnedRelay(doc, proof Record) (Record, bool, error) {
 		changed = true
 	}
 	routing["rules"] = remaining
-	next["routing"] = routing
+	next[section] = routing
 	// Balancer selectors match prefixes, not only full tag equality.
 	if raw := routing["balancers"]; raw != nil {
 		values, ok := raw.([]any)
