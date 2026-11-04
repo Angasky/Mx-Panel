@@ -71,6 +71,8 @@ func editCore(ctx context.Context, kind, expected string, run coreRunner, edit f
 	return applyCore(ctx, kind, raw, next, "", run)
 }
 
+var errCoreRolledBack = errors.New("内核应用失败，原配置和服务已恢复")
+
 func applyCore(ctx context.Context, kind string, raw []byte, next Record, managedTag string, run coreRunner) (Record, error) {
 	script, err := coreWriteScript(kind, raw, next, managedTag)
 	if err != nil {
@@ -82,7 +84,7 @@ func applyCore(ctx context.Context, kind string, raw []byte, next Record, manage
 			return nil, errors.New("内核应用失败且回滚未确认，请检查服务器服务状态")
 		}
 		if strings.Contains(output, "MXIOC_CORE_ROLLED_BACK") {
-			return nil, errors.New("内核应用失败，原配置和服务已恢复")
+			return nil, errCoreRolledBack
 		}
 		return nil, errors.New("内核写入结果待核对，请重新读取；未自动重放请求")
 	}
@@ -107,7 +109,7 @@ func applyCore(ctx context.Context, kind string, raw []byte, next Record, manage
 func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Record) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
 		if next != nil && value(record["coreUserPending"]) != "" {
-			return nil, errors.New("独立内核用户撤销待核对，暂不能修改配置")
+			return nil, errors.New("独立内核用户变更待核对，暂不能修改配置")
 		}
 		return coreOperation(ctx, kind, expected, next, run)
 	})

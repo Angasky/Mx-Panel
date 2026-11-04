@@ -70,7 +70,7 @@ func TestCoreUserRemovalPlanVerifiesOwnershipAndPreservesOtherUsers(t *testing.T
 			manual := Record{"tag": "unmanaged"}
 			doc := Record{"inbounds": []any{native, manual}, "outbounds": []any{Record{"tag": "untouched"}}}
 			state := legacyCoreState{Inbounds: []Record{row}}
-			next, rows, err := planCoreUserRemoval(kind, state, doc, binding, false)
+			next, rows, err := planCoreUserChange(kind, "remove", state, doc, binding, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -79,21 +79,66 @@ func TestCoreUserRemovalPlanVerifiesOwnershipAndPreservesOtherUsers(t *testing.T
 				!sameCoreInbound(manual, anyRecords(next["inbounds"])[1]) {
 				t.Fatal("removal changed unrelated entries")
 			}
-			if _, _, err := planCoreUserRemoval(kind, state, next, binding, false); err == nil {
+			if _, _, err := planCoreUserChange(kind, "remove", state, next, binding, false); err == nil {
 				t.Fatal("changed remote configuration accepted without recovery intent")
 			}
-			retried, _, err := planCoreUserRemoval(kind, state, next, binding, true)
+			retried, _, err := planCoreUserChange(kind, "remove", state, next, binding, true)
 			if err != nil || !sameCoreInbound(next, retried) {
 				t.Fatal("retry did not produce the same configuration")
 			}
-			again, _, err := planCoreUserRemoval(kind, legacyCoreState{Inbounds: rows}, next, binding, false)
+			again, _, err := planCoreUserChange(kind, "remove", legacyCoreState{Inbounds: rows}, next, binding, false)
 			if err != nil || again != nil {
 				t.Fatal("already removed user should be a no-op")
 			}
 			bad := bindingFor(t, row, other)
 			bad["inboundId"], bad["userEmail"] = 17, "alice"
-			if _, _, err := planCoreUserRemoval(kind, state, doc, bad, false); err == nil {
+			if _, _, err := planCoreUserChange(kind, "remove", state, doc, bad, false); err == nil {
 				t.Fatal("incorrect credential hash accepted")
+			}
+		})
+	}
+}
+
+func TestCoreUserPauseAndResumePreserveIdentity(t *testing.T) {
+	user := Record{"email": "alice", "id": "3c5827c6-2f92-4861-a1f8-562d5388bca7"}
+	other := Record{"email": "bob", "id": "30403cc4-583b-426a-8424-ec98489977b2"}
+	row := Record{"id": 17, "tag": "mxioc-inbound-17", "port": 443, "protocol": "vless",
+		"settings": Record{"clients": []any{user, other}}}
+	binding := bindingFor(t, row, user)
+	binding["inboundId"], binding["monthlyPaused"] = 17, true
+	for _, kind := range []string{"xray", "sing-box"} {
+		t.Run(kind, func(t *testing.T) {
+			native, err := legacyNativeInbound(kind, row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := Record{"inbounds": []any{native}}
+			state := legacyCoreState{Inbounds: []Record{row}}
+			paused, rows, err := planCoreUserChange(kind, "pause", state, doc, binding, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pausedUser, err := FindUser(rows[0], binding, false)
+			if err != nil || pausedUser["enable"] != false || sameCoreInbound(doc, paused) {
+				t.Fatal("pause should keep the binding but remove its native authorization")
+			}
+			state.Inbounds = rows
+			binding["monthlyBaselinePending"] = true
+			if _, _, err := planCoreUserChange(kind, "resume", state, paused, binding, false); err == nil {
+				t.Fatal("resume accepted without a new baseline")
+			}
+			delete(binding, "monthlyBaselinePending")
+			resumed, rows, err := planCoreUserChange(kind, "resume", state, paused, binding, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resumedUser, err := FindUser(rows[0], binding, false)
+			if err != nil || resumedUser["enable"] != true || sameCoreInbound(paused, resumed) {
+				t.Fatal("resume did not restore the bound credential")
+			}
+			retry, _, err := planCoreUserChange(kind, "resume", state, resumed, binding, true)
+			if err != nil || !sameCoreInbound(resumed, retry) {
+				t.Fatal("interrupted resume did not produce the same config")
 			}
 		})
 	}

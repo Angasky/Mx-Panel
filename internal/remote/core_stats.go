@@ -95,7 +95,7 @@ type coreCounterUsers struct {
 	emails []string
 }
 
-func coreCounterIndex(kind string, doc, stats Record) (map[string]coreCounterUsers, map[string]int) {
+func coreEnabledCounterUsers(kind string, doc, stats Record) map[string]bool {
 	enabled := map[string]bool{}
 	for _, email := range anyStrings(stats["users"]) {
 		enabled[email] = true
@@ -111,6 +111,11 @@ func coreCounterIndex(kind string, doc, stats Record) (map[string]coreCounterUse
 		enabled = actual
 	}
 
+	return enabled
+}
+
+func coreCounterIndex(kind string, doc, stats Record) (map[string]coreCounterUsers, map[string]int) {
+	enabled := coreEnabledCounterUsers(kind, doc, stats)
 	byTag, counts := map[string]coreCounterUsers{}, map[string]int{}
 	for _, native := range anyRecords(doc["inbounds"]) {
 		var entries []Record

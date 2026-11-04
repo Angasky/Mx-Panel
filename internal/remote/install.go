@@ -110,7 +110,7 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 		return nil, err
 	}
 	if value(record["coreUserPending"]) != "" {
-		return nil, errors.New("独立内核用户撤销待核对，暂不能安装或更新")
+		return nil, errors.New("独立内核用户变更待核对，暂不能安装或更新")
 	}
 	if record["connectionMode"] != "install" {
 		return nil, errors.New("已有软件接入模式不会执行安装脚本")

@@ -9,6 +9,22 @@ import (
 
 func (m *Manager) readStandaloneUser(ctx context.Context, id string, binding Record) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
+		if binding["monthlyPaused"] == true && value(record["coreUserPending"]) != "" {
+			pending, err := m.OpenUser(value(record["coreUserPending"]))
+			key, keyErr := coreUserChangeKey(binding)
+			if err != nil || keyErr != nil {
+				return nil, errors.New("独立内核待核对的用户变更记录无效")
+			}
+			if pending["operation"] == "pause" && pending["key"] == key {
+				if _, err := m.changeCoreUser(ctx, id, kind, "pause", record, binding, run); err != nil {
+					return nil, err
+				}
+				record, err = m.Record(id)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 		saved, err := m.Secret(record, "coreState")
 		if err != nil {
 			return nil, err
@@ -59,7 +75,12 @@ func readCoreUser(ctx context.Context, kind string, state legacyCoreState, bindi
 	result := Record{"inbound": row, "client": user}
 	email := value(binding["userEmail"])
 	groups, counts := coreCounterIndex(kind, doc, state.UserStats)
-	if user["enable"] == false || counts[email] != 1 || !slices.Contains(groups[tag].emails, email) {
+	eligible := counts[email] == 1 && slices.Contains(groups[tag].emails, email)
+	if user["enable"] == false {
+		eligible = binding["monthlyPaused"] == true && binding["monthlyBaselinePending"] == true &&
+			counts[email] == 0 && coreEnabledCounterUsers(kind, doc, state.UserStats)[email]
+	}
+	if !eligible {
 		result["counterError"] = "独立内核用户未启用计量或计数归属不唯一"
 		return result, nil
 	}

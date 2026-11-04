@@ -348,7 +348,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if value(record["coreUserPending"]) != "" &&
 		(kind != previousKind || value(record["host"]) != previousHost || value(record["fingerprint"]) != previousFingerprint ||
 			strconv.Itoa(port) != previousSSHPort) {
-		return nil, errors.New("独立内核用户撤销待核对，暂不能更换服务器身份")
+		return nil, errors.New("独立内核用户变更待核对，暂不能更换服务器身份")
 	}
 	if kind != previousKind {
 		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "coreUserPending", "meters", "bandwidths", "relays"} {

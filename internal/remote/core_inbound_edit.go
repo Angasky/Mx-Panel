@@ -13,7 +13,7 @@ import (
 func (m *Manager) EditCoreInbound(ctx context.Context, id, version, operation, tag string, inbound Record) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
 		if value(record["coreUserPending"]) != "" {
-			return nil, errors.New("独立内核用户撤销待核对，暂不能修改配置")
+			return nil, errors.New("独立内核用户变更待核对，暂不能修改配置")
 		}
 		return editCore(ctx, kind, version, run, func(doc Record) (Record, error) {
 			return patchCoreInbound(doc, operation, tag, inbound)
