@@ -4116,6 +4116,14 @@ async function maintenance() {
   const profile = S.profile;
   let [update, account] = await Promise.all([api('/updates'), api('/account')]);
   if (S.page !== 'maintenance' || S.profile !== profile) return;
+  if (update.manual) {
+    $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>Go 版本维护</h3><span class="pill">${esc(update.version)}</span></div>
+      <p>下载与服务器架构对应的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。</p>
+      <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>
+      <a class="btn" href="https://github.com/Angasky/dingzhi-ban/releases" target="_blank" rel="noopener noreferrer">查看发布包</a>
+    </section>`;
+    return;
+  }
   $('content').innerHTML = `
   ${updatePanel(update)}
 

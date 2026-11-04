@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var releaseVersion = "dev"
+
 func main() {
 	listen := flag.String("listen", "127.0.0.1:62578", "listen address; development port differs from Python")
 	root := flag.String("root", "/opt/mxioc-rule-manager", "application data directory")
@@ -19,8 +21,19 @@ func main() {
 	proxy := flag.Bool("trust-loopback-proxy", false, "trust HTTPS forwarding only from loopback reverse proxy")
 	local := flag.Bool("local-development", false, "allow loopback HTTP for isolated development only")
 	check := flag.Bool("check-data", false, "validate existing credentials and every subscription without starting services")
+	adminHTML := flag.String("admin-html", "", "optional release-specific administrator HTML path")
+	bootstrapUser := flag.String("bootstrap-user", "", "initialize a fresh data directory and account using a password read from stdin")
 	flag.Parse()
-	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, TrustLoopbackProxy: *proxy, LocalDevelopment: *local})
+	if *bootstrapUser != "" {
+		if *check {
+			log.Fatal("--bootstrap-user and --check-data are mutually exclusive")
+		}
+		if err := bootstrap(*root, *auth, *bootstrapUser, os.Stdin); err != nil {
+			log.Fatal("initialization failed: ", err)
+		}
+		return
+	}
+	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local})
 	if err != nil {
 		log.Fatal("startup validation failed: ", err)
 	}

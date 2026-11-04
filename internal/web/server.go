@@ -26,7 +26,7 @@ import (
 )
 
 type Options struct {
-	Root, AuthFile                       string
+	Root, AuthFile, AdminHTML, Version   string
 	TrustLoopbackProxy, LocalDevelopment bool
 }
 type account struct {
@@ -185,7 +185,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		http.ServeFile(w, r, filepath.Join(s.options.Root, "index.html"))
+		path := s.options.AdminHTML
+		if path == "" {
+			path = filepath.Join(s.options.Root, "index.html")
+		}
+		http.ServeFile(w, r, path)
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
@@ -228,6 +232,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		http.SetCookie(w, &http.Cookie{Name: "mxioc_session", Path: "/admin", MaxAge: -1, HttpOnly: true, Secure: r.TLS != nil || !s.options.LocalDevelopment, SameSite: http.SameSiteStrictMode})
 		respond(w, 200, map[string]any{"ok": true})
+		return
+	}
+	if r.URL.Path == "/admin/api/updates" && r.Method == "GET" {
+		version := s.options.Version
+		if version == "" {
+			version = "dev"
+		}
+		respond(w, 200, map[string]any{"manual": true, "version": version, "available": false})
 		return
 	}
 	if r.URL.Path == "/admin/api/account" && r.Method == "GET" {

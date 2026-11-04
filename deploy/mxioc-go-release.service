@@ -1,0 +1,21 @@
+[Unit]
+Description=Mxioc native Go service
+After=network.target
+Conflicts=mxioc-rule-manager.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/mxioc-rule-manager
+ExecStartPre=/opt/mxioc-go/current/mxioc --root /opt/mxioc-rule-manager --auth /etc/mxioc-rule-manager.auth.json --check-data
+ExecStart=/opt/mxioc-go/current/mxioc --root /opt/mxioc-rule-manager --auth /etc/mxioc-rule-manager.auth.json --admin-html /opt/mxioc-go/current/index.html --listen 127.0.0.1:62578 --trust-loopback-proxy
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

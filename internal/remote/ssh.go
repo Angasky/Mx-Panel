@@ -185,6 +185,10 @@ func quote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'
 // Execute uses a fresh SSH connection so cancellation cannot close unrelated
 // requests. Secrets travel in the channel input, never in process arguments.
 func Execute(ctx context.Context, c Connection, script string, maxOutput int) (string, error) {
+	return executeObserved(ctx, c, script, maxOutput, nil)
+}
+
+func executeObserved(ctx context.Context, c Connection, script string, maxOutput int, observer io.Writer) (string, error) {
 	if _, bounded := ctx.Deadline(); !bounded {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 90*time.Second)
@@ -198,10 +202,14 @@ func Execute(ctx context.Context, c Connection, script string, maxOutput int) (s
 		return "", err
 	}
 	defer client.Close()
-	return executeClient(ctx, client, c, script, maxOutput)
+	return executeClientObserved(ctx, client, c, script, maxOutput, observer)
 }
 
 func executeClient(ctx context.Context, client *ssh.Client, c Connection, script string, maxOutput int) (string, error) {
+	return executeClientObserved(ctx, client, c, script, maxOutput, nil)
+}
+
+func executeClientObserved(ctx context.Context, client *ssh.Client, c Connection, script string, maxOutput int, observer io.Writer) (string, error) {
 	if maxOutput < 1 || maxOutput > 16<<20 {
 		return "", errors.New("输出大小限制无效")
 	}
@@ -226,6 +234,9 @@ func executeClient(ctx context.Context, client *ssh.Client, c Connection, script
 	}
 	output := &capture{limit: maxOutput}
 	session.Stdout = output
+	if observer != nil {
+		session.Stdout = io.MultiWriter(output, observer)
+	}
 	session.Stderr = output
 	session.Stdin = strings.NewReader(input)
 	done := make(chan error, 1)

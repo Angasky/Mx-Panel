@@ -1,2 +1,4 @@
 internal/remote/scripts/*.sh text eol=lf
 third_party/yaml/* text eol=lf
+deploy/*-go*.sh text eol=lf
+deploy/mxioc-go-release.service text eol=lf

@@ -175,7 +175,8 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 		<-gate
 		return nil, err
 	}
-	job := Record{"id": hex.EncodeToString(random), "serverId": id, "installType": record["installType"], "status": "running", "stage": "connecting", "startedAt": time.Now().Unix(), "log": "原生 SSH 安装任务已启动；完成后返回执行日志。", "error": ""}
+	jobID := hex.EncodeToString(random)
+	job := Record{"id": jobID, "serverId": id, "installType": record["installType"], "status": "running", "stage": "connecting", "startedAt": time.Now().Unix(), "log": "原生 SSH 安装任务已启动；完成后返回执行日志。", "error": ""}
 	if len(keep) > 47-len(active) {
 		keep = keep[len(keep)-(47-len(active)):]
 	}
@@ -191,8 +192,10 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 	runner := m.installRun
 	if runner == nil {
 		runner = func(ctx context.Context, c Connection, script string) (string, error) {
-			output, e := Execute(ctx, c, script, 64<<10)
+			observer := &installStageWriter{report: func(stage string) { m.updateInstallStage(jobID, stage) }}
+			output, e := executeObserved(ctx, c, script, 64<<10, observer)
 			if e == nil && record["installType"] == "3x-ui" {
+				m.updateInstallStage(jobID, "api-check")
 				output += "\nMXIOC_STAGE=api-check\n"
 				_, e = m.verifyInstalledPanel(ctx, id)
 				if e != nil {
@@ -206,7 +209,7 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 	for k, v := range job {
 		result[k] = v
 	}
-	go m.runInstall(parent, connection, script, config, value(job["id"]), gate, runner)
+	go m.runInstall(parent, connection, script, config, jobID, gate, runner)
 	return result, nil
 }
 func (m *Manager) runInstall(parent context.Context, connection Connection, script, config, id string, gate chan struct{}, runner func(context.Context, Connection, string) (string, error)) {
@@ -272,8 +275,8 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 				job["error"] = "安装超时或总控退出，远端状态待核对；未自动重放"
 			}
 			for _, line := range strings.Split(output, "\n") {
-				if strings.HasPrefix(line, "MXIOC_STAGE=") {
-					job["stage"] = strings.TrimSpace(strings.TrimPrefix(line, "MXIOC_STAGE="))
+				if stage := installStage(line); stage != "" {
+					job["stage"] = stage
 				}
 			}
 		}
