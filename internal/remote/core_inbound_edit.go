@@ -3,6 +3,8 @@ package remote
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -57,6 +59,16 @@ func patchCoreInbound(doc Record, operation, tag string, inbound Record) (Record
 			}
 			rows[index] = inbound
 		}
+	case "delete":
+		if index < 0 {
+			return nil, errors.New("入站不存在")
+		}
+		next := maps.Clone(doc)
+		next["inbounds"] = slices.Delete(slices.Clone(rows), index, index+1)
+		if containsConfigString(next, tag) {
+			return nil, errors.New("入站标签仍在其他配置中使用，请先检查并移除引用")
+		}
+		return next, nil
 	default:
 		return nil, errors.New("不支持该入站操作")
 	}

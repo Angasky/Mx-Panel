@@ -2855,13 +2855,14 @@ async function editNativeCoreInbound() {
     const data = await api('/servers/core?id=' + encodeURIComponent(serverId));
     if (!loading.isConnected || S.serverId !== serverId) return;
     const entries = (data.config.inbounds || []).filter(row => typeof row.tag === 'string' && row.tag && !row.tag.startsWith('mxioc-inbound-'));
-    openModal('独立内核入站', '<form id="nativeCoreForm"><label for="nativeCoreChoice">入站</label><select id="nativeCoreChoice"><option value="">新建入站</option></select><p class="muted">使用当前内核的原生 JSON。保存已有入站时保留 tag。</p><textarea id="nativeCoreJSON" class="raw" spellcheck="false" required></textarea><div id="nativeCoreError" class="error"></div><button id="nativeCoreSave" class="btn primary">校验并保存</button></form>');
+    openModal('独立内核入站', '<form id="nativeCoreForm"><label for="nativeCoreChoice">入站</label><select id="nativeCoreChoice"><option value="">新建入站</option></select><p class="muted">使用当前内核的原生 JSON。保存已有入站时保留 tag。</p><textarea id="nativeCoreJSON" class="raw" spellcheck="false" required></textarea><div id="nativeCoreError" class="error"></div><button id="nativeCoreSave" class="btn primary">校验并保存</button> <button id="nativeCoreDelete" class="btn danger" formnovalidate>删除入站</button></form>');
     const form = $('nativeCoreForm'), choice = $('nativeCoreChoice'), editor = $('nativeCoreJSON');
-    const save = $('nativeCoreSave'), errorBox = $('nativeCoreError');
+    const save = $('nativeCoreSave'), remove = $('nativeCoreDelete'), errorBox = $('nativeCoreError');
     entries.forEach((row, index) => choice.add(new Option(row.tag, String(index))));
     const populate = () => {
       const row = choice.value === '' ? {tag: '', [data.kind === 'sing-box' ? 'type' : 'protocol']: ''} : entries[Number(choice.value)];
       editor.value = JSON.stringify(row, null, 2);
+      remove.hidden = choice.value === '';
       errorBox.textContent = '';
     };
     choice.onchange = populate;
@@ -2869,18 +2870,20 @@ async function editNativeCoreInbound() {
     form.onsubmit = async event => {
       event.preventDefault();
       if (save.disabled) return;
-      save.disabled = true;
+      const deleting = event.submitter === remove;
+      const creating = choice.value === '';
+      if (deleting && (creating || !confirm('确定删除这个入站？该端口上的连接可能中断。'))) return;
+      save.disabled = remove.disabled = choice.disabled = true;
       try {
-        const config = JSON.parse(editor.value);
-        const creating = choice.value === '';
+        const config = deleting ? null : JSON.parse(editor.value);
         const tag = creating ? config.tag : entries[Number(choice.value)].tag;
-        await api('/servers/core/inbound', jsonOpt('PUT', {serverId, version:data.version, operation:creating ? 'create' : 'update', tag, config}));
+        await api('/servers/core/inbound', jsonOpt('PUT', {serverId, version:data.version, operation:deleting ? 'delete' : creating ? 'create' : 'update', tag, config}));
         if (form.isConnected) closeModal();
-        notice('独立内核入站已保存');
+        notice(deleting ? '独立内核入站已删除' : '独立内核入站已保存');
       } catch (error) {
         if (form.isConnected) errorBox.textContent = error.message;
       } finally {
-        save.disabled = false;
+        save.disabled = remove.disabled = choice.disabled = false;
       }
     };
   } catch (error) {

@@ -167,27 +167,7 @@ func stripOwnedRelay(doc, proof Record) (Record, bool, error) {
 			}
 		}
 	}
-	var references func(any) bool
-	references = func(v any) bool {
-		switch x := v.(type) {
-		case string:
-			return x == tag
-		case map[string]any:
-			for _, v := range x {
-				if references(v) {
-					return true
-				}
-			}
-		case []any:
-			for _, v := range x {
-				if references(v) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-	if references(next) {
+	if containsConfigString(next, tag) {
 		return nil, false, errors.New("中转出站仍被其他配置引用，未删除")
 	}
 	return next, changed, nil
@@ -337,4 +317,24 @@ func (m *Manager) deleteRelayInbound(ctx context.Context, p *Panel, record, proo
 	}
 	result["relayCleaned"] = true
 	return result, nil
+}
+
+func containsConfigString(v any, target string) bool {
+	switch x := v.(type) {
+	case string:
+		return x == target
+	case map[string]any:
+		for _, v := range x {
+			if containsConfigString(v, target) {
+				return true
+			}
+		}
+	case []any:
+		for _, v := range x {
+			if containsConfigString(v, target) {
+				return true
+			}
+		}
+	}
+	return false
 }

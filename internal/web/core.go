@@ -32,7 +32,7 @@ func (s *Server) coreRoutes(w http.ResponseWriter, r *http.Request) bool {
 			Operation string         `json:"operation"`
 			Tag       string         `json:"tag"`
 		}
-		if readJSON(w, r, &input) != nil || input.ServerID == "" || len(input.Version) != 64 || input.Config == nil {
+		if readJSON(w, r, &input) != nil || input.ServerID == "" || len(input.Version) != 64 || (input.Config == nil && !(scoped && input.Operation == "delete")) {
 			problem(w, 400, "请提交服务器、原配置版本和 JSON 配置对象")
 			return true
 		}

@@ -35,3 +35,29 @@ func TestPatchCoreInboundPreservesUnrelatedConfiguration(t *testing.T) {
 		t.Fatalf("unexpected configuration: %v", doc)
 	}
 }
+
+func TestDeleteCoreInboundRejectsReferences(t *testing.T) {
+	target := Record{"tag": "entry", "port": 443}
+	other := Record{"tag": "other", "port": 444}
+	for _, rule := range []struct {
+		key, field string
+	}{
+		{"routing", "inboundTag"},
+		{"route", "inbound"},
+	} {
+		doc := Record{"inbounds": []any{target, other}, rule.key: Record{
+			"rules": []any{Record{rule.field: []any{"entry"}}},
+		}}
+		if _, err := patchCoreInbound(doc, "delete", "entry", nil); err == nil {
+			t.Errorf("accepted deletion with %s reference", rule.key)
+		}
+		if !reflect.DeepEqual(doc["inbounds"], []any{target, other}) {
+			t.Fatal("rejected deletion mutated the input")
+		}
+		delete(doc, rule.key)
+		next, err := patchCoreInbound(doc, "delete", "entry", nil)
+		if err != nil || !reflect.DeepEqual(next["inbounds"], []any{other}) {
+			t.Fatalf("delete: %v, %v", next, err)
+		}
+	}
+}
