@@ -307,6 +307,9 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 	if err != nil {
 		return nil, err
 	}
+	if _, err := corePath(value(record["installType"])); err == nil {
+		return m.createStandaloneInbound(ctx, server, key, requestHash, payload)
+	}
 	revision := createServerRevision(record)
 	entry, err := m.loadCreate(key)
 	if err != nil {

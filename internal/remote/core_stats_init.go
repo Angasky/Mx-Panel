@@ -99,13 +99,8 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 		return Record{"enabled": err == nil}, err
 	}
 	stats := Record{"listen": coreStatsListen, "binary": "/usr/local/bin/xray", "users": []any{}}
-	check := "test -x /usr/local/bin/xray"
-	if kind == "sing-box" {
-		check += " && /usr/bin/sing-box version"
-	}
-	output, err := run(ctx, check, 64<<10)
-	if err != nil || (kind == "sing-box" && !strings.Contains(output, "with_v2ray_api")) {
-		return nil, errors.New("缺少 Xray 统计查询工具，或 sing-box 构建缺少 with_v2ray_api")
+	if err := checkCoreStatsTools(ctx, kind, run); err != nil {
+		return nil, err
 	}
 	next := doc
 	if journal == nil || journal["after"] != before {
@@ -176,4 +171,16 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 		return nil, errors.New("远端计量已启用，总控记录保存待重试")
 	}
 	return Record{"enabled": true}, nil
+}
+
+func checkCoreStatsTools(ctx context.Context, kind string, run coreRunner) error {
+	check := "test -x /usr/local/bin/xray"
+	if kind == "sing-box" {
+		check += " && /usr/bin/sing-box version"
+	}
+	output, err := run(ctx, check, 64<<10)
+	if err != nil || (kind == "sing-box" && !strings.Contains(output, "with_v2ray_api")) {
+		return errors.New("缺少 Xray 统计查询工具，或 sing-box 构建缺少 with_v2ray_api")
+	}
+	return nil
 }
