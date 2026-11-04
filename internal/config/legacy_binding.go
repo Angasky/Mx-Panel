@@ -88,6 +88,9 @@ func (r *Repository) MigrateLegacyBinding(profile string, position int, token st
 	for _, key := range []string{"scope", "identityHash", "userEmail", "userHash", "operationId"} {
 		binding[key] = proposed[key]
 	}
+	if proposed["legacyMeterRetained"] == true {
+		binding["legacyMeterRetained"] = true
+	}
 	binding["importedNames"] = []any{name}
 	binding["importedNodes"] = []any{Document{"name": name, "identity": identity}}
 	bindingErrors(record)

@@ -377,6 +377,9 @@ func (c *Controller) applyReadingToBinding(p, current, reading Record) error {
 	current["uploadRemainder"] = delta.Next.UpRemainder
 	current["downloadRemainder"] = delta.Next.DownRemainder
 	current["counterSource"] = "authenticated-client"
+	if reading["legacyMeterRetained"] == true {
+		current["legacyMeterRetained"] = true
+	}
 	current["lastSampleAt"] = c.Now().Unix()
 	current["error"] = ""
 	delete(current, "monthlyBaselinePending")

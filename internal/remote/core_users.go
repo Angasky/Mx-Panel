@@ -33,7 +33,14 @@ func (m *Manager) readStandaloneUser(ctx context.Context, id string, binding Rec
 		if err != nil {
 			return nil, err
 		}
-		return readCoreUser(ctx, kind, state, binding, run)
+		result, err := readCoreUser(ctx, kind, state, binding, run)
+		if err == nil {
+			meters, _ := record["meters"].(Record)
+			if reading, ok := result["reading"].(Record); ok && meters[value(binding["inboundId"])] != nil {
+				reading["legacyMeterRetained"] = true
+			}
+		}
+		return result, err
 	})
 }
 

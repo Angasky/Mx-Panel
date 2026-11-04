@@ -3205,10 +3205,28 @@ async function removeTrafficBinding(index, button, migrate = false) {
     if (S.profile !== profile) return;
     S.data.profile.traffic = result.traffic;
     if (S.page === 'traffic') traffic();
-    notice(migrate ? (result.legacyMeterRetained ? '已切换到独立用户计量，旧端口计量规则仍保留' : '旧绑定已迁移为独立用户') : '绑定记录已删除，已计费用量保留');
+    notice(migrate ? (result.legacyMeterRetained ? '已切换到独立用户计量，可清理旧端口计量规则' : '旧绑定已迁移为独立用户') : '绑定记录已删除，已计费用量保留');
   } catch (error) {
     if (S.profile === profile && $('trafficError')) $('trafficError').textContent = error.message;
   } finally { bindingRemovalPending = false; if (button?.isConnected) button.disabled = false; }
+}
+
+async function clearTrafficLegacyMeter(index, button) {
+  if (bindingRemovalPending || button.disabled) return;
+  const profile = S.profile, binding = S.data.profile?.traffic?.bindings?.[index];
+  if (!binding || !confirm('清理这个入站的旧端口计量规则？认证用户计量和已计费用量会保留。')) return;
+  bindingRemovalPending = button.disabled = true;
+  try {
+    const options = jsonOpt('PUT', {recordIndex:binding.recordIndex, recordToken:binding.recordToken, confirmed:true});
+    options.headers['X-Profile'] = profile;
+    const result = await api('/traffic/bindings/clear-meter', options);
+    if (S.profile !== profile) return;
+    S.data.profile.traffic = result.traffic;
+    if (S.page === 'traffic') traffic();
+    notice('旧端口计量规则已清理');
+  } catch (error) {
+    if (S.profile === profile && $('trafficError')) $('trafficError').textContent = error.message;
+  } finally { bindingRemovalPending = false; if (button.isConnected) button.disabled = false; }
 }
 
 function trafficBindings(t) {
@@ -3220,7 +3238,7 @@ function trafficBindings(t) {
     (b.counterSource === 'authenticated-client' || (S.idempotentCreate && ['inbound',''].includes(b.counterSource ?? '')))
     ? `<button type="button" class="btn small" onclick="removeTrafficBinding(${positions.get(b)},this,true)">迁移到独立用户</button>` : '';
   const labels = {active:'有效',detached:'已解绑',revoked:'已撤销',missing:'远端已不存在',identity_changed:'身份已变化（停止管理）',provisioning:'用户创建待核对（重试添加可恢复）'};
-  return `<h3>有效绑定节点（${active.length}）</h3><div class="tablewrap"><table><thead><tr><th>订阅用户 / 入站</th><th>服务器 / ID</th><th>状态 / 限速</th><th>操作 / 错误</th></tr></thead><tbody>${active.map(b => `<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${b.scope === 'user' ? '独立用户 · '+esc(b.userEmail) : '旧版专属绑定（可迁移）'}</div></td><td>${esc(b.serverId)} / ${b.inboundId}</td><td>${b.monthlyPaused ? '月额度暂停' : '有效'} · ${esc((b.multiplierUnits ?? ((t.multiplier ?? 1) * 1000)) / 1000)} 倍<div class="hint">${bandwidthLabel(b.bandwidth)}</div><div class="hint">${b.counterSource === 'authenticated-client' ? '认证用户流量' : b.counterSource === 'pending' ? '等待首次采集' : '入站/端口流量（含连接开销）'} · 本次采集 ${formatBytes(b.lastRawDelta || 0)}${b.lastSampleAt ? ' · '+esc(new Date(b.lastSampleAt * 1000).toLocaleTimeString('zh-CN')) : ''}</div></td><td><button type="button" class="btn small" ${b.scope === 'user' ? 'disabled title="共用入站暂不支持单用户带宽限制"' : ''} onclick="nodeBandwidthModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点带宽限制</button><button type="button" class="btn small" onclick="nodeMultiplierModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点流量倍率</button>${migrateButton(b)}${removeButton(b)}<div class="error">${esc(b.error || '')}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">暂无有效绑定，请选择服务器入站添加独立订阅用户</td></tr>'}</tbody></table></div>
+  return `<h3>有效绑定节点（${active.length}）</h3><div class="tablewrap"><table><thead><tr><th>订阅用户 / 入站</th><th>服务器 / ID</th><th>状态 / 限速</th><th>操作 / 错误</th></tr></thead><tbody>${active.map(b => `<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${b.scope === 'user' ? '独立用户 · '+esc(b.userEmail) : '旧版专属绑定（可迁移）'}</div></td><td>${esc(b.serverId)} / ${b.inboundId}</td><td>${b.monthlyPaused ? '月额度暂停' : '有效'} · ${esc((b.multiplierUnits ?? ((t.multiplier ?? 1) * 1000)) / 1000)} 倍<div class="hint">${bandwidthLabel(b.bandwidth)}</div><div class="hint">${b.counterSource === 'authenticated-client' ? '认证用户流量' : b.counterSource === 'pending' ? '等待首次采集' : '入站/端口流量（含连接开销）'} · 本次采集 ${formatBytes(b.lastRawDelta || 0)}${b.lastSampleAt ? ' · '+esc(new Date(b.lastSampleAt * 1000).toLocaleTimeString('zh-CN')) : ''}</div></td><td><button type="button" class="btn small" ${b.scope === 'user' ? 'disabled title="共用入站暂不支持单用户带宽限制"' : ''} onclick="nodeBandwidthModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点带宽限制</button><button type="button" class="btn small" onclick="nodeMultiplierModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点流量倍率</button>${migrateButton(b)}${b.legacyMeterRetained === true ? `<button type="button" class="btn small" onclick="clearTrafficLegacyMeter(${positions.get(b)},this)">清理旧端口计量</button>` : ''}${removeButton(b)}<div class="error">${esc(b.error || '')}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">暂无有效绑定，请选择服务器入站添加独立订阅用户</td></tr>'}</tbody></table></div>
   ${history.length ? `<details id="trafficHistory"><summary>失效历史绑定（${history.length}）</summary><p class="hint">这些不是当前有效绑定，已停止计量；历史计费用量仍保留。身份变化表示旧绑定已失效，同一 ID 可能已被新节点使用。清理仅移除本地历史绑定，不会连接服务器、删除远端节点或订阅中的节点链接。</p><div class="tablewrap"><table><thead><tr><th>历史节点</th><th>状态</th><th>历史错误</th></tr></thead><tbody>${history.map(b=>`<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${esc(b.serverId)} / ${b.inboundId}</div></td><td>${esc(labels[b.status] || b.status)}</td><td>${esc(b.error || '—')}${removeButton(b)}</td></tr>`).join('')}</tbody></table></div><button id="trafficCleanup" class="btn small danger" type="button">清理失效历史绑定</button></details>` : ''}`;
 }
 

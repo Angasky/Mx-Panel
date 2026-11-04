@@ -99,6 +99,9 @@ func (c *Controller) MigrateLegacyBinding(ctx context.Context, profile string, p
 		return nil, err
 	}
 	proposed["operationId"] = op
+	if meters[id] != nil {
+		proposed["legacyMeterRetained"] = true
+	}
 	response, err := c.Backend.SubscriptionUser(ctx, server, proposed, "read", nil)
 	if err != nil {
 		return nil, err

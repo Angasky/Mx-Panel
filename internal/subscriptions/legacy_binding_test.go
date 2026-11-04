@@ -22,6 +22,15 @@ func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
 type legacyCoreMigrationBackend struct {
 	*fakeBackend
 	enrolls int
+	clears  int
+}
+
+func (b *legacyCoreMigrationBackend) ClearLegacyMeter(_ context.Context, server string, id, port int) error {
+	if server != "s" || id != 1 || port != 24001 {
+		panic("unexpected meter target")
+	}
+	b.clears++
+	return nil
 }
 
 func (b *legacyCoreMigrationBackend) Record(id string) (Record, error) {
@@ -110,6 +119,20 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 	}
 	if standalone && (core.enrolls != 1 || result["legacyMeterRetained"] != true) {
 		t.Fatal("expected one verified enrollment while keeping the old meter")
+	}
+	if standalone {
+		token := config.BindingToken("clash", stateBinding(t, c))
+		backend.missingCounters = true
+		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err == nil || core.clears != 0 {
+			t.Fatal("missing authenticated counters should preserve the old meter")
+		}
+		backend.missingCounters = false
+		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err != nil || core.clears != 1 {
+			t.Fatal("verified meter cleanup failed", err)
+		}
+		if stateBinding(t, c)["legacyMeterRetained"] != nil {
+			t.Fatal("cleared meter is still marked present")
+		}
 	}
 	if after, err := c.Repository.Raw("clash"); err != nil || before != after {
 		t.Fatal("existing YAML was rewritten")

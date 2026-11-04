@@ -74,7 +74,7 @@ func TrafficInfo(record Document, now time.Time) (Document, error) {
 			return nil, errors.New("用户绑定格式无效")
 		}
 		out := Document{"recordIndex": index, "recordToken": BindingToken(stringValue(record["id"]), b)}
-		for _, k := range []string{"scope", "serverId", "inboundId", "name", "port", "status", "error", "importedNames", "multiplierUnits", "up", "down", "lastSampleAt", "lastRawDelta", "monthlyPaused", "counterSource"} {
+		for _, k := range []string{"scope", "serverId", "inboundId", "name", "port", "status", "error", "importedNames", "multiplierUnits", "up", "down", "lastSampleAt", "lastRawDelta", "monthlyPaused", "counterSource", "legacyMeterRetained"} {
 			if value, exists := b[k]; exists {
 				out[k] = value
 			}
