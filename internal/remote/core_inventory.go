@@ -84,11 +84,20 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 				}
 			}
 		}
-		rows = append(rows, Record{
+		entry := Record{
 			"id": id, "port": port, "protocol": protocol, "remark": value(row["remark"]),
 			"enable": status == "present" || status == "unverified", "coreStatus": status, "shareLinks": shares,
 			"coreRelay": coreRelayProof(row) != nil,
-		})
+		}
+		if status == "missing" && value(record["coreUserPending"]) == "" {
+			if hash, err := EndpointIdentity(row); err == nil {
+				entry["missingUserIdentity"] = hash
+			}
+			if hash, err := LegacyInboundIdentity(row); err == nil {
+				entry["missingLegacyIdentity"] = hash
+			}
+		}
+		rows = append(rows, entry)
 	}
 	return Record{"server": publicServer(record), "inbounds": rows, "readOnly": true, "coreStatsConfig": state.UserStats}, nil
 }

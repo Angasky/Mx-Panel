@@ -31,10 +31,7 @@ func inventoryRows(snapshot Record) ([]Record, map[int]bool, error) {
 }
 
 func (c *Controller) ReconcileServer(ctx context.Context, server string, snapshot Record, observed map[string]bool) (Record, error) {
-	if snapshot["readOnly"] == true {
-		return Record{"removed": 0, "errors": []string{}}, nil
-	}
-	_, live, err := inventoryRows(snapshot)
+	rows, live, err := inventoryRows(snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +46,7 @@ func (c *Controller) ReconcileServer(ctx context.Context, server string, snapsho
 		if err != nil {
 			return nil, err
 		}
-		n, err := c.Repository.ReconcileInventory(id, server, live, observed)
+		n, err := c.reconcileInventory(id, server, snapshot["readOnly"] == true, rows, live, observed)
 		release()
 		removed += n
 		if err != nil {
@@ -57,6 +54,23 @@ func (c *Controller) ReconcileServer(ctx context.Context, server string, snapsho
 		}
 	}
 	return Record{"removed": removed, "errors": failures}, nil
+}
+
+func (c *Controller) reconcileInventory(profile, server string, standalone bool, rows []Record, live map[int]bool, observed map[string]bool) (int, error) {
+	if !standalone {
+		return c.Repository.ReconcileInventory(profile, server, live, observed)
+	}
+	missing := map[int]Record{}
+	for _, row := range rows {
+		if row["coreStatus"] == "missing" && (row["missingUserIdentity"] != nil || row["missingLegacyIdentity"] != nil) {
+			id, _ := number(row["id"], 0) // inventoryRows already validated the ID.
+			missing[int(id)] = row
+		}
+	}
+	if len(missing) == 0 {
+		return 0, nil
+	}
+	return c.Repository.ReconcileMissingCoreInbounds(profile, server, missing, observed)
 }
 
 // Called while the profile operation lock is held. A failed read never becomes
@@ -87,16 +101,17 @@ func (c *Controller) reconcileProfileLocked(ctx context.Context, profile string)
 			failures = append(failures, "服务器不可达，已保留订阅节点")
 			continue
 		}
-		if snapshot["readOnly"] == true {
-			continue
-		}
 		rows, live, err := inventoryRows(snapshot)
 		if err != nil {
 			failures = append(failures, err.Error())
 			continue
 		}
-		if _, err = c.Repository.ReconcileInventory(profile, server, live, observed); err != nil {
+		standalone := snapshot["readOnly"] == true
+		if _, err = c.reconcileInventory(profile, server, standalone, rows, live, observed); err != nil {
 			failures = append(failures, "缺失节点清理失败，等待重试")
+			continue
+		}
+		if standalone {
 			continue
 		}
 		byID := map[string]Record{}

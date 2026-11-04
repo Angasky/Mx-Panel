@@ -123,3 +123,95 @@ func TestReusedLocalNameIsPreservedAndBadInventoryRejected(t *testing.T) {
 		}
 	}
 }
+
+type missingCoreBackend struct {
+	*fakeBackend
+	inventory Record
+}
+
+func (b *missingCoreBackend) Inbounds(context.Context, string) (Record, error) {
+	return b.inventory, nil
+}
+
+func TestStandaloneReconciliationRequiresExplicitIdentityProof(t *testing.T) {
+	for _, background := range []bool{false, true} {
+		name := "refresh"
+		if background {
+			name = "background"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			c, base, _ := controllerFixture(t)
+			if _, err := c.Batch(ctx, "clash", "s", []int{1, 2}); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Repository.UpdateState("clash", func(p Record) error { traffic(p)["enforce"] = false; return nil }); err != nil {
+				t.Fatal(err)
+			}
+			binding := stateBinding(t, c)
+			name := binding["importedNames"].([]any)[0]
+			if err := c.Repository.Mutate("clash", func(doc Record) error {
+				groups, _ := doc["proxy-groups"].([]any)
+				doc["proxy-groups"] = append(groups, Record{"name": "fallback-fixture", "type": "fallback",
+					"proxies": []any{name}, "url": "https://example.net/", "interval": 30})
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Repository.UpdateState("clash", func(p Record) error {
+				p["failovers"] = []any{Record{"name": "fallback-fixture"}}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			observed, err := c.Repository.BindingSnapshot("s")
+			if err != nil {
+				t.Fatal(err)
+			}
+			core := &missingCoreBackend{fakeBackend: base}
+			c.Backend = core
+			reconcile := func(rows ...any) {
+				t.Helper()
+				core.inventory = Record{"readOnly": true, "inbounds": rows}
+				if background {
+					if _, err := c.Sync(ctx, "clash"); err != nil {
+						t.Fatal(err)
+					}
+				} else if _, err := c.ReconcileServer(ctx, "s", core.inventory, observed); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertNodes := func(want int) {
+				t.Helper()
+				snapshot, err := c.Repository.Snapshot("clash")
+				if err != nil || len(snapshot["nodes"].([]any)) != want {
+					t.Fatalf("expected %d nodes: %v", want, err)
+				}
+			}
+			reconcile(Record{"id": 1, "coreStatus": "disabled", "missingUserIdentity": binding["identityHash"]})
+			assertNodes(2)
+			reconcile(Record{"id": 1, "coreStatus": "missing", "missingUserIdentity": strings.Repeat("f", 64)})
+			assertNodes(2)
+			reconcile(Record{"id": 1, "coreStatus": "missing", "missingUserIdentity": binding["identityHash"]})
+			assertNodes(1)
+			if got := stateBinding(t, c)["status"]; got != "missing" {
+				t.Fatal("verified missing node not marked", got)
+			}
+			snapshot, err := c.Repository.Snapshot("clash")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, group := range objects(snapshot["groups"]) {
+				if group["name"] == "fallback-fixture" {
+					policy, _ := group["config"].(Record)
+					proxies, _ := policy["proxies"].([]any)
+					if len(proxies) != 1 || proxies[0] != "REJECT" {
+						t.Fatal("empty managed failover should reject traffic", proxies)
+					}
+					return
+				}
+			}
+			t.Fatal("managed failover disappeared")
+		})
+	}
+}

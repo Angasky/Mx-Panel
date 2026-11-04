@@ -31,6 +31,13 @@ func TestCoreInventoryLegacyIDsAndNativePresence(t *testing.T) {
 				if row["coreStatus"] != status || row["id"] != 17+i || row["settings"] != nil {
 					t.Errorf("unexpected row: %v", row)
 				}
+				if (len(value(row["missingUserIdentity"])) == 64) != (status == "missing") {
+					t.Errorf("unexpected absence proof for %s", status)
+				}
+			}
+			pending, err := coreInventory(kind, Record{"coreUserPending": "pending"}, doc, saved)
+			if err != nil || anyRecords(pending["inbounds"])[2]["missingUserIdentity"] != nil {
+				t.Fatal("pending operation must not establish absence", err)
 			}
 		})
 	}

@@ -105,6 +105,24 @@ func (r *Repository) ImportTargets(server string, ids []int) ([]Document, error)
 // An authoritative snapshot may only change binding generations observed before
 // fetching it. Registry metadata is durable before touching YAML, so failures retry.
 func (r *Repository) ReconcileInventory(profile, server string, live map[int]bool, observed map[string]bool) (int, error) {
+	return r.reconcileInventory(profile, server, observed, func(id int, _ Document) bool { return !live[id] })
+}
+
+// Standalone inventory describes only locally managed inbounds. An omitted
+// row proves nothing, and a matching ID alone cannot identify an old binding.
+func (r *Repository) ReconcileMissingCoreInbounds(profile, server string, missing map[int]Document, observed map[string]bool) (int, error) {
+	return r.reconcileInventory(profile, server, observed, func(id int, binding Document) bool {
+		row := missing[id]
+		field := "missingLegacyIdentity"
+		if binding["scope"] == "user" {
+			field = "missingUserIdentity"
+		}
+		hash := stringValue(row[field])
+		return len(hash) == 64 && binding["identityHash"] == hash
+	})
+}
+
+func (r *Repository) reconcileInventory(profile, server string, observed map[string]bool, isMissing func(int, Document) bool) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	index, err := r.index()
@@ -125,7 +143,7 @@ func (r *Repository) ReconcileInventory(profile, server string, live map[int]boo
 		if err != nil {
 			return 0, err
 		}
-		if !live[id] && (b["status"] == "active" || b["status"] == "provisioning" || b["inboundDeletePending"] != nil) {
+		if isMissing(id, b) && (b["status"] == "active" || b["status"] == "provisioning" || b["inboundDeletePending"] != nil) {
 			b["status"] = "missing"
 			b["error"] = "远端入站已不存在"
 			delete(b, "inboundDeletePending")
@@ -198,10 +216,20 @@ func (r *Repository) cleanupMissingLocked(profile string) (int, error) {
 		for name := range names {
 			replaceReferences(doc, name, "")
 		}
+		failovers := map[string]bool{}
+		for _, v := range rows(p, "failovers") {
+			if group, ok := v.(Document); ok {
+				failovers[stringValue(group["name"])] = true
+			}
+		}
 		for _, v := range rows(doc, "proxy-groups") {
 			g := v.(map[string]any)
 			if len(rows(g, "proxies")) == 0 && len(rows(g, "use")) == 0 {
-				g["proxies"] = []any{"DIRECT"}
+				target := "DIRECT"
+				if failovers[stringValue(g["name"])] {
+					target = "REJECT"
+				}
+				g["proxies"] = []any{target}
 			}
 		}
 		removed = len(names)
