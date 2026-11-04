@@ -16,6 +16,32 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	path := r.URL.Path
 	method := r.Method
+	if path == "/admin/api/policy-templates" {
+		var result config.Document
+		var err error
+		switch method {
+		case "GET":
+			query := r.URL.Query()
+			result, err = s.repository.PolicyTemplates(r.Header.Get("X-Profile"), query.Get("id"), query.Get("source"))
+		case "POST", "PUT", "DELETE":
+			var payload config.Document
+			if readJSON(w, r, &payload) != nil || payload == nil {
+				problem(w, 400, "请求 JSON 必须为对象")
+				return true
+			}
+			result, err = s.repository.SavePolicyTemplate(method, payload)
+		default:
+			w.Header().Set("Allow", "GET, POST, PUT, DELETE")
+			problem(w, 405, "请求方法不支持")
+			return true
+		}
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
 	if method == "GET" && (path == "/admin/api/failovers" || path == "/admin/api/server-chains") {
 		state, err := s.repository.State(r.Header.Get("X-Profile"))
 		if err != nil {

@@ -271,8 +271,11 @@ func replaceReferences(doc Document, old, name string) {
 			if name == "" {
 				continue
 			}
-			index := strings.LastIndex(raw, old)
-			raw = raw[:index] + name + raw[index+len(old):]
+			end := len(raw)
+			if options := stringValue(parts["options"]); options != "" {
+				end -= len(options) + 1
+			}
+			raw = raw[:end-len(old)] + name + raw[end:]
 		}
 		updated = append(updated, raw)
 	}

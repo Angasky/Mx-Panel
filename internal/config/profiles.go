@@ -122,7 +122,28 @@ func (r *Repository) CreateProfile(payload map[string]any) (map[string]any, erro
 		template = "blank"
 	}
 	var doc Document
-	if template != "blank" {
+	if strings.HasPrefix(template, "policy-") {
+		var selected Document
+		for _, item := range rows(index, "policyTemplates") {
+			if candidate, ok := item.(Document); ok && candidate["id"] == template {
+				selected = candidate
+				break
+			}
+		}
+		if selected == nil {
+			return nil, errors.New("策略模板不存在，请重新选择")
+		}
+		doc, err = r.blankProfile()
+		if err != nil {
+			return nil, err
+		}
+		if err = normalizeNumbers(selected); err != nil {
+			return nil, err
+		}
+		if err = applyPolicyTemplate(doc, selected); err != nil {
+			return nil, err
+		}
+	} else if template != "blank" {
 		var source map[string]any
 		for _, value := range records {
 			record := value.(map[string]any)
@@ -149,17 +170,9 @@ func (r *Repository) CreateProfile(payload map[string]any) (map[string]any, erro
 			return nil, err
 		}
 	} else {
-		raw, readErr := os.ReadFile(filepath.Join(r.Root, "templates", "clash.yaml"))
-		if readErr == nil {
-			if err = yaml.Unmarshal(raw, &doc); err != nil {
-				return nil, errors.New("内置模板损坏")
-			}
-			doc["proxies"] = []any{}
-		}
-		if os.IsNotExist(readErr) {
-			doc = Document{"proxies": []any{}, "proxy-groups": []any{map[string]any{"name": "✈️ Proxy", "type": "select", "proxies": []any{"DIRECT"}}}, "rules": []any{"MATCH,✈️ Proxy"}}
-		} else if readErr != nil {
-			return nil, readErr
+		doc, err = r.blankProfile()
+		if err != nil {
+			return nil, err
 		}
 	}
 	if err = validate(doc); err != nil {

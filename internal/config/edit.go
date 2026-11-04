@@ -186,6 +186,18 @@ func EditGroup(doc Document, method string, payload map[string]any) error {
 			return errors.New("策略组不能包含自身")
 		}
 	}
+	var replacements []string
+	if _, exists := payload["groupRules"]; exists {
+		ruleSource := old
+		if method == "POST" {
+			ruleSource = ""
+		}
+		var err error
+		replacements, err = prepareGroupRules(doc, payload, ruleSource, name)
+		if err != nil {
+			return err
+		}
+	}
 	group["name"] = name
 	if method == "POST" {
 		doc["proxy-groups"] = append(list, group)
@@ -198,6 +210,9 @@ func EditGroup(doc Document, method string, payload map[string]any) error {
 		if old != name {
 			replaceReferences(doc, old, name)
 		}
+	}
+	if replacements != nil {
+		replaceGroupRules(doc, name, replacements)
 	}
 	return checkReferences(doc)
 }
