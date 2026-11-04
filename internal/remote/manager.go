@@ -293,6 +293,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 		}
 	}
 	previousKind := value(record["installType"])
+	previousHost, previousFingerprint, previousSSHPort := value(record["host"]), value(record["fingerprint"]), value(record["sshPort"])
 	if previousKind == "" {
 		previousKind = "3x-ui"
 	}
@@ -344,8 +345,13 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if (kind == "x-ui" || kind == "x-panel") && mode != "existing" {
 		return nil, errors.New("X-ui / X-Panel 仅支持接入现有面板")
 	}
+	if value(record["coreUserPending"]) != "" &&
+		(kind != previousKind || value(record["host"]) != previousHost || value(record["fingerprint"]) != previousFingerprint ||
+			strconv.Itoa(port) != previousSSHPort) {
+		return nil, errors.New("独立内核用户撤销待核对，暂不能更换服务器身份")
+	}
 	if kind != previousKind {
-		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "meters", "bandwidths", "relays"} {
+		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "coreUserPending", "meters", "bandwidths", "relays"} {
 			delete(record, key)
 		}
 	}

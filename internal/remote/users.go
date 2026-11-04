@@ -283,12 +283,15 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 	if err != nil || inboundID < 1 {
 		return nil, errors.New("绑定入站 ID 无效")
 	}
-	if operation == "read" {
+	if operation == "read" || operation == "remove" {
 		record, err := m.Record(id)
 		if err != nil {
 			return nil, err
 		}
 		if _, err := corePath(value(record["installType"])); err == nil {
+			if operation == "remove" {
+				return m.removeStandaloneUser(ctx, id, binding)
+			}
 			return m.readStandaloneUser(ctx, id, binding)
 		}
 	}

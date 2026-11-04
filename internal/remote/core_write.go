@@ -13,6 +13,10 @@ import (
 // CoreWriteScript applies a complete validated candidate with an optimistic
 // content check and remote rollback. It never interpolates user supplied paths.
 func CoreWriteScript(kind string, previous []byte, next Record) (string, error) {
+	return coreWriteScript(kind, previous, next, "")
+}
+
+func coreWriteScript(kind string, previous []byte, next Record, managedTag string) (string, error) {
 	var path, binary, check string
 	switch kind {
 	case "xray":
@@ -39,7 +43,7 @@ func CoreWriteScript(kind string, previous []byte, next Record) (string, error) 
 			}
 		}
 	}
-	if err := protectCoreInbounds(original, next); err != nil {
+	if err := protectCoreInbounds(original, next, managedTag); err != nil {
 		return "", err
 	}
 	raw, err := json.Marshal(next)
@@ -89,14 +93,14 @@ printf 'MXIOC_CORE_APPLIED\n'
 
 // Reserve the legacy and Go managed inbound namespace in the full-config
 // editor. Check both sides so a manually added tag cannot claim an identity.
-func protectCoreInbounds(previous, next Record) error {
+func protectCoreInbounds(previous, next Record, managedTag string) error {
 	protected := func(doc Record) (map[string]string, error) {
 		rows, _ := doc["inbounds"].([]any)
 		result := map[string]string{}
 		for _, entry := range rows {
 			row, _ := entry.(map[string]any)
 			tag := value(row["tag"])
-			if !strings.HasPrefix(tag, "mxioc-inbound-") {
+			if tag == managedTag || !strings.HasPrefix(tag, "mxioc-inbound-") {
 				continue
 			}
 			if _, exists := result[tag]; exists {

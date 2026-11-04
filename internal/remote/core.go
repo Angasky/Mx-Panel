@@ -68,7 +68,11 @@ func editCore(ctx context.Context, kind, expected string, run coreRunner, edit f
 	if err != nil {
 		return nil, err
 	}
-	script, err := CoreWriteScript(kind, raw, next)
+	return applyCore(ctx, kind, raw, next, "", run)
+}
+
+func applyCore(ctx context.Context, kind string, raw []byte, next Record, managedTag string, run coreRunner) (Record, error) {
+	script, err := coreWriteScript(kind, raw, next, managedTag)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +98,17 @@ func editCore(ctx context.Context, kind, expected string, run coreRunner, edit f
 	if string(want) != string(got) {
 		return nil, errors.New("内核保存结果与请求不同，请重新读取核对")
 	}
-	sum = sha256.Sum256(after)
+	sum := sha256.Sum256(after)
 	return Record{"updated": true, "version": hex.EncodeToString(sum[:]), "kind": kind}, nil
 }
 
 // CoreConfig uses the same per-server exclusion gate as panel writes, server
 // removal and credential edits. Each call owns its SSH connection.
 func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Record) (Record, error) {
-	return m.withCore(ctx, id, func(ctx context.Context, kind string, _ Record, run coreRunner) (Record, error) {
+	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
+		if next != nil && value(record["coreUserPending"]) != "" {
+			return nil, errors.New("独立内核用户撤销待核对，暂不能修改配置")
+		}
 		return coreOperation(ctx, kind, expected, next, run)
 	})
 }
