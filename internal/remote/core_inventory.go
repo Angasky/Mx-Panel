@@ -36,16 +36,9 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 		}
 	}
 
-	var state struct {
-		Inbounds  []Record
-		UserStats Record
-	}
-	if saved != "" {
-		decoder := json.NewDecoder(strings.NewReader(saved))
-		decoder.UseNumber()
-		if err := decoder.Decode(&state); err != nil || state.Inbounds == nil || !json.Valid([]byte(saved)) {
-			return nil, errors.New("旧版独立内核托管记录无效")
-		}
+	state, err := parseLegacyCoreState(saved)
+	if err != nil {
+		return nil, err
 	}
 	protocolKey, portKey := "protocol", "port"
 	if kind == "sing-box" {
@@ -73,9 +66,7 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 			status = "unverified"
 			if expected, err := legacyNativeInbound(kind, row); err == nil {
 				status = "mismatch"
-				want, wantErr := canonicalJSON(expected)
-				got, gotErr := canonicalJSON(actual)
-				if wantErr == nil && gotErr == nil && bytes.Equal(want, got) {
+				if sameCoreInbound(expected, actual) {
 					status = "present"
 				}
 			}
@@ -127,4 +118,28 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		}
 		return inventory, nil
 	})
+}
+
+type legacyCoreState struct {
+	Inbounds  []Record
+	UserStats Record
+}
+
+func parseLegacyCoreState(saved string) (legacyCoreState, error) {
+	var state legacyCoreState
+	if saved == "" {
+		return state, nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(saved))
+	decoder.UseNumber()
+	if err := decoder.Decode(&state); err != nil || state.Inbounds == nil || !json.Valid([]byte(saved)) {
+		return state, errors.New("旧版独立内核托管记录无效")
+	}
+	return state, nil
+}
+
+func sameCoreInbound(expected, actual Record) bool {
+	want, wantErr := canonicalJSON(expected)
+	got, gotErr := canonicalJSON(actual)
+	return wantErr == nil && gotErr == nil && bytes.Equal(want, got)
 }

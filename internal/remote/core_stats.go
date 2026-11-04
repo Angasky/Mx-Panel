@@ -90,9 +90,12 @@ func parseCoreCounters(raw string) (map[string]coreTraffic, error) {
 	return result, nil
 }
 
-// Collect display totals for verified inbounds only. One email mapped to
-// multiple native users is ambiguous and must not be counted in either row.
-func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[string]coreTraffic) {
+type coreCounterUsers struct {
+	count  int
+	emails []string
+}
+
+func coreCounterIndex(kind string, doc, stats Record) (map[string]coreCounterUsers, map[string]int) {
 	enabled := map[string]bool{}
 	for _, email := range anyStrings(stats["users"]) {
 		enabled[email] = true
@@ -108,11 +111,7 @@ func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[s
 		enabled = actual
 	}
 
-	type users struct {
-		count  int
-		emails []string
-	}
-	byTag, counts := map[string]users{}, map[string]int{}
+	byTag, counts := map[string]coreCounterUsers{}, map[string]int{}
 	for _, native := range anyRecords(doc["inbounds"]) {
 		var entries []Record
 		field := "name"
@@ -124,7 +123,7 @@ func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[s
 			entries = append(anyRecords(settings["clients"]), anyRecords(settings["users"])...)
 			entries = append(entries, anyRecords(settings["accounts"])...)
 		}
-		group := users{count: len(entries)}
+		group := coreCounterUsers{count: len(entries)}
 		for _, client := range entries {
 			email := value(client[field])
 			counts[email]++
@@ -147,6 +146,11 @@ func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[s
 		}
 		byTag[value(native["tag"])] = group
 	}
+	return byTag, counts
+}
+
+func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[string]coreTraffic) {
+	byTag, counts := coreCounterIndex(kind, doc, stats)
 	for _, row := range anyRecords(inventory["inbounds"]) {
 		if row["coreStatus"] != "present" {
 			continue
@@ -172,18 +176,22 @@ func applyCoreCounters(kind string, doc, stats, inventory Record, counters map[s
 	}
 }
 
-func readCoreCounters(ctx context.Context, kind string, doc, stats, inventory Record, run coreRunner) error {
+func queryCoreCounters(ctx context.Context, kind string, doc, stats Record, run coreRunner) (map[string]coreTraffic, error) {
 	address, err := coreStatsAddress(kind, doc, stats)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	raw, err := run(ctx, "/usr/local/bin/xray api statsquery --server="+quote(address)+" --pattern='user>>>'", 2<<20)
 	if err != nil {
-		return errCoreStats
+		return nil, errCoreStats
 	}
-	counters, err := parseCoreCounters(raw)
+	return parseCoreCounters(raw)
+}
+
+func readCoreCounters(ctx context.Context, kind string, doc, stats, inventory Record, run coreRunner) error {
+	counters, err := queryCoreCounters(ctx, kind, doc, stats, run)
 	if err == nil {
 		applyCoreCounters(kind, doc, stats, inventory, counters)
 	}

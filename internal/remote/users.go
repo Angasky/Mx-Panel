@@ -283,6 +283,15 @@ func (m *Manager) SubscriptionUser(ctx context.Context, id string, binding Recor
 	if err != nil || inboundID < 1 {
 		return nil, errors.New("绑定入站 ID 无效")
 	}
+	if operation == "read" {
+		record, err := m.Record(id)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := corePath(value(record["installType"])); err == nil {
+			return m.readStandaloneUser(ctx, id, binding)
+		}
+	}
 	result, err := m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
 		for _, relay := range anyRecords(record["relays"]) {
 			if value(relay["inboundId"]) == strconv.Itoa(inboundID) && relay["status"] != nil && relay["status"] != "active" && (operation == "add" || operation == "resume" || operation == "verify") {
