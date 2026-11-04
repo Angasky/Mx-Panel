@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"strings"
 	"testing"
@@ -73,15 +72,21 @@ func TestNativeInstallTaskRunsOnceLocksAndRedacts(t *testing.T) {
 func TestNativeInstallFailureAndRecoveryNeverReplay(t *testing.T) {
 	m, id := installFixture(t)
 	m.installRun = func(context.Context, Connection, string) (string, error) {
-		return "MXIOC_STAGE=config\nvalidation failure", errors.New("fixture failure")
+		return "MXIOC_STAGE=config\nvalidation failure\n\x1b[33mPassword:\x1b[0m generated-secret\n", remoteExitError(22)
 	}
 	job, err := m.StartInstall(id, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	failed := waitInstall(t, m, value(job["id"]))
-	if failed["status"] != "failed" || failed["stage"] != "config" {
+	if failed["status"] != "failed" || failed["stage"] != "config" || value(failed["exitCode"]) != "22" ||
+		!strings.Contains(value(failed["error"]), "配置校验") || !strings.Contains(value(failed["log"]), "validation failure") ||
+		strings.Contains(value(failed["log"]), "generated-secret") {
 		t.Fatal(failed)
+	}
+	timeline := anyRecords(failed["timeline"])
+	if len(timeline) != 2 || timeline[0]["stage"] != "connecting" || timeline[1]["stage"] != "config" {
+		t.Fatal("missing install progress timeline")
 	}
 	m.mu.Lock()
 	data, _ := m.load()
@@ -97,6 +102,20 @@ func TestNativeInstallFailureAndRecoveryNeverReplay(t *testing.T) {
 	recovered, _ := m.InstallJob(value(job["id"]))
 	if recovered["status"] != "interrupted" {
 		t.Fatal(recovered)
+	}
+}
+
+func TestInstallRequiresExactSuccessMarker(t *testing.T) {
+	m, id := installFixture(t)
+	m.installRun = func(context.Context, Connection, string) (string, error) {
+		return "tool printed MXIOC_STAGE=installed as text", nil
+	}
+	job, err := m.StartInstall(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := waitInstall(t, m, value(job["id"])); got["status"] != "failed" {
+		t.Fatal("partial marker accepted")
 	}
 }
 func TestNativeInstallScriptsValidateWithoutPython(t *testing.T) {

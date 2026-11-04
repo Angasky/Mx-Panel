@@ -2239,7 +2239,7 @@ async function showServerJob(jobId) {
   const identity = decodeURIComponent(jobId);
   const view = {};
   S.jobView = view;
-  openModal('软件安装进度与日志', '<p id="serverJobState" role="status">正在读取任务…</p><div id="serverJobError" class="error" role="alert"></div><div id="serverJobResult"></div><pre id="serverJobLog" class="server-log"></pre>');
+  openModal('软件安装进度与日志', '<p id="serverJobState" role="status">正在读取任务…</p><div id="serverJobError" class="error" role="alert"></div><div id="serverJobResult"></div><ol id="serverJobTimeline" class="hint"></ol><pre id="serverJobLog" class="server-log"></pre>');
   const poll = async () => {
     if (S.jobView !== view || $('modal').classList.contains('hidden') || !$('serverJobLog')) return;
     try {
@@ -2247,6 +2247,7 @@ async function showServerJob(jobId) {
       if (S.jobView !== view || !$('serverJobLog')) return;
       $('serverJobState').textContent = (job.status === 'running' && job.error ? '安装失败，正在读取诊断' : remoteStatus(job.status)) + ' · ' + remoteStage(job.stage) + (job.exitCode != null ? ' · 退出码 '+job.exitCode : '');
       $('serverJobError').textContent = job.error || '';
+      $('serverJobTimeline').innerHTML = (job.timeline || []).map(item => `<li>${esc(new Date(item.at * 1000).toLocaleTimeString())} · ${esc(remoteStage(item.stage))}</li>`).join('');
       const log = $('serverJobLog'), bottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 50;
       log.textContent = job.log || '等待远端输出…'; if (bottom) log.scrollTop = log.scrollHeight;
       const url = panelLink(job.panelUrl);
@@ -4235,6 +4236,7 @@ async function maintenance() {
   if (update.manual) {
     $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>Go 版本维护</h3><span class="pill">${esc(update.version)}</span></div>
       <p id="goUpdateStatus" aria-live="polite">${esc(update.checkError || (update.checking ? '正在检查…' : update.latestVersion ? '最新发布：' + update.latestVersion + (update.dismissed ? '（已忽略）' : update.available ? '（可更新）' : '') : update.checked ? '暂无可下载的 Go 发布包' : '尚未检查发布版本'))}</p>
+      ${update.checkedAt ? `<p class="hint">上次成功检查：${esc(new Date(update.checkedAt * 1000).toLocaleString())}</p>` : ''}
       <div class="toolbar"><button id="goUpdateCheck" class="btn">检查更新</button>${update.available ? '<button id="goUpdateDismiss" class="btn">忽略此版本</button>' : ''}</div>
       <p>下载与服务器架构对应的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。</p>
       <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>

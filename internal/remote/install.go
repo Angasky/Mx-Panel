@@ -83,6 +83,7 @@ func (m *Manager) RecoverInstallJobs() error {
 		if job["status"] == "running" || job["status"] == "queued" {
 			job["status"] = "interrupted"
 			job["error"] = "总控已重启，远端执行结果待核对；未自动重放安装"
+			job["finishedAt"] = time.Now().Unix()
 			changed = true
 		}
 	}
@@ -179,7 +180,8 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 		return nil, err
 	}
 	jobID := hex.EncodeToString(random)
-	job := Record{"id": jobID, "serverId": id, "installType": record["installType"], "status": "running", "stage": "connecting", "startedAt": time.Now().Unix(), "log": "原生 SSH 安装任务已启动；完成后返回执行日志。", "error": ""}
+	job := Record{"id": jobID, "serverId": id, "installType": record["installType"], "status": "running", "startedAt": time.Now().Unix(), "log": "正在连接远端，详细日志将在任务结束后显示。", "error": ""}
+	appendInstallStage(job, "connecting")
 	if len(keep) > 47-len(active) {
 		keep = keep[len(keep)-(47-len(active)):]
 	}
@@ -248,8 +250,16 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 			output = strings.ReplaceAll(output, secret, "[已隐藏]")
 		}
 	}
+	output = redactInstallLog(output)
 	if len(output) > 64<<10 {
 		output = output[len(output)-(64<<10):]
+	}
+	lastStage, installed := "", false
+	for _, line := range strings.Split(output, "\n") {
+		if stage := installStage(line); stage != "" {
+			lastStage = stage
+			installed = installed || stage == "installed"
+		}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -267,20 +277,22 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 			job["panelUrl"] = server["panelUrl"]
 		}
 		job["finishedAt"] = time.Now().Unix()
-		if runErr == nil && strings.Contains(output, "MXIOC_STAGE=installed") {
+		if lastStage != "" && job["stage"] == "connecting" {
+			appendInstallStage(job, lastStage)
+		}
+		if runErr == nil && installed {
 			job["status"] = "succeeded"
-			job["stage"] = "complete"
+			appendInstallStage(job, "complete")
 		} else {
 			job["status"] = "failed"
-			job["error"] = "安装或服务验证失败，请检查任务日志；未自动重放"
+			var code remoteExitError
+			if errors.As(runErr, &code) && code > 0 && code <= 255 {
+				job["exitCode"] = int(code)
+			}
+			job["error"] = installFailure(value(job["stage"]), int(code))
 			if ctx.Err() != nil {
 				job["status"] = "interrupted"
 				job["error"] = "安装超时或总控退出，远端状态待核对；未自动重放"
-			}
-			for _, line := range strings.Split(output, "\n") {
-				if stage := installStage(line); stage != "" {
-					job["stage"] = stage
-				}
 			}
 		}
 	}

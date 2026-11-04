@@ -209,6 +209,12 @@ func executeClient(ctx context.Context, client *ssh.Client, c Connection, script
 	return executeClientObserved(ctx, client, c, script, maxOutput, nil)
 }
 
+type remoteExitError int
+
+func (e remoteExitError) Error() string {
+	return "远端命令失败，退出码 " + strconv.Itoa(int(e))
+}
+
 func executeClientObserved(ctx context.Context, client *ssh.Client, c Connection, script string, maxOutput int, observer io.Writer) (string, error) {
 	if maxOutput < 1 || maxOutput > 16<<20 {
 		return "", errors.New("输出大小限制无效")
@@ -257,7 +263,7 @@ func executeClientObserved(ctx context.Context, client *ssh.Client, c Connection
 	if err != nil {
 		var status *ssh.ExitError
 		if errors.As(err, &status) {
-			return result, errors.New("远端命令失败，退出码 " + strconv.Itoa(status.ExitStatus()))
+			return result, remoteExitError(status.ExitStatus())
 		}
 		if errors.Is(err, io.EOF) {
 			return result, errors.New("SSH 会话提前断开")

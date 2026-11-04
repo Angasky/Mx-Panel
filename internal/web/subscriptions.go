@@ -46,7 +46,13 @@ func (s *Server) RunBackground(ctx context.Context) error {
 	if err = backend.RecoverInstallJobs(); err != nil {
 		return err
 	}
-	return c.Start(ctx)
+	if err := c.Start(ctx); err != nil {
+		return err
+	}
+	if goReleaseVersion.MatchString(s.options.Version) {
+		go s.updates.watch(ctx, goUpdateCheckInterval, s.now, fetchGoRelease)
+	}
+	return nil
 }
 
 func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool {

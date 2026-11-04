@@ -56,3 +56,38 @@ func TestGoUpdateDismissRequiresOriginAndPersists(t *testing.T) {
 		t.Fatalf("ignored version did not persist: %v", err)
 	}
 }
+
+func TestGoUpdateWatcherChecksImmediatelyAndStops(t *testing.T) {
+	var updates goUpdates
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	first := time.Unix(100, 0)
+	second := first.Add(time.Hour)
+	checks := 0
+	go func() {
+		defer close(done)
+		updates.watch(ctx, time.Millisecond, func() time.Time {
+			if checks == 0 {
+				return first
+			}
+			return second
+		}, func(context.Context) (string, error) {
+			checks++
+			if checks == 1 {
+				return "v2.0.0", nil
+			}
+			cancel()
+			return "", errors.New("temporary failure")
+		})
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not make scheduled checks")
+	}
+	status := updates.status("v1.0.0")
+	if checks != 2 || status.CheckedAt != first.Unix() || !status.Available || status.CheckError == "" {
+		t.Fatal("failed check replaced the last successful release", status)
+	}
+}

@@ -16,6 +16,7 @@ import (
 )
 
 const goReleaseRepo = "Angasky/dingzhi-ban"
+const goUpdateCheckInterval = 6 * time.Hour
 
 var goReleaseVersion = regexp.MustCompile(`^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$`)
 
@@ -38,12 +39,14 @@ type goUpdateStatus struct {
 	Dismissed  bool   `json:"dismissed"`
 	Checking   bool   `json:"checking"`
 	Checked    bool   `json:"checked"`
+	CheckedAt  int64  `json:"checkedAt,omitempty"`
 	CheckError string `json:"checkError,omitempty"`
 }
 
 type goUpdates struct {
 	mu        sync.Mutex
 	attempted time.Time
+	checkedAt time.Time
 	latest    string
 	ignored   string
 	checking  bool
@@ -116,7 +119,20 @@ func (u *goUpdates) check(ctx context.Context, now time.Time, fetch func(context
 		u.err = "暂时无法读取 GitHub 发布列表，请稍后重试"
 		return
 	}
-	u.err, u.latest = "", latest
+	u.err, u.latest, u.checkedAt = "", latest, now
+}
+
+func (u *goUpdates) watch(ctx context.Context, interval time.Duration, now func() time.Time, fetch func(context.Context) (string, error)) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for ctx.Err() == nil {
+		u.check(ctx, now(), fetch)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (u *goUpdates) status(current string) goUpdateStatus {
@@ -128,6 +144,9 @@ func (u *goUpdates) status(current string) goUpdateStatus {
 	status := goUpdateStatus{
 		Manual: true, Version: current, Latest: u.latest,
 		Checking: u.checking, Checked: !u.attempted.IsZero(), CheckError: u.err,
+	}
+	if !u.checkedAt.IsZero() {
+		status.CheckedAt = u.checkedAt.Unix()
 	}
 	if u.latest != "" {
 		status.ReleaseURL = "https://github.com/" + goReleaseRepo + "/releases/tag/go-" + u.latest
