@@ -279,6 +279,14 @@ func (m *Manager) UpdateInbound(ctx context.Context, server string, id int, payl
 	return result.(map[string]any), nil
 }
 func (m *Manager) DeleteInbound(ctx context.Context, server string, id int, expected string, guard func(Record) error) (Record, error) {
+	return m.deleteInbound(ctx, server, id, expected, guard, false)
+}
+
+func (m *Manager) DeleteNamedRelay(ctx context.Context, server string, id int, expected string, guard func(Record) error) (Record, error) {
+	return m.deleteInbound(ctx, server, id, expected, guard, true)
+}
+
+func (m *Manager) deleteInbound(ctx context.Context, server string, id int, expected string, guard func(Record) error, requireRelay bool) (Record, error) {
 	if id < 1 {
 		return nil, errors.New("入站 ID 无效")
 	}
@@ -291,6 +299,19 @@ func (m *Manager) DeleteInbound(ctx context.Context, server string, id int, expe
 			if value(relay["inboundId"]) == strconv.Itoa(id) {
 				return m.deleteRelayInbound(ctx, panel, record, relay, id, expected, guard)
 			}
+		}
+		if requireRelay {
+			_, exists, err := panelInbound(ctx, panel, id)
+			if err != nil {
+				return nil, err
+			}
+			if exists {
+				return nil, errors.New("入站不属于总控中转，未删除")
+			}
+			if err := guard(nil); err != nil {
+				return nil, err
+			}
+			return Record{"deleted": true, "alreadyMissing": true}, nil
 		}
 		return deletePanelInbound(ctx, panel, record, id, expected, guard)
 	})

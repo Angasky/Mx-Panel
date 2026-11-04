@@ -42,6 +42,26 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
+	if method == "DELETE" && path == "/admin/api/server-chains" {
+		var input struct {
+			Name string `json:"name"`
+		}
+		if readJSON(w, r, &input) != nil {
+			problem(w, 400, "请提交服务器链路名称")
+			return true
+		}
+		controller, err := s.subscriptionController()
+		if err == nil {
+			var result config.Document
+			result, err = controller.DeleteServerChain(r.Context(), r.Header.Get("X-Profile"), input.Name)
+			if err == nil {
+				respond(w, 200, result)
+				return true
+			}
+		}
+		problem(w, 400, err.Error())
+		return true
+	}
 	if method == "GET" && (path == "/admin/api/failovers" || path == "/admin/api/server-chains") {
 		state, err := s.repository.State(r.Header.Get("X-Profile"))
 		if err != nil {

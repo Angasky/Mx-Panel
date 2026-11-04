@@ -40,3 +40,16 @@ func LegacyUserBinding(row, binding Record) (Record, error) {
 	}
 	return proposed, nil
 }
+
+func VerifyDedicatedBinding(row, binding Record) error {
+	settings, err := inboundObject(row["settings"])
+	if err != nil {
+		return err
+	}
+	clients, ok := settings["clients"].([]any)
+	if !ok || len(clients) != 1 {
+		return errors.New("链路入站不是独占单用户入站")
+	}
+	_, err = FindUser(row, binding, false)
+	return err
+}
