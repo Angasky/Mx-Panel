@@ -190,7 +190,7 @@ func (m *Manager) markRelayDeleting(server string, proof Record) error {
 	}
 	for _, row := range rows {
 		if value(row["inboundId"]) == value(proof["inboundId"]) {
-			if row["outboundTag"] != proof["outboundTag"] || row["outboundHash"] != proof["outboundHash"] || row["routeHash"] != proof["routeHash"] {
+			if row["outboundTag"] != proof["outboundTag"] || row["outboundHash"] != proof["outboundHash"] || row["routeHash"] != proof["routeHash"] || row["inboundTag"] != proof["inboundTag"] {
 				return errors.New("中转归属已变化")
 			}
 			row["deletePending"] = true
@@ -287,6 +287,23 @@ func (m *Manager) deleteRelayInbound(ctx context.Context, p *Panel, record, proo
 	config, _, e := readPanelConfig(ctx, p)
 	if e != nil {
 		return nil, e
+	}
+	if proof["outboundHash"] == nil && proof["routeHash"] == nil && proof["inboundTag"] == nil {
+		inbound, exists, err := panelInbound(ctx, p, id)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, errLegacyRelayProof
+		}
+		recovered, err := m.recoverRelayProof(record, proof, inbound, config)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.recordRelay(value(record["id"]), inbound, value(proof["outboundTag"]), "active", recovered); err != nil {
+			return nil, err
+		}
+		proof = recovered
 	}
 	if _, _, e = stripOwnedRelay(config, proof); e != nil {
 		return nil, e
