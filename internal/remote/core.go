@@ -44,17 +44,29 @@ func readCore(ctx context.Context, kind string, run func(context.Context, string
 }
 
 func coreOperation(ctx context.Context, kind, expected string, next Record, run func(context.Context, string, int) (string, error)) (Record, error) {
+	var edit func(Record) (Record, error)
+	if next != nil {
+		edit = func(Record) (Record, error) { return next, nil }
+	}
+	return editCore(ctx, kind, expected, run, edit)
+}
+
+func editCore(ctx context.Context, kind, expected string, run coreRunner, edit func(Record) (Record, error)) (Record, error) {
 	raw, doc, err := readCore(ctx, kind, run)
 	if err != nil {
 		return nil, err
 	}
 	sum := sha256.Sum256(raw)
 	version := hex.EncodeToString(sum[:])
-	if next == nil {
+	if edit == nil {
 		return Record{"config": doc, "version": version, "kind": kind}, nil
 	}
 	if len(expected) != 64 || expected != version {
 		return nil, errors.New("内核配置已变化，请重新读取后编辑")
+	}
+	next, err := edit(doc)
+	if err != nil {
+		return nil, err
 	}
 	script, err := CoreWriteScript(kind, raw, next)
 	if err != nil {

@@ -2516,7 +2516,7 @@ function renderRemoteNodes() {
   const canImport=row=>!readOnly&&['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol)&&row.enable!==false;
   const q = S.filters.remoteNodes || '', s = S.remoteServer;
   const page = tableSlice(S.remoteRows.filter(x => `${x.remark} ${x.protocol} ${x.port}`.toLowerCase().includes(q.toLowerCase())), 'serverNodes');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? '' : `<button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? '<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button>' : `<button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
     <div class="toolbar"><button id="remoteBatchImport" class="btn" onclick="remoteNodeBatchLinks()">批量导入订阅</button><button id="remoteSelectionClear" class="btn small">取消节点选择</button><input id="search" aria-label="搜索远端节点" placeholder="搜索节点名称、协议、端口…" value="${esc(q)}"></div>
     <div class="tablewrap"><table><thead><tr><th><input id="remoteNodesAll" type="checkbox" aria-label="全选本页可导入节点"></th><th>ID</th><th>名称</th><th>协议 / 端口</th><th>状态</th><th>上传 / 下载</th><th>订阅联动</th><th>操作</th></tr></thead><tbody>
     ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
@@ -2846,6 +2846,47 @@ document.addEventListener('visibilitychange', () => {
   else if (S.page === 'monitoring') { if(S.monitorId) void refreshHostMetrics(); else renderMonitorOverview(); }
 });
 
+
+async function editNativeCoreInbound() {
+  const serverId = S.serverId;
+  openModal('独立内核入站', '<p id="nativeCoreLoading" class="muted">正在读取服务器配置…</p>');
+  const loading = $('nativeCoreLoading');
+  try {
+    const data = await api('/servers/core?id=' + encodeURIComponent(serverId));
+    if (!loading.isConnected || S.serverId !== serverId) return;
+    const entries = (data.config.inbounds || []).filter(row => typeof row.tag === 'string' && row.tag && !row.tag.startsWith('mxioc-inbound-'));
+    openModal('独立内核入站', '<form id="nativeCoreForm"><label for="nativeCoreChoice">入站</label><select id="nativeCoreChoice"><option value="">新建入站</option></select><p class="muted">使用当前内核的原生 JSON。保存已有入站时保留 tag。</p><textarea id="nativeCoreJSON" class="raw" spellcheck="false" required></textarea><div id="nativeCoreError" class="error"></div><button id="nativeCoreSave" class="btn primary">校验并保存</button></form>');
+    const form = $('nativeCoreForm'), choice = $('nativeCoreChoice'), editor = $('nativeCoreJSON');
+    const save = $('nativeCoreSave'), errorBox = $('nativeCoreError');
+    entries.forEach((row, index) => choice.add(new Option(row.tag, String(index))));
+    const populate = () => {
+      const row = choice.value === '' ? {tag: '', [data.kind === 'sing-box' ? 'type' : 'protocol']: ''} : entries[Number(choice.value)];
+      editor.value = JSON.stringify(row, null, 2);
+      errorBox.textContent = '';
+    };
+    choice.onchange = populate;
+    populate();
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (save.disabled) return;
+      save.disabled = true;
+      try {
+        const config = JSON.parse(editor.value);
+        const creating = choice.value === '';
+        const tag = creating ? config.tag : entries[Number(choice.value)].tag;
+        await api('/servers/core/inbound', jsonOpt('PUT', {serverId, version:data.version, operation:creating ? 'create' : 'update', tag, config}));
+        if (form.isConnected) closeModal();
+        notice('独立内核入站已保存');
+      } catch (error) {
+        if (form.isConnected) errorBox.textContent = error.message;
+      } finally {
+        save.disabled = false;
+      }
+    };
+  } catch (error) {
+    if (loading.isConnected) loading.textContent = error.message;
+  }
+}
 
 function remoteNodeEdit(id) {
   const row = S.remoteRows.find(x => x.id === id); if (!row) return;
