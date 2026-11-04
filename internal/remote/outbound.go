@@ -1,6 +1,10 @@
 package remote
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
+)
 
 // NodeOutbound is shared by complete client configurations and remote relays.
 // Unknown options are rejected rather than silently weakening the transport.
@@ -13,7 +17,7 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 		}
 	}
 	allowed := map[string]bool{}
-	for _, k := range []string{"name", "type", "server", "port", "uuid", "password", "username", "cipher", "alterId", "alter-id", "encryption", "flow", "network", "tls", "servername", "sni", "client-fingerprint", "skip-cert-verify", "alpn", "reality-opts", "ws-opts", "grpc-opts", "udp", "tfo"} {
+	for _, k := range []string{"name", "type", "server", "port", "uuid", "password", "username", "cipher", "alterId", "alter-id", "encryption", "flow", "network", "tls", "servername", "sni", "client-fingerprint", "skip-cert-verify", "alpn", "reality-opts", "ws-opts", "grpc-opts", "xhttp-opts", "udp", "tfo"} {
 		allowed[k] = true
 	}
 	for k := range node {
@@ -95,16 +99,26 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 	if network == "" {
 		network = "tcp"
 	}
-	if network != "tcp" && network != "ws" && network != "grpc" {
-		return nil, errors.New("Xray 传输仅支持 TCP、WebSocket 和 gRPC")
+	if network != "tcp" && network != "ws" && network != "grpc" && network != "xhttp" {
+		return nil, errors.New("当前 Xray 出站传输不受支持")
 	}
-	if node["ws-opts"] != nil && network != "ws" || node["grpc-opts"] != nil && network != "grpc" {
+	if node["ws-opts"] != nil && network != "ws" || node["grpc-opts"] != nil && network != "grpc" || node["xhttp-opts"] != nil && network != "xhttp" {
 		return nil, errors.New("传输参数与节点网络类型不一致")
 	}
 	if value(node["flow"]) != "" && (kind != "vless" || node["tls"] != true || network != "tcp") {
 		return nil, errors.New("Vision 要求 VLESS TLS TCP")
 	}
 	stream := Record{"network": network, "security": "none"}
+	if network == "xhttp" {
+		if kind != "vless" || node["tls"] != true || node["reality-opts"] != nil {
+			return nil, errors.New("当前 XHTTP 出站需要 VLESS 和 TLS")
+		}
+		opts, err := links.XHTTPOptions(node["xhttp-opts"])
+		if err != nil {
+			return nil, err
+		}
+		stream["xhttpSettings"] = opts
+	}
 	if raw := node["reality-opts"]; raw != nil {
 		if node["alpn"] != nil {
 			return nil, errors.New("Reality ALPN 选项尚未适配")

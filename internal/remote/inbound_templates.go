@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Angasky/dingzhi-ban/internal/links"
 	"github.com/Angasky/dingzhi-ban/internal/netguard"
 )
 
@@ -32,7 +33,7 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || name == "vless-ws-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
+	return name == "trojan-tls" || name == "vless-ws-tls" || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
 }
 
 func grpcTemplate(name string) bool { return name == "vless-grpc-tls" || name == "vmess-grpc-tls" }
@@ -118,6 +119,20 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 		} else if name == "tuic" {
 			protocol = "tuic"
 			alpn = nil // Use the core's TUIC ALPN default.
+		} else if name == "vless-xhttp-tls" {
+			options := Record{"path": "/vpn", "mode": "stream-up"}
+			for field, key := range map[string]string{"path": "path", "xhttpMode": "mode"} {
+				if v, exists := payload[field]; exists {
+					options[key] = v
+				}
+			}
+			options, err := links.XHTTPOptions(options)
+			if err != nil {
+				return nil, errors.New("XHTTP 路径或传输模式无效")
+			}
+			settings["decryption"] = "none"
+			stream["network"], stream["xhttpSettings"] = "xhttp", options
+			alpn = []any{"h2"}
 		} else if grpcTemplate(name) {
 			service := "vpn"
 			if raw, exists := payload["grpcService"]; exists {

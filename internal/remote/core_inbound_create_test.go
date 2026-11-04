@@ -31,6 +31,7 @@ func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) 
 	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-grpc-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vmess-grpc-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "vless-xhttp-tls", []string{"xray"}, false)
 	testStandaloneInboundCreate(t, "hysteria2", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "tuic", []string{"sing-box"}, false)
 }

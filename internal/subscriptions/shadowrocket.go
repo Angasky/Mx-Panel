@@ -41,6 +41,9 @@ type rocketGroup struct {
 
 func rocketGroups(source config.Subscription) ([]rocketGroup, []Record) {
 	return managedHAGroups(source, func(node Record) error {
+		if node["network"] == "xhttp" {
+			return errors.New("XHTTP 路径请使用 Mihomo 或 Xray 主备配置")
+		}
 		if node["type"] == "mieru" {
 			return errors.New("小火箭不支持 Mieru，请使用完整 Mihomo 订阅")
 		}

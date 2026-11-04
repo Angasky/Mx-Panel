@@ -87,6 +87,8 @@ func Convert(source config.Subscription, format string, now time.Time) (Export, 
 		kind := text(node["type"])
 		if text(node["dialer-proxy"]) != "" {
 			reason = "链式代理需要完整 Mihomo 订阅"
+		} else if format == "shadowrocket" && node["network"] == "xhttp" {
+			reason = "此 XHTTP 节点请使用 Mihomo 或 Xray 客户端订阅"
 		} else if kind == "snell" && !f.Snell || kind == "tuic" && !f.TUIC || kind == "mieru" {
 			reason = "客户端或该导出格式不支持此协议"
 		}

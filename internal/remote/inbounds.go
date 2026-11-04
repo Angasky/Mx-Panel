@@ -167,6 +167,20 @@ func InboundNodes(row, record Record) ([]Record, error) {
 			}
 			node["grpc-opts"] = Record{"grpc-service-name": value(grpc["serviceName"])}
 		}
+		if network == "xhttp" {
+			if protocol != "vless" || stream["security"] != "tls" {
+				return nil, errors.New("此 XHTTP 入站暂无法转换")
+			}
+			opts, err := object(stream["xhttpSettings"])
+			if err != nil {
+				return nil, err
+			}
+			opts, err = links.XHTTPOptions(opts)
+			if err != nil {
+				return nil, err
+			}
+			node["xhttp-opts"] = opts
+		}
 		security := value(stream["security"])
 		if security == "tls" || security == "reality" {
 			node["tls"] = true
@@ -179,7 +193,7 @@ func InboundNodes(row, record Record) ([]Record, error) {
 				sni = value(record["domain"])
 			}
 			node["servername"] = sni
-			if network == "grpc" && security == "tls" && tls["alpn"] != nil {
+			if (network == "grpc" || network == "xhttp") && security == "tls" && tls["alpn"] != nil {
 				node["alpn"] = tls["alpn"]
 			}
 			if protocol == "hysteria2" || protocol == "tuic" {

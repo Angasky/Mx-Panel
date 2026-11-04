@@ -253,7 +253,7 @@ func standaloneTemplateProtocol(kind, template string) string {
 		return "trojan"
 	case "vless-ws-tls", "vless-grpc-tls":
 		return "vless"
-	case "vless-reality":
+	case "vless-reality", "vless-xhttp-tls":
 		if kind == "xray" {
 			return "vless"
 		}

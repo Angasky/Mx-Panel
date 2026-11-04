@@ -6,6 +6,9 @@ import (
 )
 
 func singRelayOutbound(node Record, tag string) (Record, error) {
+	if node["network"] == "xhttp" {
+		return nil, errors.New("当前 sing-box 中转不支持 XHTTP 落地")
+	}
 	kind := value(node["type"])
 	if kind == "hysteria2" || kind == "tuic" {
 		return singQUICRelayOutbound(node, tag, kind)

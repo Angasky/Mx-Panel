@@ -111,7 +111,7 @@ func Parse(value string) (map[string]any, error) {
 		allowed[key] = true
 	}
 	for key, values := range q {
-		if (!allowed[key] && key != "congestion_control" && key != "udp_relay_mode" && key != "tls") || len(values) != 1 {
+		if (!allowed[key] && key != "congestion_control" && key != "udp_relay_mode" && key != "tls" && key != "mode") || len(values) != 1 {
 			return nil, ErrURI
 		}
 	}
@@ -240,6 +240,9 @@ func Parse(value string) (map[string]any, error) {
 		}
 		node["reality-opts"] = map[string]any{"public-key": q.Get("pbk"), "short-id": q.Get("sid")}
 	}
+	if q.Has("mode") && q.Get("type") != "xhttp" {
+		return nil, ErrURI
+	}
 	if network := q.Get("type"); network != "" && network != "tcp" {
 		node["network"] = network
 		switch network {
@@ -247,6 +250,21 @@ func Parse(value string) (map[string]any, error) {
 			node["ws-opts"] = map[string]any{"path": q.Get("path"), "headers": map[string]any{"Host": q.Get("host")}}
 		case "grpc":
 			node["grpc-opts"] = map[string]any{"grpc-service-name": q.Get("serviceName")}
+		case "xhttp":
+			if scheme != "vless" || q.Get("security") != "tls" || node["tls"] != true || q.Has("flow") || q.Has("serviceName") {
+				return nil, ErrURI
+			}
+			raw := map[string]any{}
+			for _, key := range []string{"path", "mode", "host"} {
+				if q.Has(key) {
+					raw[key] = q.Get(key)
+				}
+			}
+			opts, err := XHTTPOptions(raw)
+			if err != nil {
+				return nil, err
+			}
+			node["xhttp-opts"] = opts
 		default:
 			return nil, ErrURI
 		}
@@ -408,9 +426,23 @@ func Export(n map[string]any) (string, error) {
 		}
 		q.Set("alpn", strings.Join(values, ","))
 	}
+	if n["xhttp-opts"] != nil && text(n["network"]) != "xhttp" {
+		return "", ErrURI
+	}
 	if network := text(n["network"]); network != "" && network != "tcp" {
 		q.Set("type", network)
 		switch network {
+		case "xhttp":
+			if kind != "vless" || n["tls"] != true || n["reality-opts"] != nil || text(n["flow"]) != "" {
+				return "", ErrURI
+			}
+			opts, err := XHTTPOptions(n["xhttp-opts"])
+			if err != nil {
+				return "", err
+			}
+			for key, value := range opts {
+				q.Set(key, text(value))
+			}
 		case "ws", "grpc":
 			path, host, err := shareTransport(n, network)
 			if err != nil {

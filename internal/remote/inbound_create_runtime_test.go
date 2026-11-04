@@ -90,7 +90,7 @@ func TestNativeInboundTemplatesAcceptedByRealXray(t *testing.T) {
 		t.Skip("set MXIOC_TEST_XRAY for template validation")
 	}
 	cert, key := templateTestCertificate(t, "node.example.com", false)
-	for _, name := range []string{"vless-reality", "vmess-tcp", "trojan-tls", "vless-ws-tls", "hysteria2"} {
+	for _, name := range []string{"vless-reality", "vmess-tcp", "trojan-tls", "vless-ws-tls", "vless-xhttp-tls", "hysteria2"} {
 		t.Run(name, func(t *testing.T) {
 			row, err := buildInboundTemplate(Record{"template": name, "serverName": "node.example.com", "certFile": "/fixture/fullchain.pem", "keyFile": "/fixture/private.pem", "port": 24001}, "1.1.1.1")
 			if err != nil {
@@ -290,5 +290,44 @@ func TestGRPCTemplatesExportAndValidateNativeConfig(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestXHTTPTemplateRoundTripsToXrayOutbound(t *testing.T) {
+	row, err := buildInboundTemplate(Record{"template": "vless-xhttp-tls", "port": 24001,
+		"serverName": "node.example.com", "certFile": "/fixture/cert", "keyFile": "/fixture/key",
+		"path": "/vpn-test", "xhttpMode": "packet-up"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := NewUser(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row["settings"].(Record)["clients"] = []any{user}
+	nodes, err := InboundNodes(row, Record{"host": "node.example.com"})
+	if err != nil || len(nodes) != 1 {
+		t.Fatal("XHTTP node export failed", err)
+	}
+	uri, err := links.Export(nodes[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := links.Parse(uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbound, err := NodeOutbound(parsed, "xhttp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := outbound["streamSettings"].(Record)
+	opts, _ := stream["xhttpSettings"].(Record)
+	if stream["network"] != "xhttp" || opts["path"] != "/vpn-test" || opts["mode"] != "packet-up" ||
+		parsed["servername"] != "node.example.com" || strings.Join(anyStrings(parsed["alpn"]), ",") != "h2" {
+		t.Fatal("XHTTP transport options lost during URI round trip")
+	}
+	if _, err := singRelayOutbound(parsed, "xhttp"); err == nil {
+		t.Fatal("unsupported XHTTP landing silently degraded to TCP")
 	}
 }
