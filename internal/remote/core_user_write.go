@@ -82,7 +82,7 @@ func planCoreUserChange(kind, operation string, state legacyCoreState, doc, bind
 			return nil, nil, errors.New("独立内核入站已停用")
 		}
 		if user == nil {
-			if len(proposed) != 1 {
+			if len(proposed) != 1 || proposed[0] == nil {
 				return nil, nil, errors.New("缺少独立用户创建凭据")
 			}
 			clients, _ := settings["clients"].([]any)
@@ -171,6 +171,12 @@ func (m *Manager) changeStandaloneUser(ctx context.Context, id, operation string
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
 		return m.changeCoreUser(ctx, id, kind, operation, record, binding, run, proposed)
 	})
+}
+
+// EnrollLegacyCoreUser registers counters for an existing verified user.
+// The add path requires a proposed credential to create a missing user.
+func (m *Manager) EnrollLegacyCoreUser(ctx context.Context, server string, binding Record) (Record, error) {
+	return m.changeStandaloneUser(ctx, server, "add", binding, nil)
 }
 
 func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string, record, binding Record, run coreRunner, proposed ...Record) (Record, error) {

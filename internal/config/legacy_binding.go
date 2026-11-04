@@ -6,8 +6,17 @@ import (
 	"github.com/Angasky/dingzhi-ban/internal/managednodes"
 )
 
+func LegacyCounterSource(source any) bool {
+	switch source {
+	case nil, "", "inbound", "authenticated-client":
+		return true
+	}
+	return false
+}
+
 // MigrateLegacyBinding checks that the existing connection belongs to exactly
 // one profile before changing only its accounting and ownership metadata.
+// A nil settle callback validates ownership without writing.
 func (r *Repository) MigrateLegacyBinding(profile string, position int, token string, proposed, node Document, settle func(Document, Document) error) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -26,7 +35,7 @@ func (r *Repository) MigrateLegacyBinding(profile string, position int, token st
 	}
 	binding := bindings[position].(Document)
 	if BindingToken(profile, binding) != token || binding["status"] != "active" || binding["scope"] == "user" ||
-		binding["counterSource"] != "authenticated-client" || binding["monthlyPaused"] == true ||
+		!LegacyCounterSource(binding["counterSource"]) || binding["counterSource"] != proposed["counterSource"] || binding["monthlyPaused"] == true ||
 		binding["monthlyBaselinePending"] == true || binding["inboundDeletePending"] != nil {
 		return errors.New("旧绑定状态已变化或不满足自动迁移条件")
 	}
@@ -69,6 +78,9 @@ func (r *Repository) MigrateLegacyBinding(profile string, position int, token st
 	}
 	if name == "" {
 		return errors.New("当前订阅中找不到与远端身份一致的节点")
+	}
+	if settle == nil {
+		return nil
 	}
 	if err := settle(record, binding); err != nil {
 		return err

@@ -9,6 +9,41 @@ import (
 )
 
 func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
+	for _, source := range []string{"authenticated-client", "inbound"} {
+		t.Run(source, func(t *testing.T) {
+			testMigrateLegacyBinding(t, source, false)
+		})
+	}
+	t.Run("standalone-inbound", func(t *testing.T) {
+		testMigrateLegacyBinding(t, "inbound", true)
+	})
+}
+
+type legacyCoreMigrationBackend struct {
+	*fakeBackend
+	enrolls int
+}
+
+func (b *legacyCoreMigrationBackend) Record(id string) (Record, error) {
+	row, err := b.fakeBackend.Record(id)
+	row["meters"] = Record{"1": 24001}
+	return row, err
+}
+
+func (b *legacyCoreMigrationBackend) Inbounds(ctx context.Context, id string) (Record, error) {
+	row, err := b.fakeBackend.Inbounds(ctx, id)
+	row["provisionInbounds"], row["readOnly"] = row["inbounds"], true
+	return row, err
+}
+
+func (b *legacyCoreMigrationBackend) EnrollLegacyCoreUser(ctx context.Context, id string, binding Record) (Record, error) {
+	b.enrolls++
+	b.missingCounters = false
+	return b.fakeBackend.SubscriptionUser(ctx, id, binding, "read", nil)
+}
+
+func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
+	t.Helper()
 	c, backend, _ := controllerFixture(t)
 	row := backend.rows[0]
 	client := Record{"email": "legacy@example.test", "auth": "legacy-test-secret", "enable": true}
@@ -39,7 +74,7 @@ func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 	binding := Record{"serverId": "s", "inboundId": 1, "port": 24001, "status": "active",
-		"identityHash": hash, "up": 20, "down": 0, "counterSource": "authenticated-client", "multiplierUnits": 2000}
+		"identityHash": hash, "up": 20, "down": 0, "counterSource": source, "multiplierUnits": 2000}
 	if err := c.Repository.UpdateState("clash", func(p Record) error {
 		p["remoteNodes"] = []any{binding}
 		p["traffic"] = Record{"upload": 5, "enabled": true, "enforce": true}
@@ -48,17 +83,33 @@ func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := config.BindingToken("clash", stateBinding(t, c))
+	core := &legacyCoreMigrationBackend{fakeBackend: backend}
+	if standalone {
+		backend.kind, backend.missingCounters = "xray", true
+		c.Backend = core
+	}
 	backend.stats["legacy@example.test"] = Record{"up": int64(30), "down": int64(0), "source": "authenticated-client"}
 	if _, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err == nil {
 		t.Fatal("migration accepted a shared credential")
+	}
+	if core.enrolls != 0 {
+		t.Fatal("unverified ownership should not configure counters")
 	}
 	put(other, []any{})
 	before, err := c.Repository.Raw("clash")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err != nil {
+	result, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true)
+	if err != nil {
 		t.Fatal(err)
+	}
+	cutover := source == "inbound"
+	if result["counterBaselineRebuilt"] != cutover {
+		t.Fatal("unexpected baseline mode")
+	}
+	if standalone && (core.enrolls != 1 || result["legacyMeterRetained"] != true) {
+		t.Fatal("expected one verified enrollment while keeping the old meter")
 	}
 	if after, err := c.Repository.Raw("clash"); err != nil || before != after {
 		t.Fatal("existing YAML was rewritten")
@@ -68,8 +119,22 @@ func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 	newBinding := stateBinding(t, c)
-	if newBinding["scope"] != "user" || text(newBinding["up"]) != "30" || text(traffic(p)["upload"]) != "25" {
+	want := "25"
+	if cutover {
+		want = "5"
+	}
+	if newBinding["scope"] != "user" || newBinding["counterSource"] != "authenticated-client" ||
+		text(newBinding["up"]) != "30" || text(traffic(p)["upload"]) != want {
 		t.Fatal("incorrect user binding or settlement")
+	}
+	if cutover {
+		if err := c.applyReading("clash", newBinding, Record{"up": 33, "down": 0, "source": "authenticated-client"}); err != nil {
+			t.Fatal(err)
+		}
+		p, err := c.Repository.State("clash")
+		if err != nil || text(traffic(p)["upload"]) != "11" {
+			t.Fatal("first post-migration sample must bill only the user delta", err)
+		}
 	}
 	if _, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err == nil {
 		t.Fatal("stale migration token accepted")
