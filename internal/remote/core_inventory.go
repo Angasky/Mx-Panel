@@ -1,15 +1,18 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
 )
 
 // Legacy metadata supplies stable subscription IDs. Native configuration
-// supplies presence only, since matching a tag does not prove user identity.
+// is compared with the reconstructed legacy config, including enabled users.
 func coreInventory(kind string, record, doc Record, saved string) (Record, error) {
 	native := map[string]Record{}
 	if input, exists := doc["inbounds"]; exists {
@@ -66,13 +69,32 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 			status = "disabled"
 		case actual != nil && row["enable"] != false &&
 			value(actual[protocolKey]) == protocol && value(actual[portKey]) == strconv.Itoa(port):
-			status = "present"
+			status = "unverified"
+			if expected, err := legacyNativeInbound(kind, row); err == nil {
+				status = "mismatch"
+				want, wantErr := canonicalJSON(expected)
+				got, gotErr := canonicalJSON(actual)
+				if wantErr == nil && gotErr == nil && bytes.Equal(want, got) {
+					status = "present"
+				}
+			}
 		case actual != nil:
 			status = "mismatch"
 		}
+		shares := []any{}
+		if status == "present" {
+			nodes, err := InboundNodes(row, record)
+			if err == nil {
+				for _, node := range nodes {
+					if uri, err := links.Export(node); err == nil {
+						shares = append(shares, uri)
+					}
+				}
+			}
+		}
 		rows = append(rows, Record{
 			"id": id, "port": port, "protocol": protocol, "remark": value(row["remark"]),
-			"enable": status == "present", "coreStatus": status, "shareLinks": []any{},
+			"enable": status == "present" || status == "unverified", "coreStatus": status, "shareLinks": shares,
 		})
 	}
 	return Record{"server": publicServer(record), "inbounds": rows, "readOnly": true}, nil
