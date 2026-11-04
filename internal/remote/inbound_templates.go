@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/netip"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/Angasky/dingzhi-ban/internal/netguard"
@@ -31,8 +32,12 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || name == "vless-ws-tls" || name == "hysteria2" || name == "tuic"
+	return name == "trojan-tls" || name == "vless-ws-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
 }
+
+func grpcTemplate(name string) bool { return name == "vless-grpc-tls" || name == "vmess-grpc-tls" }
+
+var grpcServiceName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
 // Templates start without authentication users. The subscription controller
 // persists ownership before granting the first usable UUID/password.
@@ -113,6 +118,24 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 		} else if name == "tuic" {
 			protocol = "tuic"
 			alpn = nil // Use the core's TUIC ALPN default.
+		} else if grpcTemplate(name) {
+			service := "vpn"
+			if raw, exists := payload["grpcService"]; exists {
+				var ok bool
+				service, ok = raw.(string)
+				if !ok || !grpcServiceName.MatchString(service) {
+					return nil, errors.New("gRPC 服务名须为 1–128 个字母、数字、点、下划线或连字符")
+				}
+			}
+			if name == "vmess-grpc-tls" {
+				protocol = "vmess"
+				settings["disableInsecureEncryption"] = false
+			} else {
+				settings["decryption"] = "none"
+			}
+			stream["network"] = "grpc"
+			stream["grpcSettings"] = Record{"serviceName": service}
+			alpn = []any{"h2"}
 		} else {
 			settings["decryption"] = "none"
 			ws := value(payload["path"])

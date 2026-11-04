@@ -313,6 +313,9 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 	if templateName(payload) == "tuic" {
 		return nil, errors.New("TUIC 模板需要独立 sing-box")
 	}
+	if grpcTemplate(templateName(payload)) {
+		return nil, errors.New("当前 gRPC 模板需要独立 Xray 或 sing-box")
+	}
 	revision := createServerRevision(record)
 	entry, err := m.loadCreate(key)
 	if err != nil {

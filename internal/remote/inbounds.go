@@ -139,6 +139,9 @@ func InboundNodes(row, record Record) ([]Record, error) {
 			node["flow"] = client["flow"]
 		}
 		network := value(stream["network"])
+		if protocol == "vmess" && network == "grpc" && stream["security"] == "tls" {
+			node["cipher"] = "aes-128-gcm"
+		}
 		if network != "" && network != "tcp" && network != "raw" && protocol != "hysteria2" {
 			node["network"] = network
 		}
@@ -176,6 +179,9 @@ func InboundNodes(row, record Record) ([]Record, error) {
 				sni = value(record["domain"])
 			}
 			node["servername"] = sni
+			if network == "grpc" && security == "tls" && tls["alpn"] != nil {
+				node["alpn"] = tls["alpn"]
+			}
 			if protocol == "hysteria2" || protocol == "tuic" {
 				node["sni"] = sni
 				alpn := tls["alpn"]

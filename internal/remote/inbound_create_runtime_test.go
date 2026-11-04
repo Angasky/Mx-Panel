@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
 )
 
 func templateTestCertificate(t *testing.T, domain string, expired bool) (string, string) {
@@ -211,4 +213,82 @@ func TestNativeHY2TemplateWithRealXray(t *testing.T) {
 		}
 	}
 	t.Log("real HY2: empty clients denied; owned auth connected; empty clients denied again; all traffic loopback")
+}
+
+func TestGRPCTemplatesExportAndValidateNativeConfig(t *testing.T) {
+	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls"} {
+		t.Run(template, func(t *testing.T) {
+			payload := Record{"template": template, "serverName": "node.example.com", "certFile": "/fixture/cert.pem",
+				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1"}
+			row, err := buildInboundTemplate(payload, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload["grpcService"] = "/not-a-shared-service-name"
+			if _, err := buildInboundTemplate(payload, ""); err == nil {
+				t.Fatal("invalid service name accepted")
+			}
+			row["tag"], row["listen"] = "mxioc-inbound-1", "127.0.0.1"
+			client, err := NewUser(row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			row["settings"].(Record)["clients"] = []any{client}
+			nodes, err := InboundNodes(row, Record{"host": "node.example.com"})
+			if err != nil || len(nodes) != 1 {
+				t.Fatal("generated user could not be exported", err)
+			}
+			uri, err := links.Export(nodes[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			node, err := links.Parse(uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			options, _ := node["grpc-opts"].(Record)
+			if node["network"] != "grpc" || node["tls"] != true || node["servername"] != "node.example.com" ||
+				options["grpc-service-name"] != "vpn-test_1" || strings.Join(anyStrings(node["alpn"]), ",") != "h2" {
+				t.Fatal("subscription export lost the service, SNI or HTTP/2 ALPN")
+			}
+			if template == "vmess-grpc-tls" && node["cipher"] != "aes-128-gcm" {
+				t.Fatal("VMess gRPC must export an explicit cross-core cipher")
+			}
+			for kind, variable := range map[string]string{"xray": "MXIOC_TEST_XRAY", "sing-box": "MXIOC_TEST_SING_BOX"} {
+				t.Run(kind, func(t *testing.T) {
+					binary := os.Getenv(variable)
+					if binary == "" {
+						t.Skip("set " + variable + " for native config verification")
+					}
+					cert, key := templateTestCertificate(t, "node.example.com", false)
+					row["streamSettings"].(Record)["tlsSettings"].(Record)["certificates"] = []any{Record{"certificateFile": cert, "keyFile": key}}
+					native, err := legacyNativeInbound(kind, row)
+					if err != nil {
+						t.Fatal(err)
+					}
+					out := Record{"protocol": "blackhole"}
+					if kind == "sing-box" {
+						out = Record{"type": "direct", "tag": "direct"}
+					}
+					data, err := json.Marshal(Record{"inbounds": []any{native}, "outbounds": []any{out}})
+					if err != nil {
+						t.Fatal(err)
+					}
+					file := filepath.Join(t.TempDir(), "config.json")
+					if err := os.WriteFile(file, data, 0600); err != nil {
+						t.Fatal(err)
+					}
+					args := []string{"run", "-test", "-config", file}
+					if kind == "sing-box" {
+						args = []string{"check", "-c", file}
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					if output, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil {
+						t.Fatal("native config rejected", err, string(output))
+					}
+				})
+			}
+		})
+	}
 }

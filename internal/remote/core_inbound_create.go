@@ -247,11 +247,11 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 
 func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
-	case "vmess-tcp":
+	case "vmess-tcp", "vmess-grpc-tls":
 		return "vmess"
 	case "trojan-tls":
 		return "trojan"
-	case "vless-ws-tls":
+	case "vless-ws-tls", "vless-grpc-tls":
 		return "vless"
 	case "vless-reality":
 		if kind == "xray" {

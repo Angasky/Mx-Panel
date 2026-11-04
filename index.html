@@ -2561,6 +2561,8 @@ async function prepareNodeCertificate(serverId,domain,form) {
 function remoteNodeForm(relay) {
   const standalone = ['xray','sing-box'].includes(S.remoteServer?.installType);
   const singRelay = relay && S.remoteServer?.installType === 'sing-box';
+  const grpcTemplates = ['vless-grpc-tls','vmess-grpc-tls'];
+  const tlsTemplates = ['trojan-tls','vless-ws-tls','hysteria2','tuic', ...grpcTemplates];
   const formServerId=S.serverId,formProfile=S.profile,creationOperationId=crypto.randomUUID().replaceAll('-','');
   const randomPort = 20001 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 45535);
   openModal(relay ? '添加服务器中转' : '添加服务器节点', `<form id="remoteNodeForm"><div class="grid">
@@ -2568,11 +2570,15 @@ function remoteNodeForm(relay) {
     <div><label for="rnPort">监听端口</label><input id="rnPort" type="number" min="1" max="65535" ${standalone ? 'placeholder="留空自动分配"' : `required value="${randomPort}"`}><p class="hint">默认随机使用 20001–65535，可手动修改；创建时检查冲突。</p></div>
     ${relay ? '' : '<div class="span2"><label for="rnTemplate">节点模板</label><select id="rnTemplate"><option value="vless-reality">VLESS + Reality / Vision（免证书）</option><option value="vmess-tcp">VMess + TCP</option><option value="trojan-tls">Trojan + TLS（自动证书）</option><option value="vless-ws-tls">VLESS + WebSocket + TLS（自动证书）</option></select><p class="hint">模板按所选服务器内核提供。同一入站可供多个订阅使用；每个订阅拥有独立用户、用量和有效期。共用入站暂不支持单用户带宽限制。</p></div>'}
     <div class="span2 ${singRelay ? 'hidden' : ''}" id="rnSniFields"><label id="rnSniLabel" for="rnSni">Reality 伪装域名</label><div class="sni-field"><input id="rnSni" value="raw.githubusercontent.com" ${singRelay ? '' : 'required'}><datalist id="rnTlsDomains">${remoteTlsDomains().map(domain=>`<option value="${esc(domain)}"></option>`).join('')}</datalist><button id="rnSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button></div><p class="hint" id="rnSniHint">Reality 可扫描并选择内置候选域名。</p></div>
-    ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
+    ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"></div><div id="rnGrpcField" class="hidden"><label for="rnGrpcService">gRPC 服务名</label><input id="rnGrpcService" value="vpn" maxlength="128" pattern="[A-Za-z0-9._\\-]+"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
     ${relay ? `<div class="span2"><label for="rnLanding">落地节点分享链接</label><textarea id="rnLanding" required placeholder="${singRelay ? '支持 HY2、TUIC、VLESS、VMess、Trojan、SS、SOCKS5、HTTP' : 'vless://、vmess://、trojan://、ss://、socks5:// 或 http://'}"></textarea><div class="note">将创建 ${singRelay ? 'VMess TCP' : 'Reality'} 入口、落地出站和专属路由。</div></div>` : ''}
   </div>${standalone ? '<p class="note">创建会重启内核。统计接口验证通过后，后台才会为当前订阅创建独立用户。</p>' : ''}<label class="inlinecheck"><input id="rnImport" type="checkbox" checked disabled>创建后添加到当前订阅</label><div id="remoteError" class="error" role="alert"></div><button id="rnSave" class="btn primary">创建${relay ? '中转' : '节点'}</button></form>`);
   if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
+    if (standalone) {
+      $('rnTemplate').add(new Option('VLESS + gRPC + TLS', 'vless-grpc-tls'));
+      $('rnTemplate').add(new Option('VMess + gRPC + TLS', 'vmess-grpc-tls'));
+    }
     if (standalone && S.remoteServer.installType === 'sing-box') {
       $('rnTemplate').querySelector('[value="vless-reality"]').remove();
       $('rnTemplate').add(new Option('TUIC + TLS（自动证书）', 'tuic'));
@@ -2582,13 +2588,17 @@ function remoteNodeForm(relay) {
   if ($('rnCertMode')) $('rnCertMode').onchange=()=>{const manual=val('rnCertMode')==='manual';$('rnManualCertFields').classList.toggle('hidden',!manual);$('rnAutoCertHint').classList.toggle('hidden',manual);$('rnCert').required=$('rnKey').required=manual;};
   if ($('rnTemplate')) {
     $('rnTemplate').onchange = () => {
-      const tls = ['trojan-tls','vless-ws-tls','hysteria2','tuic'].includes(val('rnTemplate'));
+      const tls = tlsTemplates.includes(val('rnTemplate'));
       if(tls!==wasTls) {if(wasTls)tlsDomain=val('rnSni');else realityDomain=val('rnSni');$('rnSni').value=tls ? tlsDomain : realityDomain;} wasTls=tls;
       $('rnSniLabel').textContent=tls ? '证书域名 / SNI（你自己的域名）' : 'Reality 伪装域名';
       $('rnSni').placeholder=tls ? '例如 hy2.example.com' : '选择或扫描 Reality 域名';
       if(tls)$('rnSni').setAttribute('list','rnTlsDomains');else $('rnSni').removeAttribute('list');
       $('rnSniHint').textContent=tls ? '从已使用的证书域名中选择，或输入新的自有域名。GitHub 等第三方域名不能申请到你的服务器证书。' : 'Reality 扫描保留全部内置候选，只有实测通过的域名可选。';
       $('rnWsField').classList.toggle('hidden',val('rnTemplate')!=='vless-ws-tls');
+      const grpc = grpcTemplates.includes(val('rnTemplate'));
+      $('rnGrpcField').classList.toggle('hidden', !grpc);
+      $('rnGrpcService').required = grpc;
+      $('rnGrpcService').disabled = !grpc;
       $('rnTlsFields').classList.toggle('hidden', !tls);
       $('rnSniFields').classList.toggle('hidden', !tls && val('rnTemplate') !== 'vless-reality');
       $('rnSni').required=tls || val('rnTemplate')==='vless-reality';
@@ -2605,9 +2615,9 @@ function remoteNodeForm(relay) {
     if(S.profile!==profile || S.serverId!==serverId){$('remoteError').textContent='服务器或订阅已切换，请重新打开创建窗口';return;}
     let created = false;
     $('rnSave').disabled = true;
-    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? 'vmess-tcp' : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
+    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, grpcService:grpcTemplates.includes(val('rnTemplate')) ? val('rnGrpcService') : undefined, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? 'vmess-tcp' : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
     try {
-      if(!submittedPayload && !relay && ['trojan-tls','vless-ws-tls','hysteria2','tuic'].includes(payload.template) && val('rnCertMode')==='auto') {
+      if(!submittedPayload && !relay && tlsTemplates.includes(payload.template) && val('rnCertMode')==='auto') {
         const job=await prepareNodeCertificate(serverId,payload.serverName,form);
         if(!job || !form.isConnected || $('modal').classList.contains('hidden'))return;
         if(S.profile!==profile || S.serverId!==serverId)throw Error('服务器或订阅已切换，证书已准备完成；请返回目标页面后创建节点');
