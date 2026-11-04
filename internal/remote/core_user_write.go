@@ -16,7 +16,7 @@ func coreConfigHash(raw []byte) string {
 
 // Only the exact managed inbound and bound credential may be changed. Keep
 // the legacy metadata until the restarted core confirms the new config.
-func planCoreUserChange(kind, operation string, state legacyCoreState, doc, binding Record, recovering bool) (Record, []Record, error) {
+func planCoreUserChange(kind, operation string, state legacyCoreState, doc, binding Record, verifiedJournal bool) (Record, []Record, error) {
 	id := value(binding["inboundId"])
 	tag := "mxioc-inbound-" + id
 	rowIndex := -1
@@ -91,7 +91,7 @@ func planCoreUserChange(kind, operation string, state legacyCoreState, doc, bind
 			continue
 		}
 		if seen || row["enable"] == false ||
-			(!sameCoreInbound(expected, actual) && !(recovering && sameCoreInbound(candidate, actual))) {
+			(!verifiedJournal && !sameCoreInbound(expected, actual)) {
 			return nil, nil, errors.New("独立内核远端入站与托管记录不一致")
 		}
 		seen = true
@@ -159,17 +159,10 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 	if err != nil {
 		return nil, err
 	}
-	var journal Record
-	if pendingToken != "" {
-		journal, err = m.OpenUser(pendingToken)
-		currentHash := coreConfigHash(raw)
-		pendingOperation := value(journal["operation"])
-		if pendingOperation == "" {
-			pendingOperation = "remove"
-		}
-		if err != nil || pendingOperation != operation || journal["key"] != key || (journal["before"] != currentHash && journal["after"] != currentHash) {
-			return nil, errors.New("独立内核有待核对的用户变更，当前配置或操作不匹配")
-		}
+	before := coreConfigHash(raw)
+	journal, supersede, err := m.coreUserJournal(pendingToken, key, operation, before)
+	if err != nil {
+		return nil, err
 	}
 	next, rows, err := planCoreUserChange(kind, operation, state, doc, binding, journal != nil)
 	if err != nil {
@@ -201,21 +194,25 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 		return nil, err
 	}
 	after := coreConfigHash(payload)
-	before := coreConfigHash(raw)
-	if journal == nil {
-		pendingToken, err = m.SealUser(Record{"key": key, "operation": operation, "before": before, "after": after})
+	if journal == nil || supersede {
+		previous := pendingToken
+		// If the previous operation wrote to disk, rollback to this new
+		// baseline can still leave legacy metadata out of sync.
+		keepOnRollback := journal != nil && (journal["keepOnRollback"] == true || journal["before"] != before)
+		journal = Record{"key": key, "operation": operation, "before": before, "after": after, "keepOnRollback": keepOnRollback}
+		pendingToken, err = m.SealUser(journal)
 		if err != nil {
 			return nil, err
 		}
-		if err = m.updateCoreUserState(id, stateToken, "", stateToken, pendingToken); err != nil {
+		if err = m.updateCoreUserState(id, stateToken, previous, stateToken, pendingToken); err != nil {
 			return nil, err
 		}
 	} else if journal["after"] != after {
-		return nil, errors.New("独立内核待核对的配置与撤销结果不一致")
+		return nil, errors.New("独立内核待核对的配置与用户变更结果不一致")
 	}
 	tag := "mxioc-inbound-" + value(binding["inboundId"])
 	if _, err := applyCore(ctx, kind, raw, next, tag, run); err != nil {
-		if errors.Is(err, errCoreRolledBack) && (journal == nil || journal["before"] == before) {
+		if errors.Is(err, errCoreRolledBack) && journal["before"] == before && journal["keepOnRollback"] != true {
 			err = errors.Join(err, m.updateCoreUserState(id, stateToken, pendingToken, stateToken, ""))
 		}
 		return nil, err
@@ -229,4 +226,29 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 func coreUserChangeKey(binding Record) (string, error) {
 	return identity(Record{"inboundId": value(binding["inboundId"]), "identityHash": binding["identityHash"],
 		"userHash": binding["userHash"], "userEmail": binding["userEmail"]})
+}
+
+func (m *Manager) coreUserJournal(token, key, operation, currentHash string) (Record, bool, error) {
+	if token == "" {
+		return nil, false, nil
+	}
+	journal, err := m.OpenUser(token)
+	if err != nil || journal["key"] != key ||
+		(journal["before"] != currentHash && journal["after"] != currentHash) {
+		return nil, false, errors.New("独立内核用户变更待核对，当前配置或绑定不匹配")
+	}
+	pending := value(journal["operation"])
+	if pending == "" { // Older records only represented removal.
+		pending = "remove"
+	}
+	if pending == operation {
+		return journal, false, nil
+	}
+	// Revocation supersedes a quota transition for the same verified user.
+	// A new pause may also supersede an unfinished resume, never vice versa.
+	if (operation == "remove" && (pending == "pause" || pending == "resume")) ||
+		(operation == "pause" && pending == "resume") {
+		return journal, true, nil
+	}
+	return nil, false, errors.New("独立内核已有待核对的用户操作，暂不能执行当前操作")
 }
