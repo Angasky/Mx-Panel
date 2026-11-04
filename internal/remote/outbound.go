@@ -113,17 +113,25 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 		if err != nil {
 			return nil, err
 		}
-		for k := range opts {
-			if k != "public-key" && k != "short-id" {
-				return nil, errors.New("Reality 扩展参数未适配")
-			}
-		}
 		if kind != "vless" || network != "tcp" || value(opts["public-key"]) == "" {
 			return nil, errors.New("Reality 要求 VLESS TCP 和有效公钥")
 		}
 		fp := value(node["client-fingerprint"])
 		if fp == "" {
 			fp = "chrome"
+		}
+		for k, setting := range opts {
+			switch k {
+			case "public-key", "short-id":
+			case "support-x25519mlkem768":
+				// Xray negotiates this using its Chrome ClientHello.
+				enabled, ok := setting.(bool)
+				if !ok || !enabled || fp != "chrome" {
+					return nil, errors.New("该 Reality 混合密钥配置不能无损转换为当前 Xray 指纹")
+				}
+			default:
+				return nil, errors.New("Reality 扩展参数未适配")
+			}
 		}
 		stream["security"] = "reality"
 		stream["realitySettings"] = Record{"serverName": value(node["servername"]), "fingerprint": fp, "publicKey": opts["public-key"], "shortId": value(opts["short-id"]), "spiderX": "/"}

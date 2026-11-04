@@ -66,9 +66,6 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 		t.Fatal("unverified exit should not create a relay")
 	}
 	backend.readings["exit"] = exitSnapshot
-	if _, err := c.createServerChain(context.Background(), "clash", request, true); err == nil || backend.creates != 0 {
-		t.Fatal("failover must not create standalone paths before cancellation is supported")
-	}
 	for i := 0; i < 2; i++ {
 		result, err := c.CreateServerChain(context.Background(), "clash", request)
 		if err != nil || result["bound"] != true || backend.creates != 1 || backend.adds != 1 {

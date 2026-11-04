@@ -56,12 +56,35 @@ func TestXrayHAPythonCompatibilityAndStrictPriority(t *testing.T) {
 			t.Fatal("last fallback is not reject")
 		}
 	}
+	checkXrayHAConfig(t, got)
+}
+
+func TestXrayHAMixedNativeEntrances(t *testing.T) {
+	doc, err := xrayFailover(Record{"name": "mixed"}, []Record{
+		{"name": "xray", "type": "vless", "server": "one.example.net", "port": 24001, "uuid": "11111111-1111-4111-8111-111111111111",
+			"tls": true, "servername": "www.example.net", "client-fingerprint": "chrome", "flow": "xtls-rprx-vision",
+			"reality-opts": Record{"public-key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "short-id": "abcd", "support-x25519mlkem768": true}},
+		{"name": "sing-box", "type": "vmess", "server": "two.example.net", "port": 24002,
+			"uuid": "22222222-2222-4222-8222-222222222222", "cipher": "auto", "alterId": 0},
+	}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkXrayHAConfig(t, data)
+}
+
+func checkXrayHAConfig(t *testing.T, raw []byte) {
+	t.Helper()
 	binary := os.Getenv("MXIOC_TEST_XRAY")
 	if binary != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, binary, "run", "-test", "-config", "stdin:")
-		cmd.Stdin = strings.NewReader(string(got))
+		cmd.Stdin = strings.NewReader(string(raw))
 		if output, err := cmd.CombinedOutput(); err != nil {
 			t.Fatal("real Xray rejected config", err, string(output))
 		}

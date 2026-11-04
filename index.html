@@ -3711,24 +3711,47 @@ async function chains() {
   </section>`;
 }
 
+function chainNodeServer(node, servers) {
+  const normalize = value => String(value || '').replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  const host = normalize(node?.config?.server || node?.server);
+  if (!host) return null;
+  const matches = servers.filter(s => [s.host, s.domain, s.nodeAddress].some(value => normalize(value) === host));
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function failoverModal() {
   const normal = ordinaryNodes();
   if (normal.length < 3) return alert('至少需要两个入口节点和一个独立出口节点，所有服务器都须已登记到总控');
+  const profile = S.profile;
+  let servers;
+  try { ({servers = []} = await api('/servers')); }
+  catch (error) { return notice(error.message); }
+  if (S.profile !== profile) return;
   openModal('多入口主备 · 固定出口', `<form id="failoverForm"><div class="grid">
     <div class="span2"><label>主备组名称</label><input id="foName" required placeholder="例如 亚洲多入口 → 美国固定出口"></div>
     <div class="span2"><label>入口节点（第一项为主入口，按备用优先级排序）</label><div id="foEntries"></div><button type="button" id="foAdd" class="btn small">增加备用入口</button></div>
     <div><label>固定出口</label><select id="foExit">${options(normal.map(n => n.name), normal[normal.length - 1].name)}</select></div>
     <div><label>检测间隔（秒）</label><input id="foInterval" type="number" min="10" max="600" value="30" required></div>
     <div><label>各入口新建端口</label><input id="foPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div>
-    <div><label>Reality SNI</label><input id="foSni" value="raw.githubusercontent.com" required></div>
+    <div><label>Reality SNI</label><input id="foSni" value="raw.githubusercontent.com"><p class="hint">Reality 入口使用同一域名，请在每台入口服务器实测通过。sing-box 使用 VMess TCP。</p></div>
   </div><p class="hint">每个入口会新建专属服务器转发，均绑定当前订阅的流量和到期限制。原有节点保持原配置。请确认端口空闲且防火墙放行；创建期间请勿关闭窗口。</p>
   <fieldset class="section"><legend>加入业务策略组</legend>${groupChecks(S.data.groups.filter(g => g.type === 'select').map(g => g.name), 'foGroup')}</fieldset>
   <div id="formError" class="error"></div><button class="btn primary">创建服务器转发和主备组</button></form>`);
-  const profile = S.profile, operationId = crypto.randomUUID().replaceAll('-', '');
+  const operationId = crypto.randomUUID().replaceAll('-', '');
   const addEntry = (name) => {
     const row = document.createElement('div'); row.className = 'toolbar';
-    row.innerHTML = `<select class="foEntry">${options(normal.map(n => n.name), name)}</select><button type="button" class="btn small danger">移除</button>`;
-    row.querySelector('button').onclick = () => row.remove();
+    row.innerHTML = `<select class="foEntry">${options(normal.map(n => n.name), name)}</select><button type="button" class="btn small foScan">扫描 SNI</button><button type="button" class="btn small danger">移除</button>`;
+    const select = row.querySelector('select'), scan = row.querySelector('.foScan');
+    const ingress = () => chainNodeServer(normal.find(n => n.name === select.value), servers);
+    const refresh = () => scan.classList.toggle('hidden', ingress()?.installType === 'sing-box');
+    select.onchange = refresh;
+    scan.onclick = () => {
+      const server = ingress();
+      if (!server) { $('formError').textContent = '该入口未匹配到已登记服务器'; return; }
+      openSniScanner(server.id, 'foSni');
+    };
+    row.querySelector('.danger').onclick = () => row.remove();
+    refresh();
     $('foEntries').appendChild(row);
   };
   addEntry(normal[0].name); addEntry(normal[1].name);
@@ -3842,10 +3865,7 @@ async function chainModal(index) {
   </form>`);
 
   const chainProfile = S.profile, chainOperationId = crypto.randomUUID().replaceAll('-', '');
-  const entryServer = () => {
-    const node = normal.find(n => n.name === val('chainEntry'));
-    return managedServers.find(s => [s.host, s.domain, s.nodeAddress].filter(Boolean).some(h => h.toLowerCase() === String(node?.config?.server || node?.server || '').replace(/^\[|\]$/g, '').toLowerCase()));
-  };
+  const entryServer = () => chainNodeServer(normal.find(n => n.name === val('chainEntry')), managedServers);
   $('chainMode').onchange = () => $('chainServerFields').classList.toggle('hidden', val('chainMode') !== 'server');
   $('chainSniTest').onclick = () => {
     const ingress = entryServer();

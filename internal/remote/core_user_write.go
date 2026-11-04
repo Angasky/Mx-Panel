@@ -143,6 +143,10 @@ func planCoreUserChange(kind, operation string, state legacyCoreState, doc, bind
 func (m *Manager) updateCoreUserState(id, expectedState, expectedPending, nextState, nextPending string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.updateCoreUserStateLocked(id, expectedState, expectedPending, nextState, nextPending)
+}
+
+func (m *Manager) updateCoreUserStateLocked(id, expectedState, expectedPending, nextState, nextPending string) error {
 	data, err := m.load()
 	if err != nil {
 		return err

@@ -227,7 +227,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		if err != nil {
 			return nil, err
 		}
-		if err := m.updateCoreUserState(server, stateToken, "", stateToken, pending); err != nil {
+		if err := m.reserveCoreCreate(server, key, stateToken, pending); err != nil {
 			return nil, err
 		}
 	} else if journal["after"] != after {

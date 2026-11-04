@@ -79,10 +79,6 @@ func matchChainInbound(snapshot, node Record) (string, error) {
 }
 
 func (c *Controller) CreateServerChain(ctx context.Context, profile string, input Record) (Record, error) {
-	return c.createServerChain(ctx, profile, input, false)
-}
-
-func (c *Controller) createServerChain(ctx context.Context, profile string, input Record, failover bool) (Record, error) {
 	registry, ok := c.Backend.(chainServerRegistry)
 	if !ok {
 		return nil, errors.New("服务器链路创建尚未适配")
@@ -115,15 +111,8 @@ func (c *Controller) createServerChain(ctx context.Context, profile string, inpu
 	}
 	template := "vless-reality"
 	switch ingress["installType"] {
-	case "3x-ui", "x-ui", "x-panel":
-	case "xray":
-		if failover {
-			return nil, errors.New("独立 Xray 入口暂未接入主备组")
-		}
+	case "3x-ui", "x-ui", "x-panel", "xray":
 	case "sing-box":
-		if failover {
-			return nil, errors.New("独立 sing-box 入口暂未接入主备组")
-		}
 		template = "vmess-tcp"
 	default:
 		return nil, errors.New("服务器中转入口需要已接入的 Web 面板或独立内核")

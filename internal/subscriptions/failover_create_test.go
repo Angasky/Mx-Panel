@@ -22,7 +22,7 @@ func TestFailoverDraftResumesWithOrderedPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 		nodes = append(nodes, node)
-		registry = append(registry, Record{"id": name, "host": host, "installType": "3x-ui"})
+		registry = append(registry, Record{"id": name, "host": host, "installType": []string{"xray", "sing-box", "3x-ui"}[i]})
 		readings[name] = Record{"inbounds": []any{Record{"id": 1, "port": 443, "enable": true, "shareLinks": []any{uri}}}}
 	}
 	if err := c.Repository.Mutate("clash", func(doc Record) error { doc["proxies"] = nodes; return nil }); err != nil {
