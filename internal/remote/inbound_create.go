@@ -37,6 +37,9 @@ func (m *Manager) createJournal() (Record, error) {
 		if !ok {
 			return nil, errors.New("入站创建记录格式无效")
 		}
+		if entry["status"] == "canceled" && value(entry["scope"]) != "" {
+			continue
+		}
 		for _, field := range []string{"serverId", "scope", "revision", "requestHash", "status", "sealedDesired"} {
 			if _, ok := entry[field].(string); !ok || value(entry[field]) == "" {
 				return nil, errors.New("入站创建记录字段无效")
@@ -60,6 +63,9 @@ func (m *Manager) saveCreate(key string, entry Record) error {
 		return errors.New("入站创建历史已达上限，请先归档创建记录")
 	}
 	if previous, ok := data[key].(map[string]any); ok {
+		if previous["status"] == "canceled" {
+			return errors.New("此入站创建请求已取消")
+		}
 		for _, field := range []string{"serverId", "scope", "revision", "requestHash"} {
 			if previous[field] != entry[field] {
 				return errors.New("新建操作标识已被其他配置使用，未下发")
@@ -308,6 +314,9 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 	}
 	prepared := payload
 	if entry != nil {
+		if entry["status"] == "canceled" {
+			return nil, errors.New("此入站创建请求已取消")
+		}
 		if entry["serverId"] != server || entry["scope"] != scope || entry["revision"] != revision || entry["requestHash"] != requestHash {
 			return nil, errors.New("创建配置或服务器身份已变化，请先核对之前的创建结果")
 		}
@@ -339,6 +348,9 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 			return nil, e
 		}
 		if previous != nil {
+			if previous["status"] == "canceled" {
+				return nil, errors.New("此入站创建请求已取消")
+			}
 			if previous["serverId"] != server || previous["scope"] != scope || previous["revision"] != revision || previous["requestHash"] != requestHash {
 				return nil, errors.New("创建操作标识已用于其他配置")
 			}

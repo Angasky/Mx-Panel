@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+type unsentCreateCanceler interface {
+	CancelUnsentCreates(string, []string) error
+}
+
 func (c *Controller) DeleteFailover(ctx context.Context, profile, name string) (Record, error) {
 	if strings.TrimSpace(name) == "" {
 		return nil, errors.New("请选择主备组")
@@ -26,7 +30,23 @@ func (c *Controller) DeleteFailover(ctx context.Context, profile, name string) (
 	if err != nil {
 		return nil, err
 	}
-	paths, err := c.Repository.BeginFailoverDelete(profile, name)
+	draft, requests, err := c.Repository.FailoverDraftCancelPlan(profile, name)
+	if err != nil {
+		unlock()
+		return nil, err
+	}
+	if len(requests) > 0 {
+		canceler, ok := c.Backend.(unsentCreateCanceler)
+		if !ok {
+			unlock()
+			return nil, errors.New("尚不能核对草稿中未完成的远端请求")
+		}
+		if err := canceler.CancelUnsentCreates(profile, requests); err != nil {
+			unlock()
+			return nil, err
+		}
+	}
+	paths, err := c.Repository.BeginFailoverDelete(profile, name, draft)
 	unlock()
 	if err != nil {
 		return nil, err

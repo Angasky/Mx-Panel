@@ -6,12 +6,15 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Angasky/dingzhi-ban/internal/config"
 )
 
 type failoverDeleteBackend struct {
 	*fakeBackend
 	failServer string
 	writes     []string
+	canceled   []string
 }
 
 func (b *failoverDeleteBackend) DeleteNamedRelay(_ context.Context, server string, id int, _ string, guard func(Record) error) (Record, error) {
@@ -92,5 +95,63 @@ func TestDeleteFailoverDetachesRulesAndResumesRemainingPaths(t *testing.T) {
 	if err != nil || len(objects(state["failovers"])) != 0 || len(objects(state["serverChains"])) != 0 ||
 		!reflect.DeepEqual(backend.writes, []string{"primary", "backup", "backup"}) {
 		t.Fatal("completed path was replayed or metadata retained", err)
+	}
+}
+
+func (b *failoverDeleteBackend) CancelUnsentCreates(_ string, requests []string) error {
+	b.canceled = append(b.canceled, requests...)
+	return nil
+}
+
+func TestCancelFailoverDraftWithoutRemotePaths(t *testing.T) {
+	testCancelFailoverDraft(t, false)
+}
+
+func TestCancelFailoverDraftCleansOnlyCompletedPaths(t *testing.T) {
+	testCancelFailoverDraft(t, true)
+}
+
+func testCancelFailoverDraft(t *testing.T, completed bool) {
+	t.Helper()
+	c, base, _ := controllerFixture(t)
+	backend := &failoverDeleteBackend{fakeBackend: base}
+	c.Backend = backend
+	const name = "draft"
+	op := strings.Repeat("a", 32)
+	ids := []string{config.FailoverPathRequest(op, 0), config.FailoverPathRequest(op, 1)}
+	paths := []any{"draft / 1", "draft / 2"}
+	var writes []string
+	if completed {
+		if _, err := c.Batch(context.Background(), "clash", "primary", []int{1}); err != nil {
+			t.Fatal(err)
+		}
+		names := stateBinding(t, c)["importedNames"].([]any)
+		paths[0] = names[0]
+		writes = []string{"primary"}
+	}
+	if err := c.Repository.UpdateState("clash", func(p Record) error {
+		if completed {
+			binding := objects(p["remoteNodes"])[0]
+			binding["chainRequest"] = ids[0]
+			p["serverChains"] = []any{Record{"name": paths[0], "entry": "entry1", "exit": "exit",
+				"requestId": ids[0], "serverId": "primary", "inboundId": 1}}
+		}
+		p["failoverDrafts"] = []any{Record{"name": name, "status": "creating", "requestId": op,
+			"paths": paths, "entries": []any{"entry1", "entry2"},
+			"pathRequests": []any{ids[0], ids[1]}, "exit": "exit"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.DeleteFailover(context.Background(), "clash", name); err != nil {
+		t.Fatal(err)
+	}
+	state, err := c.Repository.State("clash")
+	if completed {
+		ids = ids[1:]
+	}
+	if err != nil || len(objects(state["failovers"])) != 0 || len(objects(state["failoverDrafts"])) != 0 ||
+		len(objects(state["serverChains"])) != 0 || !reflect.DeepEqual(backend.writes, writes) || !reflect.DeepEqual(backend.canceled, ids) {
+		t.Fatal("draft was not canceled safely", err)
 	}
 }
