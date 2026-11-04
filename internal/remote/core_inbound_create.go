@@ -126,8 +126,9 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		if err != nil {
 			return nil, err
 		}
-		if template == "hysteria2" {
+		if protocol == "hysteria2" {
 			row["protocol"] = "hysteria2"
+			delete(row["settings"].(Record), "version")
 			stream := row["streamSettings"].(Record)
 			stream["network"] = "tcp"
 			delete(stream, "hysteriaSettings")
@@ -223,7 +224,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		return nil, errors.New("独立内核创建计划与保存记录不一致")
 	}
 	if _, err := applyCore(ctx, kind, raw, next, tag, run); err != nil {
-		if errors.Is(err, errCoreRolledBack) && journal["before"] == before {
+		if (errors.Is(err, errCoreRolledBack) || errors.Is(err, errCoreValidation)) && journal["before"] == before {
 			err = errors.Join(err, m.updateCoreUserState(server, stateToken, pending, stateToken, ""))
 		}
 		return nil, err
@@ -249,6 +250,13 @@ func standaloneTemplateProtocol(kind, template string) string {
 	case "hysteria2":
 		if kind == "sing-box" {
 			return "hysteria2"
+		}
+		if kind == "xray" {
+			return "hysteria"
+		}
+	case "tuic":
+		if kind == "sing-box" {
+			return "tuic"
 		}
 	}
 	return ""

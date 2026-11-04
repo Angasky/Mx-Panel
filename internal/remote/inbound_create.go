@@ -310,6 +310,9 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 	if _, err := corePath(value(record["installType"])); err == nil {
 		return m.createStandaloneInbound(ctx, server, key, requestHash, payload)
 	}
+	if templateName(payload) == "tuic" {
+		return nil, errors.New("TUIC 模板需要独立 sing-box")
+	}
 	revision := createServerRevision(record)
 	entry, err := m.loadCreate(key)
 	if err != nil {

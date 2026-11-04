@@ -5,9 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"maps"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
 )
 
 func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
@@ -21,7 +24,8 @@ func TestStandaloneRealityUsesVerifiedSNI(t *testing.T) {
 func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) {
 	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"})
 	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"})
-	testStandaloneInboundCreate(t, "hysteria2", []string{"sing-box"})
+	testStandaloneInboundCreate(t, "hysteria2", []string{"xray", "sing-box"})
+	testStandaloneInboundCreate(t, "tuic", []string{"sing-box"})
 }
 
 func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) {
@@ -142,9 +146,12 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 				t.Fatal("unrelated config changed", err)
 			}
 			row := result["inbound"].(Record)
-			if template == "hysteria2" && (row["protocol"] != "hysteria2" ||
+			if template == "hysteria2" && kind == "sing-box" && (row["protocol"] != "hysteria2" ||
 				anyRecords(doc["inbounds"])[1]["type"] != "hysteria2") {
 				t.Fatal("sing-box must receive native Hysteria2 configuration")
+			}
+			if template == "hysteria2" || template == "tuic" {
+				assertStandaloneQUICUser(t, kind, template, row, anyRecords(doc["inbounds"])[1])
 			}
 			port, err := parsedPort(row["port"], 0)
 			if err != nil || port < 20001 || value(row["id"]) != value(replayed["inbound"].(Record)["id"]) {
@@ -281,5 +288,53 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			}
 
 		})
+	}
+}
+
+func assertStandaloneQUICUser(t *testing.T, kind, template string, row, native Record) {
+	t.Helper()
+	if !coreProvisionInbound(kind, row) {
+		t.Fatal("created QUIC inbound does not support managed users")
+	}
+	if kind == "xray" {
+		settings := native["settings"].(Record)
+		if native["protocol"] != "hysteria" || settings["clients"] != nil || len(anyRecords(settings["users"])) != 0 {
+			t.Fatal("Xray Hysteria2 must start with an empty native users list")
+		}
+	} else if native["type"] != template || len(anyRecords(native["users"])) != 0 {
+		t.Fatal("sing-box QUIC inbound must start with an empty native users list")
+	}
+	client, err := NewUser(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row = maps.Clone(row)
+	settings := maps.Clone(row["settings"].(Record))
+	settings["clients"] = []any{client}
+	row["settings"] = settings
+	nodes, err := InboundNodes(row, Record{"host": "198.51.100.10"})
+	if err != nil || len(nodes) != 1 {
+		t.Fatal("could not export the new user", err)
+	}
+	node := nodes[0]
+	uri, err := links.Export(node)
+	password := client["password"]
+	if kind == "xray" {
+		password = client["auth"]
+	}
+	if err != nil || !strings.HasPrefix(uri, template+"://") || node["sni"] != "node.example.net" ||
+		node["password"] != password {
+		t.Fatal("export lost the QUIC user identity or certificate domain", err)
+	}
+	if template == "tuic" && (node["alpn"] != nil || node["uuid"] != client["id"] || strings.Contains(uri, "alpn=")) {
+		t.Fatal("TUIC must export its own credentials and keep default ALPN negotiation")
+	}
+	if kind == "xray" {
+		stream := maps.Clone(row["streamSettings"].(Record))
+		stream["hysteriaSettings"] = Record{"version": 2, "auth": "shared-fallback"}
+		row["streamSettings"] = stream
+		if coreProvisionInbound(kind, row) {
+			t.Fatal("shared fallback authentication must prevent standalone HY2 provisioning")
+		}
 	}
 }

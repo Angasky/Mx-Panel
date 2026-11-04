@@ -70,6 +70,9 @@ func planCoreUserChange(kind, operation string, state legacyCoreState, doc, bind
 		nextRow["settings"] = settings
 	}
 	if operation == "add" {
+		if !coreProvisionInbound(kind, row) {
+			return nil, nil, errors.New("当前入站协议或认证配置不支持创建独立用户")
+		}
 		if row["enable"] == false {
 			return nil, nil, errors.New("独立内核入站已停用")
 		}
@@ -183,19 +186,9 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 	if operation == "add" && len(state.UserStats) == 0 {
 		// Validate the requested binding against the actual inbound before
 		// enabling statistics or restarting the remote service.
-		_, rows, err := planCoreUserChange(kind, operation, state, doc, binding, false, proposed...)
+		_, _, err := planCoreUserChange(kind, operation, state, doc, binding, false, proposed...)
 		if err != nil {
 			return nil, err
-		}
-		supported := false
-		for _, row := range rows {
-			if value(row["id"]) == value(binding["inboundId"]) {
-				supported = coreProvisionProtocol(kind, value(row["protocol"]))
-				break
-			}
-		}
-		if !supported {
-			return nil, errors.New("该独立内核入站协议不支持自动创建订阅用户")
 		}
 		if _, err := m.enableCoreStats(ctx, id, kind, record, run); err != nil {
 			return nil, err

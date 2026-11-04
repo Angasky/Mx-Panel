@@ -12,9 +12,31 @@ func coreProvisionProtocol(kind, protocol string) bool {
 		return kind == "xray" || kind == "sing-box"
 	case "hysteria2", "tuic":
 		return kind == "sing-box"
+	case "hysteria":
+		return kind == "xray"
 	default:
 		return false
 	}
+}
+
+func coreProvisionInbound(kind string, row Record) bool {
+	protocol := value(row["protocol"])
+	if !coreProvisionProtocol(kind, protocol) {
+		return false
+	}
+	if protocol != "hysteria" {
+		return true
+	}
+	settings, err := object(row["settings"])
+	if err != nil || value(settings["version"]) != "2" {
+		return false
+	}
+	stream, err := object(row["streamSettings"])
+	if err != nil || stream["network"] != "hysteria" || stream["security"] != "tls" {
+		return false
+	}
+	transport, err := object(stream["hysteriaSettings"])
+	return err == nil && value(transport["version"]) == "2" && value(transport["auth"]) == ""
 }
 
 func coreCanProvision(kind string, doc, stats Record, protocol string) bool {

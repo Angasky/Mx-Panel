@@ -165,10 +165,10 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 					}
 				}
 			}
-			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
+			supported := coreProvisionInbound(kind, byID[id])
+			available := supported && (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
 			available = available && id != deleteRetryID && id != value(editPending["inboundId"])
-			needsStats := len(stats) == 0 && canInitialize && row["coreStatus"] == "present" &&
-				coreProvisionProtocol(kind, value(row["protocol"]))
+			needsStats := supported && len(stats) == 0 && canInitialize && row["coreStatus"] == "present"
 			row["provisionable"] = available || needsStats
 			row["needsCoreStats"] = needsStats
 			if withStats && len(stats) == 0 && row["coreStatus"] == "present" && value(record["coreUserPending"]) == "" {

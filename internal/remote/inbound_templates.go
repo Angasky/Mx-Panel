@@ -31,7 +31,7 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || name == "vless-ws-tls" || name == "hysteria2"
+	return name == "trojan-tls" || name == "vless-ws-tls" || name == "hysteria2" || name == "tuic"
 }
 
 // Templates start without authentication users. The subscription controller
@@ -110,6 +110,9 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			stream["network"] = "hysteria"
 			stream["hysteriaSettings"] = Record{"version": 2}
 			alpn = []any{"h3"}
+		} else if name == "tuic" {
+			protocol = "tuic"
+			alpn = nil // Use the core's TUIC ALPN default.
 		} else {
 			settings["decryption"] = "none"
 			ws := value(payload["path"])
@@ -123,7 +126,11 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			stream["wsSettings"] = Record{"path": ws}
 		}
 		stream["security"] = "tls"
-		stream["tlsSettings"] = Record{"serverName": domain, "alpn": alpn, "certificates": []any{Record{"certificateFile": cert, "keyFile": key}}}
+		tls := Record{"serverName": domain, "certificates": []any{Record{"certificateFile": cert, "keyFile": key}}}
+		if alpn != nil {
+			tls["alpn"] = alpn
+		}
+		stream["tlsSettings"] = tls
 	}
 	return Record{"remark": remark, "port": port, "protocol": protocol, "enable": true, "listen": "", "up": 0, "down": 0, "total": 0, "expiryTime": 0, "settings": settings, "streamSettings": stream, "sniffing": Record{"enabled": true, "destOverride": []any{"http", "tls", "quic"}}}, nil
 }

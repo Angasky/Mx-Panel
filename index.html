@@ -2569,16 +2569,12 @@ function remoteNodeForm(relay) {
     ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
     ${relay ? '<div class="span2"><label for="rnLanding">落地节点分享链接</label><textarea id="rnLanding" required placeholder="vless://、vmess://、trojan://、ss://、socks5:// 或 http://"></textarea><div class="note">将创建 Reality 入口、落地出站和最高优先级路由。失败时尝试撤回本次创建，并保留配置备份。</div></div>' : ''}
   </div>${standalone ? '<p class="note">创建会重启内核。统计接口验证通过后，后台才会为当前订阅创建独立用户。</p>' : ''}<label class="inlinecheck"><input id="rnImport" type="checkbox" checked disabled>创建后添加到当前订阅</label><div id="remoteError" class="error" role="alert"></div><button id="rnSave" class="btn primary">创建${relay ? '中转' : '节点'}</button></form>`);
-  if (standalone) {
-    if (S.remoteServer.installType === 'sing-box') {
-      $('rnTemplate').querySelector('[value="vless-reality"]').remove();
-      $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
-    }
-  } else if ($('rnTemplate')) {
+  if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
-  }
-  if (!standalone && $('rnTemplate') && S.remoteServer?.installType === 'sing-box') {
-    $('rnTemplate').add(new Option('TUIC + TLS（自动证书）', 'tuic'));
+    if (standalone && S.remoteServer.installType === 'sing-box') {
+      $('rnTemplate').querySelector('[value="vless-reality"]').remove();
+      $('rnTemplate').add(new Option('TUIC + TLS（自动证书）', 'tuic'));
+    }
   }
   let realityDomain='raw.githubusercontent.com',tlsDomain=remoteTlsDomains()[0] || '',wasTls=false;
   if ($('rnCertMode')) $('rnCertMode').onchange=()=>{const manual=val('rnCertMode')==='manual';$('rnManualCertFields').classList.toggle('hidden',!manual);$('rnAutoCertHint').classList.toggle('hidden',manual);$('rnCert').required=$('rnKey').required=manual;};

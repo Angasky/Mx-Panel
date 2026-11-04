@@ -179,10 +179,12 @@ func InboundNodes(row, record Record) ([]Record, error) {
 			if protocol == "hysteria2" || protocol == "tuic" {
 				node["sni"] = sni
 				alpn := tls["alpn"]
-				if alpn == nil {
+				if alpn == nil && protocol == "hysteria2" {
 					alpn = []any{"h3"}
 				}
-				node["alpn"] = alpn
+				if alpn != nil {
+					node["alpn"] = alpn
+				}
 			}
 		}
 		if security == "reality" {
