@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
@@ -152,6 +154,21 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	var payload map[string]any
 	if err := readJSON(w, r, &payload); err != nil || payload == nil {
 		problem(w, 400, "请求 JSON 必须为对象")
+		return true
+	}
+	if path == "/admin/api/chains" && payload["mode"] == "server" && method == "POST" {
+		controller, err := s.subscriptionController()
+		if err == nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+			defer cancel()
+			var result config.Document
+			result, err = controller.CreateServerChain(ctx, r.Header.Get("X-Profile"), payload)
+			if err == nil {
+				respond(w, 200, result)
+				return true
+			}
+		}
+		problem(w, 400, err.Error())
 		return true
 	}
 	var groups []string

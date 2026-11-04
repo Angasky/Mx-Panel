@@ -103,6 +103,10 @@ func ownedBinding(record Document, operation string) (Document, error) {
 // fails after YAML succeeds, the durable intent remains and retry deduplicates
 // by credentials instead of producing a second node or a second remote user.
 func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Document, error) {
+	return r.ImportOwnedNodeWithChain(id, operation, node, nil)
+}
+
+func (r *Repository) ImportOwnedNodeWithChain(id, operation string, node Document, chain *ServerChainImport) (Document, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	index, err := r.index()
@@ -120,9 +124,28 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 	if err = ValidateNode(node); err != nil {
 		return nil, err
 	}
+	var chainRecords []any
+	var profile Profile
+	if chain != nil {
+		chainRecords, err = prepareNamedChainRecord(record, binding, chain)
+		if err != nil {
+			return nil, err
+		}
+		profile, err = profileFrom(record)
+		if err != nil {
+			return nil, err
+		}
+		node["name"] = chain.Name
+	}
 	added := 0
 	name := ""
 	err = r.mutateLocked(id, func(doc Document) error {
+		assignGroups := func() error {
+			if chain == nil {
+				return nil
+			}
+			return EditMembership(doc, Document{"name": name, "groups": chain.Groups}, groupOptions(doc, profile))
+		}
 		previousNames := map[string]bool{}
 		if names, ok := binding["importedNames"].([]any); ok {
 			for _, v := range names {
@@ -142,7 +165,13 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 			if same || owned {
 				name = stringValue(old["name"])
 				node["name"] = name
-				return EditNode(doc, "PUT", Document{"oldName": name, "config": node})
+				if chain != nil && name != chain.Name {
+					return errors.New("中转用户凭据已用于其他节点名称")
+				}
+				if err := EditNode(doc, "PUT", Document{"oldName": name, "config": node}); err != nil {
+					return err
+				}
+				return assignGroups()
 			}
 		}
 		base := stringValue(node["name"])
@@ -155,6 +184,9 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 		for _, reserved := range []string{"DIRECT", "REJECT", "REJECT-DROP", "PASS"} {
 			used[reserved] = true
 		}
+		if chain != nil && used[base] {
+			return errors.New("链路名称已被使用")
+		}
 		name = base
 		for i := 2; used[name]; i++ {
 			name = fmt.Sprintf("%s (%d)", base, i)
@@ -162,6 +194,10 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 		node["name"] = name
 		if err := EditNode(doc, "POST", Document{"config": node}); err != nil {
 			return err
+		}
+		if chain != nil {
+			added = 1
+			return assignGroups()
 		}
 		blocked := map[string]bool{}
 		for group := range excludedNodeGroups {
@@ -189,6 +225,9 @@ func (r *Repository) ImportOwnedNode(id, operation string, node Document) (Docum
 	binding["error"] = ""
 	binding["importedNames"] = []string{name}
 	binding["importedNodes"] = []any{Document{"name": name, "identity": managednodes.Identity(node)}}
+	if chain != nil {
+		record["serverChains"] = chainRecords
+	}
 	delete(binding, "pendingUser")
 	if err = r.writeIndex(index); err != nil {
 		return nil, errors.New("节点文件已保存，归属标记待保存；请在同一入站重试")

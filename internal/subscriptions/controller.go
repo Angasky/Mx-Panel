@@ -231,7 +231,7 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 		if row != nil {
 			item["name"] = row["remark"]
 		}
-		result, e := c.provision(ctx, profile, server, row)
+		result, e := c.provision(ctx, profile, server, row, nil)
 		if e != nil {
 			item["ok"] = false
 			item["error"] = e.Error()
@@ -289,7 +289,7 @@ func (c *Controller) preflight(record Record, server string) error {
 	}
 	return nil
 }
-func (c *Controller) provision(ctx context.Context, profile, server string, row Record) (Record, error) {
+func (c *Controller) provision(ctx context.Context, profile, server string, row Record, chain *config.ServerChainImport) (Record, error) {
 	if row == nil {
 		return nil, errors.New("远端入站不存在")
 	}
@@ -311,6 +311,9 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 			}
 			binding = b
 		}
+	}
+	if chain != nil && binding != nil && binding["chainRequest"] != chain.Request {
+		return nil, errors.New("该入站已有其他订阅链路归属")
 	}
 	var client Record
 	if binding == nil {
@@ -339,6 +342,9 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 			return nil, errors.New("节点倍率无效")
 		}
 		binding = Record{"scope": "user", "serverId": server, "inboundId": row["id"], "identityHash": endpoint, "userHash": hash, "userEmail": client["email"], "pendingUser": sealed, "operationId": operation, "name": row["remark"], "port": row["port"], "status": "provisioning", "boundAt": c.Now().Unix(), "up": int64(0), "down": int64(0), "counterSource": "pending", "multiplierUnits": units, "error": ""}
+		if chain != nil {
+			binding["chainRequest"] = chain.Request
+		}
 		// Limits are durable before the first remote grant. They remain enabled
 		// on partial failure, so successfully created users stay accountable.
 		err = c.Repository.UpdateState(profile, func(p Record) error {
@@ -455,7 +461,7 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 	if err != nil || len(nodes) != 1 {
 		return nil, errors.New("用户已创建，唯一节点导入待重试")
 	}
-	result, err := c.Repository.ImportOwnedNode(profile, text(binding["operationId"]), nodes[0])
+	result, err := c.Repository.ImportOwnedNodeWithChain(profile, text(binding["operationId"]), nodes[0], chain)
 	if err != nil {
 		return nil, err
 	}

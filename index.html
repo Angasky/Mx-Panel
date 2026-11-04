@@ -3775,7 +3775,7 @@ async function chainModal(index) {
         </div>
       </div>
     </fieldset>
-    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" value="24443"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button><p class="hint">新建 Reality 入站、出口出站及专属路由，不修改原入口节点。新入站自动绑定当前订阅，用于到期和流量撤销。</p></fieldset>
+    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button><p class="hint">新建 Reality 入站、出口出站及专属路由，不修改原入口节点。新入站自动绑定当前订阅，用于到期和流量撤销。</p></fieldset>
     <fieldset class="section">
       <legend>加入策略组</legend>
       <p class="hint">默认自动勾选非广告组，保存后该链式节点会自动添加至对应策略组中。</p>
@@ -3785,9 +3785,10 @@ async function chainModal(index) {
     <button class="btn primary" style="margin-top:16px;">${uiIcon('file-code')}保存链式代理配置</button>
   </form>`);
 
+  const chainProfile = S.profile, chainOperationId = crypto.randomUUID().replaceAll('-', '');
   const entryServer = () => {
     const node = normal.find(n => n.name === val('chainEntry'));
-    return managedServers.find(s => [s.host, s.domain].filter(Boolean).some(h => h.toLowerCase() === String(node?.config?.server || node?.server || '').replace(/^\[|\]$/g, '').toLowerCase()));
+    return managedServers.find(s => [s.host, s.domain, s.nodeAddress].filter(Boolean).some(h => h.toLowerCase() === String(node?.config?.server || node?.server || '').replace(/^\[|\]$/g, '').toLowerCase()));
   };
   $('chainMode').onchange = () => $('chainServerFields').classList.toggle('hidden', val('chainMode') !== 'server');
   $('chainSniTest').onclick = () => {
@@ -3801,6 +3802,7 @@ async function chainModal(index) {
     if (button) button.disabled = true;
     try {
       let body = {
+        operationId: chainOperationId,
         mode: val('chainMode'), port: val('chainPort'), serverName: val('chainSni'), sniVerified:$('chainSni')?.dataset.sniVerified === val('chainSni'),sniAddress:$('chainSni')?.dataset.sniVerified === val('chainSni') ? $('chainSni')?.dataset.sniAddress : undefined,
         name: val('chainName'),
         entry: val('chainEntry'),
@@ -3808,9 +3810,14 @@ async function chainModal(index) {
         oldName: x?.name,
         groups: [...document.querySelectorAll('.chainGroup:checked')].map(z => z.value)
       };
-      await api('/chains', jsonOpt(x ? 'PUT' : 'POST', body));
-      closeModal();
-      await reload();
+      if (S.profile !== chainProfile) throw Error('订阅已切换，请重新打开创建窗口');
+      const options = jsonOpt(x ? 'PUT' : 'POST', body);
+      options.headers['X-Profile'] = chainProfile;
+      await api('/chains', options);
+      if (S.profile === chainProfile) {
+        closeModal();
+        await reload();
+      }
       notice('链式代理已保存');
     } catch (err) {
       if ($('formError')) $('formError').textContent = err.message;

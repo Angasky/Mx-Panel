@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 )
 
@@ -16,12 +17,12 @@ type relayCreator interface {
 }
 
 func (c *Controller) CreateInbound(ctx context.Context, profile, server string, payload Record) (Record, error) {
-	return c.createInbound(ctx, profile, server, payload, false)
+	return c.createInbound(ctx, profile, server, payload, false, nil, nil)
 }
 func (c *Controller) CreateRelay(ctx context.Context, profile, server string, payload Record) (Record, error) {
-	return c.createInbound(ctx, profile, server, payload, true)
+	return c.createInbound(ctx, profile, server, payload, true, nil, nil)
 }
-func (c *Controller) createInbound(ctx context.Context, profile, server string, payload Record, relay bool) (Record, error) {
+func (c *Controller) createInbound(ctx context.Context, profile, server string, payload Record, relay bool, chain *config.ServerChainImport, prepare func() error) (Record, error) {
 	if !c.started.Load() {
 		return nil, errors.New("独立用户后台计量尚未启动")
 	}
@@ -60,6 +61,11 @@ func (c *Controller) createInbound(ctx context.Context, profile, server string, 
 	if err = c.preflight(state, server); err != nil {
 		return nil, err
 	}
+	if prepare != nil {
+		if err := prepare(); err != nil {
+			return nil, err
+		}
+	}
 	// An empty inbound grants no access. The first usable user is created by the
 	// existing durable ownership workflow, with limits rechecked before granting.
 	created, err := create(ctx, server, profile, payload)
@@ -77,7 +83,7 @@ func (c *Controller) createInbound(ctx context.Context, profile, server string, 
 	if err = c.Repository.CheckInboundAvailable(server, id); err != nil {
 		return nil, err
 	}
-	result, err := c.provision(ctx, profile, server, row)
+	result, err := c.provision(ctx, profile, server, row, chain)
 	if err != nil {
 		return nil, errors.New("入站 " + strconv.Itoa(id) + " 已创建，订阅独立用户导入待重试：" + err.Error() + "；请在同一窗口重试或从此入站导入，勿重复新建")
 	}
