@@ -3,11 +3,13 @@ package remote
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -261,6 +263,39 @@ func parsedPort(v any, defaultPort int) (int, error) {
 	}
 	return n, nil
 }
+func serverHostKey(host string) string {
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return addr.Unmap().String()
+	}
+	return strings.ToLower(host)
+}
+
+func (m *Manager) sameRegistration(existing, submitted Record, panel bool) bool {
+	for _, key := range []string{"name", "sshUser", "fingerprint", "installType", "connectionMode", "domain", "nodeAddress", "panelAddress"} {
+		if value(existing[key]) != value(submitted[key]) {
+			return false
+		}
+	}
+	if panel && existing["panelUser"] != submitted["panelUser"] {
+		return false
+	}
+	keys := []string{"sshPassword", "coreConfig"}
+	if panel {
+		keys = []string{"sshPassword", "panelPassword"}
+	}
+	for _, key := range keys {
+		if value(existing[key]) == "" && value(submitted[key]) == "" {
+			continue
+		}
+		old, oldErr := m.Secret(existing, key)
+		next, nextErr := m.Secret(submitted, key)
+		if oldErr != nil || nextErr != nil || subtle.ConstantTimeCompare([]byte(old), []byte(next)) != 1 {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *Manager) Save(payload Record) (Record, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -355,12 +390,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 			delete(record, key)
 		}
 	}
-	for _, v := range data["servers"].([]any) {
-		other := v.(map[string]any)
-		if other["id"] != id && other["host"] == record["host"] && value(other["sshPort"]) == strconv.Itoa(port) {
-			return nil, errors.New("该地址与 SSH 端口已登记")
-		}
-	}
+
 	if address, ok := payload["panelAddress"]; ok {
 		text := value(address)
 		if text == "" {
@@ -445,6 +475,28 @@ func (m *Manager) Save(payload Record) (Record, error) {
 		} else if value(record[key]) == "" {
 			return nil, errors.New("请填写 SSH / 面板密码")
 		}
+	}
+	var duplicate Record
+	for _, item := range data["servers"].([]any) {
+		other, ok := item.(Record)
+		if !ok {
+			return nil, errors.New("服务器记录损坏")
+		}
+		otherPort, portErr := parsedPort(other["sshPort"], 22)
+		if other["id"] == id || portErr != nil || otherPort != port ||
+			serverHostKey(value(other["host"])) != serverHostKey(value(record["host"])) {
+			continue
+		}
+		if duplicate != nil {
+			return nil, errors.New("该地址与 SSH 端口有多条登记，请检查服务器列表")
+		}
+		duplicate = other
+	}
+	if duplicate != nil {
+		if value(payload["id"]) == "" && m.sameRegistration(duplicate, record, panel) {
+			return publicServer(duplicate), nil
+		}
+		return nil, errors.New("该地址与 SSH 端口已登记，请在服务器列表编辑现有记录")
 	}
 	if value(payload["id"]) == "" {
 		data["servers"] = append(data["servers"].([]any), record)

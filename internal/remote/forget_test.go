@@ -72,3 +72,43 @@ func TestForgetServerLocalOnlyAndBusyGuards(t *testing.T) {
 		t.Fatal("local cleanup incomplete")
 	}
 }
+
+func TestForgetThenRegisterSameEndpointAndRetry(t *testing.T) {
+	root := t.TempDir()
+	m, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := serverPayload()
+	payload["host"] = "2001:db8:0:0::10"
+	old, err := m.Save(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.ForgetServer(value(old["id"]), func(_ Record, commit func() error) (Record, error) {
+		return Record{}, commit()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	m, err = Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := m.Save(payload)
+	if err != nil || added["id"] == old["id"] {
+		t.Fatal("re-registration should create a new record", err)
+	}
+	payload["host"], payload["sshPort"] = "2001:db8::10", "22"
+	retried, err := m.Save(payload)
+	if err != nil || retried["id"] != added["id"] {
+		t.Fatal("equivalent retry should return the existing ID", err)
+	}
+	payload["sshPassword"] = "changed-password"
+	if _, err := m.Save(payload); err == nil {
+		t.Fatal("conflicting credentials should require an explicit edit")
+	}
+	servers, err := m.List()
+	if err != nil || len(servers) != 1 {
+		t.Fatal("server was duplicated", err)
+	}
+}
