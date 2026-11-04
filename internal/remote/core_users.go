@@ -68,6 +68,9 @@ func readCoreUser(ctx context.Context, kind string, state legacyCoreState, bindi
 	if err != nil || actual == nil || !sameCoreInbound(expected, actual) {
 		return nil, errors.New("独立内核远端入站与托管记录不一致")
 	}
+	if err := verifyCoreRelay(doc, row); err != nil {
+		return nil, err
+	}
 	user, err := FindUser(row, binding, false)
 	if err != nil {
 		return nil, err

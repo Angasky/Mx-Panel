@@ -256,6 +256,16 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	if templateName(payload) != "vless-reality" {
 		return nil, errors.New("中转入口仅支持 Reality 模板")
 	}
+	record, err := m.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	if value(record["installType"]) == "xray" {
+		return m.createStandaloneInbound(ctx, server, key, hash, payload, outbound)
+	}
+	if value(record["installType"]) == "sing-box" {
+		return nil, errors.New("独立 sing-box 中转暂未适配")
+	}
 	created, err := m.CreateInbound(ctx, server, scope, payload)
 	if err != nil {
 		return nil, err

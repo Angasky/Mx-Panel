@@ -14,21 +14,25 @@ import (
 )
 
 func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
-	testStandaloneInboundCreate(t, "vmess-tcp", []string{"xray", "sing-box"})
+	testStandaloneInboundCreate(t, "vmess-tcp", []string{"xray", "sing-box"}, false)
 }
 
 func TestStandaloneRealityUsesVerifiedSNI(t *testing.T) {
-	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"})
+	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"}, false)
+}
+
+func TestStandaloneRelayLifecycle(t *testing.T) {
+	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"}, true)
 }
 
 func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) {
-	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"})
-	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"})
-	testStandaloneInboundCreate(t, "hysteria2", []string{"xray", "sing-box"})
-	testStandaloneInboundCreate(t, "tuic", []string{"sing-box"})
+	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "hysteria2", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "tuic", []string{"sing-box"}, false)
 }
 
-func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) {
+func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, relay bool) {
 	t.Helper()
 	for _, kind := range kinds {
 		t.Run(kind+"/"+template, func(t *testing.T) {
@@ -48,6 +52,9 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			payload := Record{"template": template, "remark": "test-node", "operationId": strings.Repeat("a", 32)}
 			if tlsTemplate(template) {
 				payload["serverName"], payload["certFile"], payload["keyFile"] = "node.example.net", "/etc/test.crt", "/etc/test.key"
+			}
+			if relay {
+				payload["landingLink"] = "socks5://127.0.0.1:1080"
 			}
 			key, hash, err := createRequestIdentity("clash", payload)
 			if err != nil {
@@ -97,7 +104,12 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 				if err != nil {
 					return nil, err
 				}
-				return m.createCoreInbound(context.Background(), serverID, kind, key, requestHash, record, request, run)
+				var outbound Record
+				if relay && request["landingLink"] != nil {
+					outbound = Record{"tag": "mxioc-relay-" + key[:16], "protocol": "socks",
+						"settings": Record{"servers": []any{Record{"address": "127.0.0.1", "port": 1080}}}}
+				}
+				return m.createCoreInbound(context.Background(), serverID, kind, key, requestHash, record, request, outbound, run)
 			}
 			occupied := Record{"template": "vmess-tcp", "port": 443}
 			if _, err := create("occupied", occupied); err == nil || writes != 0 {
@@ -157,6 +169,61 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			if err != nil || port < 20001 || value(row["id"]) != value(replayed["inbound"].(Record)["id"]) {
 				t.Fatal("automatic port or ID changed", err)
 			}
+			if relay {
+				proof := coreRelayProof(row)
+				doc, err = inboundObject(string(raw))
+				if err != nil || proof == nil || verifyCoreRelay(doc, row) != nil || len(anyRecords(doc["outbounds"])) != 2 {
+					t.Fatal("relay route and outbound were not committed together with the ingress")
+				}
+				id, _ := strconv.Atoi(value(row["id"]))
+				version, err := InboundVersion(row)
+				if err != nil {
+					t.Fatal(err)
+				}
+				guard := func(Record) error { return nil }
+				remove := func(expected string) (Record, error) {
+					record, err := m.Record(serverID)
+					if err != nil {
+						return nil, err
+					}
+					return m.changeManagedCoreInbound(context.Background(), serverID, kind, record, id, expected,
+						nil, nil, guard, run, true)
+				}
+				original := raw
+				routing := doc["routing"].(Record)
+				rules := routing["rules"].([]any)
+				routing["rules"] = append([]any{Record{"type": "field", "network": "tcp", "outboundTag": "direct"}}, rules...)
+				raw, _ = json.Marshal(doc)
+				if _, err := create(hash, payload); err == nil || writes != 2 {
+					t.Fatal("a shadowed relay route was reused")
+				}
+				if _, err := remove(version); err == nil || writes != 2 {
+					t.Fatal("unverified relay should not be deleted")
+				}
+				raw = original
+				interruptWrite = true
+				if _, err := remove(version); err == nil || writes != 3 {
+					t.Fatal("expected interrupted relay delete")
+				}
+				m, err = Open(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := remove(version); err != nil || writes != 4 {
+					t.Fatal("relay delete recovery failed", err)
+				}
+				retry, err := remove(strings.Repeat("0", 64))
+				if err != nil || retry["alreadyMissing"] != true || writes != 4 {
+					t.Fatal("confirmed named deletion should be idempotent", err)
+				}
+				doc = nil
+				if err := json.Unmarshal(raw, &doc); err != nil || containsConfigString(doc, value(proof["outboundTag"])) ||
+					containsConfigString(doc, value(row["tag"])) || len(anyRecords(doc["outbounds"])) != 1 ||
+					len(anyRecords(doc["inbounds"])) != 1 {
+					t.Fatal("relay cleanup left owned resources or deleted unrelated ones", err)
+				}
+				return
+			}
 			if template == "vless-ws-tls" {
 				id, _ := strconv.Atoi(value(row["id"]))
 				version, err := InboundVersion(row)
@@ -174,7 +241,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 								t.Fatal("edit changed client credentials")
 							}
 							return nil
-						}, nil, run)
+						}, nil, run, false)
 				}
 				if _, err := edit(Record{"port": 443}); err == nil || writes != 2 {
 					t.Fatal("occupied port was accepted")
@@ -226,7 +293,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 							t.Fatal("unexpected rename", old["remark"], next["remark"])
 						}
 						return nil
-					}, guard, run)
+					}, guard, run, false)
 			}
 			version, err := InboundVersion(row)
 			if err != nil {

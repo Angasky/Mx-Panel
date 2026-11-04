@@ -7,17 +7,18 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 const coreInboundDelete = "core-inbound-delete"
 
-func (m *Manager) writeManagedCoreInbound(ctx context.Context, server string, id int, expected string, payload Record, editGuard func(Record, Record) error, deleteGuard func(Record) error) (Record, error) {
+func (m *Manager) writeManagedCoreInbound(ctx context.Context, server string, id int, expected string, payload Record, editGuard func(Record, Record) error, deleteGuard func(Record) error, requireRelay bool) (Record, error) {
 	return m.withCore(ctx, server, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
-		return m.changeManagedCoreInbound(ctx, server, kind, record, id, expected, payload, editGuard, deleteGuard, run)
+		return m.changeManagedCoreInbound(ctx, server, kind, record, id, expected, payload, editGuard, deleteGuard, run, requireRelay)
 	})
 }
 
-func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind string, record Record, id int, expected string, payload Record, editGuard func(Record, Record) error, deleteGuard func(Record) error, run coreRunner) (Record, error) {
+func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind string, record Record, id int, expected string, payload Record, editGuard func(Record, Record) error, deleteGuard func(Record) error, run coreRunner, requireRelay bool) (Record, error) {
 	stateToken, pending := value(record["coreState"]), value(record["coreUserPending"])
 	if stateToken == "" || len(expected) != 64 {
 		return nil, errors.New("请刷新列表后重新选择托管入站")
@@ -51,7 +52,14 @@ func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind str
 	}
 	index := slices.IndexFunc(state.Inbounds, func(row Record) bool { return value(row["id"]) == idText })
 	if index < 0 {
-		if deleteGuard == nil || deleted[idText] != expected || containsConfigString(doc, tag) {
+		matches := deleted[idText] == expected
+		if proof, ok := deleted[idText].(Record); ok {
+			matches = (proof["version"] == expected || (requireRelay && expected == strings.Repeat("0", 64))) &&
+				!containsConfigString(doc, value(proof["outboundTag"]))
+		} else if requireRelay {
+			matches = false
+		}
+		if deleteGuard == nil || !matches || containsConfigString(doc, tag) {
 			return nil, errors.New("找不到匹配的托管入站，请刷新列表")
 		}
 		if err := deleteGuard(nil); err != nil {
@@ -60,6 +68,10 @@ func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind str
 		return Record{"deleted": true, "alreadyMissing": true}, nil
 	}
 	row := state.Inbounds[index]
+	proof := coreRelayProof(row)
+	if requireRelay && proof == nil {
+		return nil, errors.New("入站不属于总控中转，未删除")
+	}
 	version, err := InboundVersion(row)
 	if err != nil || version != expected {
 		return nil, errors.New("托管入站已变化，请刷新列表")
@@ -81,6 +93,15 @@ func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind str
 		return nil, errors.New("托管入站与远端配置不一致，未删除")
 	}
 	next := maps.Clone(doc)
+	if proof != nil && (journal == nil || journal["after"] != before) {
+		if err := verifyCoreRelay(doc, row); err != nil {
+			return nil, err
+		}
+		next, _, err = stripOwnedRelay(doc, proof)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if rows, ok := doc["inbounds"].([]any); ok {
 		next["inbounds"] = slices.DeleteFunc(slices.Clone(rows), func(item any) bool {
 			return item.(Record)["tag"] == tag // coreInventory validated the list.
@@ -91,6 +112,9 @@ func (m *Manager) changeManagedCoreInbound(ctx context.Context, server, kind str
 	}
 	stateDoc["inbounds"] = slices.Delete(state.Inbounds, index, index+1)
 	deleted[idText] = expected
+	if proof != nil {
+		deleted[idText] = Record{"version": expected, "outboundTag": proof["outboundTag"]}
+	}
 	stateDoc["goDeletedInbounds"] = deleted
 	nextState, err := m.SealUser(stateDoc)
 	if err != nil {

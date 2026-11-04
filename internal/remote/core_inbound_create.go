@@ -20,16 +20,17 @@ func nativeCorePortUsed(doc Record, port int) bool {
 	return false
 }
 
-func (m *Manager) createStandaloneInbound(ctx context.Context, server, key, requestHash string, payload Record) (Record, error) {
+func (m *Manager) createStandaloneInbound(ctx context.Context, server, key, requestHash string, payload, outbound Record) (Record, error) {
 	return m.withCore(ctx, server, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
-		return m.createCoreInbound(ctx, server, kind, key, requestHash, record, payload, run)
+		return m.createCoreInbound(ctx, server, kind, key, requestHash, record, payload, outbound, run)
 	})
 }
 
-func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requestHash string, record, payload Record, run coreRunner) (Record, error) {
+func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requestHash string, record, payload, outbound Record, run coreRunner) (Record, error) {
 	template := templateName(payload)
 	protocol := standaloneTemplateProtocol(kind, template)
-	if protocol == "" || payload["inbound"] != nil || payload["landingLink"] != nil {
+	if protocol == "" || payload["inbound"] != nil || (payload["landingLink"] != nil && outbound == nil) ||
+		(outbound != nil && (kind != "xray" || template != "vless-reality")) {
 		return nil, errors.New("当前独立内核不支持此托管入站模板")
 	}
 	stateToken, pending := value(record["coreState"]), value(record["coreUserPending"])
@@ -87,6 +88,9 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		}
 		if matched != 1 {
 			return nil, errors.New("同一请求的远端入站缺失或重复")
+		}
+		if err := verifyCoreRelay(doc, row); err != nil {
+			return nil, err
 		}
 		return Record{"inbound": row, "reused": true}, nil
 	}
@@ -197,6 +201,12 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		for _, item := range live {
 			if item.(Record)["tag"] == tag {
 				return nil, errors.New("远端已有同名入站标签")
+			}
+		}
+		if outbound != nil {
+			next, err = patchCoreRelay(doc, row, outbound)
+			if err != nil {
+				return nil, err
 			}
 		}
 		next["inbounds"] = append(append([]any{}, live...), native)

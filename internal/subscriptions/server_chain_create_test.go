@@ -39,7 +39,11 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 		if err != nil {
 			t.Fatal(err)
 		}
-		registry = append(registry, Record{"id": id, "nodeAddress": node["server"], "installType": "3x-ui"})
+		kind := "3x-ui"
+		if id == "entry" {
+			kind = "xray"
+		}
+		registry = append(registry, Record{"id": id, "nodeAddress": node["server"], "installType": kind})
 		readings[id] = Record{"inbounds": []any{Record{"id": 1, "port": 443, "enable": true, "shareLinks": []any{uri}}}}
 	}
 	backend := &namedChainBackend{relayBackend: &relayBackend{templateBackend: &templateBackend{
@@ -60,6 +64,9 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 		t.Fatal("unverified exit should not create a relay")
 	}
 	backend.readings["exit"] = exitSnapshot
+	if _, err := c.createServerChain(context.Background(), "clash", request, true); err == nil || backend.creates != 0 {
+		t.Fatal("failover must not create standalone paths before cancellation is supported")
+	}
 	for i := 0; i < 2; i++ {
 		result, err := c.CreateServerChain(context.Background(), "clash", request)
 		if err != nil || result["bound"] != true || backend.creates != 1 || backend.adds != 1 {

@@ -275,7 +275,7 @@ func (m *Manager) UpdateInbound(ctx context.Context, server string, id int, payl
 		return nil, err
 	}
 	if _, err := corePath(value(record["installType"])); err == nil {
-		return m.writeManagedCoreInbound(ctx, server, id, expected, payload, guard, nil)
+		return m.writeManagedCoreInbound(ctx, server, id, expected, payload, guard, nil, false)
 	}
 	result, err := m.WithPanel(ctx, server, func(panel *Panel, record Record) (any, error) {
 		return editPanelInbound(ctx, panel, record, id, payload, expected, guard)
@@ -294,12 +294,19 @@ func (m *Manager) DeleteInbound(ctx context.Context, server string, id int, expe
 		return nil, err
 	}
 	if _, err := corePath(value(record["installType"])); err == nil {
-		return m.writeManagedCoreInbound(ctx, server, id, expected, nil, nil, guard)
+		return m.writeManagedCoreInbound(ctx, server, id, expected, nil, nil, guard, false)
 	}
 	return m.deleteInbound(ctx, server, id, expected, guard, false)
 }
 
 func (m *Manager) DeleteNamedRelay(ctx context.Context, server string, id int, expected string, guard func(Record) error) (Record, error) {
+	record, err := m.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	if value(record["installType"]) == "xray" {
+		return m.writeManagedCoreInbound(ctx, server, id, expected, nil, nil, guard, true)
+	}
 	return m.deleteInbound(ctx, server, id, expected, guard, true)
 }
 

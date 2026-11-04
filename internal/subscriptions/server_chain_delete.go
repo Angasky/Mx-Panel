@@ -52,6 +52,13 @@ func (c *Controller) deleteServerChain(ctx context.Context, profile, name, delet
 	expected := strings.Repeat("0", 64)
 	for _, row := range rows {
 		if text(row["id"]) == text(id) {
+			if snapshot["readOnly"] == true {
+				expected = text(row["deleteToken"])
+				if len(expected) != 64 {
+					return nil, errors.New("中转入站尚未核对，未删除")
+				}
+				break
+			}
 			expected, err = remote.InboundVersion(row)
 			if err != nil {
 				return nil, err

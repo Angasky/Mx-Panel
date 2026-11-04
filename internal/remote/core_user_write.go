@@ -69,6 +69,11 @@ func planCoreUserChange(kind, operation string, state legacyCoreState, doc, bind
 		settings["clients"] = remaining
 		nextRow["settings"] = settings
 	}
+	if operation == "add" || operation == "resume" {
+		if err := verifyCoreRelay(doc, row); err != nil {
+			return nil, nil, err
+		}
+	}
 	if operation == "add" {
 		if !coreProvisionInbound(kind, row) {
 			return nil, nil, errors.New("当前入站协议或认证配置不支持创建独立用户")

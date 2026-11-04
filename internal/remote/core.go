@@ -119,6 +119,21 @@ func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Reco
 		if next != nil && value(record["coreUserPending"]) != "" {
 			return nil, errors.New("独立内核用户变更待核对，暂不能修改配置")
 		}
+		if next != nil && value(record["coreState"]) != "" {
+			saved, err := m.Secret(record, "coreState")
+			if err != nil {
+				return nil, err
+			}
+			state, err := parseLegacyCoreState(saved)
+			if err != nil {
+				return nil, err
+			}
+			for _, row := range state.Inbounds {
+				if err := verifyCoreRelay(next, row); err != nil {
+					return nil, err
+				}
+			}
+		}
 		return coreOperation(ctx, kind, expected, next, run)
 	})
 }

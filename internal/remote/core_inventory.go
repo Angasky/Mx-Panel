@@ -66,7 +66,7 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 			status = "unverified"
 			if expected, err := legacyNativeInbound(kind, row); err == nil {
 				status = "mismatch"
-				if sameCoreInbound(expected, actual) {
+				if sameCoreInbound(expected, actual) && verifyCoreRelay(doc, row) == nil {
 					status = "present"
 				}
 			}
@@ -87,6 +87,7 @@ func coreInventory(kind string, record, doc Record, saved string) (Record, error
 		rows = append(rows, Record{
 			"id": id, "port": port, "protocol": protocol, "remark": value(row["remark"]),
 			"enable": status == "present" || status == "unverified", "coreStatus": status, "shareLinks": shares,
+			"coreRelay": coreRelayProof(row) != nil,
 		})
 	}
 	return Record{"server": publicServer(record), "inbounds": rows, "readOnly": true, "coreStatsConfig": state.UserStats}, nil
@@ -148,6 +149,15 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		provision := []any{}
 		for _, row := range anyRecords(inventory["inbounds"]) {
 			id := value(row["id"])
+			if !withStats && coreRelayProof(byID[id]) != nil {
+				if id == deleteRetryID {
+					row["deleteToken"] = deleteRetryToken
+				} else if row["coreStatus"] == "present" && value(record["coreUserPending"]) == "" {
+					if version, err := InboundVersion(byID[id]); err == nil {
+						row["deleteToken"] = version
+					}
+				}
+			}
 			if withStats {
 				switch {
 				case id == deleteRetryID:

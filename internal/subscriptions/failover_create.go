@@ -115,7 +115,7 @@ func (c *Controller) CreateFailover(ctx context.Context, profile string, input R
 		if completed[text(request["operationId"])] {
 			continue
 		}
-		if _, err := c.CreateServerChain(ctx, profile, request); err != nil {
+		if _, err := c.createServerChain(ctx, profile, request, true); err != nil {
 			return nil, fmt.Errorf("主备路径 %s 尚未完成，可从列表继续创建：%w", request["name"], err)
 		}
 	}
