@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -51,6 +52,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			raw := []byte(`{"inbounds":[{"tag":"manual","port":443,"listen_port":443}],"outbounds":[{"tag":"direct"}]}`)
 			writes, checks := 0, 0
 			validCertificate := false
+			interruptWrite := false
 			run := func(_ context.Context, command string, _ int) (string, error) {
 				if strings.HasPrefix(command, "base64 < ") {
 					return base64.StdEncoding.EncodeToString(raw), nil
@@ -76,7 +78,8 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 					t.Fatal(err)
 				}
 				writes++
-				if writes == 1 {
+				if writes == 1 || interruptWrite {
+					interruptWrite = false
 					return "", errors.New("SSH disconnected after write")
 				}
 				return "MXIOC_CORE_APPLIED", nil
@@ -143,6 +146,85 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string) 
 			if err != nil || port < 20001 || value(row["id"]) != value(replayed["inbound"].(Record)["id"]) {
 				t.Fatal("automatic port or ID changed", err)
 			}
+			if template != "vmess-tcp" {
+				return
+			}
+			inboundID, err := strconv.Atoi(value(row["id"]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			change := func(expected string, patch Record, guard func(Record) error) (Record, error) {
+				record, err := m.Record(serverID)
+				if err != nil {
+					return nil, err
+				}
+				return m.changeManagedCoreInbound(context.Background(), serverID, kind, record, inboundID, expected, patch,
+					func(old, next Record) error {
+						if old["remark"] != "test-node" || next["remark"] != "renamed" || next["tag"] != old["tag"] {
+							t.Fatal("unexpected rename", old["remark"], next["remark"])
+						}
+						return nil
+					}, guard, run)
+			}
+			version, err := InboundVersion(row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := change(version, Record{"remark": "renamed"}, nil); err != nil || writes != 2 {
+				t.Fatal("rename should save metadata only", err)
+			}
+			guard := func(old Record) error {
+				if old == nil || old["remark"] != "renamed" {
+					t.Fatal("delete guard did not see the current row")
+				}
+				return nil
+			}
+			if _, err := change(version, nil, guard); err == nil || writes != 2 {
+				t.Fatal("stale identity should not delete")
+			}
+			row["remark"] = "renamed"
+			version, err = InboundVersion(row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			original := raw
+			doc["route"] = Record{"rules": []any{Record{"inbound": []any{row["tag"]}}}}
+			raw, err = json.Marshal(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := change(version, nil, guard); err == nil || writes != 2 {
+				t.Fatal("referenced inbound should not be removed")
+			}
+			raw = original
+			interruptWrite = true
+			if _, err := change(version, nil, guard); err == nil || writes != 3 {
+				t.Fatal("interrupted delete should be pending")
+			}
+			m, err = Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := change(version, nil, guard); err != nil || writes != 4 {
+				t.Fatal("retry should confirm the persisted deletion", err)
+			}
+			replay, err := change(version, nil, func(old Record) error {
+				if old != nil {
+					t.Fatal("confirmed deletion should be absent")
+				}
+				return nil
+			})
+			if err != nil || replay["alreadyMissing"] != true || writes != 4 {
+				t.Fatal("confirmed deletion replay should not write", err)
+			}
+			if _, err := create(hash, payload); err == nil || writes != 4 {
+				t.Fatal("old create request must not resurrect deleted inbound")
+			}
+			if err := json.Unmarshal(raw, &doc); err != nil || len(anyRecords(doc["inbounds"])) != 1 ||
+				anyRecords(doc["inbounds"])[0]["tag"] != "manual" {
+				t.Fatal("delete changed unrelated inbounds", err)
+			}
+
 		})
 	}
 }

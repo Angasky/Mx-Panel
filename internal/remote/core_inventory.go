@@ -112,6 +112,7 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		stats, _ := inventory["coreStatsConfig"].(Record)
 		delete(inventory, "coreStatsConfig")
 		var retryID string
+		var deleteRetryID, deleteRetryToken string
 		var statsPending bool
 		if token := value(record["coreUserPending"]); token != "" {
 			pending, err := m.OpenUser(token)
@@ -119,6 +120,9 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 			statsPending = err == nil && pending["operation"] == coreStatsInit && (pending["before"] == hash || pending["after"] == hash)
 			if err == nil && pending["operation"] == "add" && (pending["before"] == hash || pending["after"] == hash) {
 				retryID = value(pending["inboundId"])
+			}
+			if err == nil && pending["operation"] == coreInboundDelete && (pending["before"] == hash || pending["after"] == hash) {
+				deleteRetryID, deleteRetryToken = value(pending["inboundId"]), value(pending["key"])
 			}
 		}
 		state, err := parseLegacyCoreState(saved)
@@ -137,7 +141,19 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		provision := []any{}
 		for _, row := range anyRecords(inventory["inbounds"]) {
 			id := value(row["id"])
+			if withStats {
+				switch {
+				case id == deleteRetryID:
+					row["deleteToken"] = deleteRetryToken
+					row["deletePending"] = true
+				case value(record["coreUserPending"]) == "" && (row["coreStatus"] == "present" || row["coreStatus"] == "disabled"):
+					if version, err := InboundVersion(byID[id]); err == nil {
+						row["editToken"], row["deleteToken"] = version, version
+					}
+				}
+			}
 			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
+			available = available && id != deleteRetryID
 			needsStats := len(stats) == 0 && canInitialize && row["coreStatus"] == "present" &&
 				coreProvisionProtocol(kind, value(row["protocol"]))
 			row["provisionable"] = available || needsStats

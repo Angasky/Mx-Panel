@@ -270,6 +270,13 @@ func (m *Manager) UpdateInbound(ctx context.Context, server string, id int, payl
 	if id < 1 {
 		return nil, errors.New("入站 ID 无效")
 	}
+	record, err := m.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := corePath(value(record["installType"])); err == nil {
+		return m.writeManagedCoreInbound(ctx, server, id, expected, payload, guard, nil)
+	}
 	result, err := m.WithPanel(ctx, server, func(panel *Panel, record Record) (any, error) {
 		return editPanelInbound(ctx, panel, record, id, payload, expected, guard)
 	})
@@ -279,6 +286,16 @@ func (m *Manager) UpdateInbound(ctx context.Context, server string, id int, payl
 	return result.(map[string]any), nil
 }
 func (m *Manager) DeleteInbound(ctx context.Context, server string, id int, expected string, guard func(Record) error) (Record, error) {
+	if id < 1 {
+		return nil, errors.New("入站 ID 无效")
+	}
+	record, err := m.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := corePath(value(record["installType"])); err == nil {
+		return m.writeManagedCoreInbound(ctx, server, id, expected, nil, nil, guard)
+	}
 	return m.deleteInbound(ctx, server, id, expected, guard, false)
 }
 

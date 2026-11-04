@@ -180,6 +180,13 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		}
 	}
 	tag := value(row["tag"])
+	deleted, err := inboundObject(stateDoc["goDeletedInbounds"])
+	if err != nil {
+		return nil, err
+	}
+	if _, exists := deleted[value(row["id"])]; exists {
+		return nil, errors.New("该请求的入站 ID 已删除，请发起新的创建请求")
+	}
 	native, err := legacyNativeInbound(kind, row)
 	if err != nil {
 		return nil, err
