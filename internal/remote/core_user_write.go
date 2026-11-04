@@ -180,6 +180,45 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 		return nil, err
 	}
 	before := coreConfigHash(raw)
+	if operation == "add" && len(state.UserStats) == 0 {
+		// Validate the requested binding against the actual inbound before
+		// enabling statistics or restarting the remote service.
+		_, rows, err := planCoreUserChange(kind, operation, state, doc, binding, false, proposed...)
+		if err != nil {
+			return nil, err
+		}
+		supported := false
+		for _, row := range rows {
+			if value(row["id"]) == value(binding["inboundId"]) {
+				supported = coreProvisionProtocol(kind, value(row["protocol"]))
+				break
+			}
+		}
+		if !supported {
+			return nil, errors.New("该独立内核入站协议不支持自动创建订阅用户")
+		}
+		if _, err := m.enableCoreStats(ctx, id, kind, record, run); err != nil {
+			return nil, err
+		}
+		record, err = m.Record(id)
+		if err != nil {
+			return nil, err
+		}
+		saved, err = m.Secret(record, "coreState")
+		if err != nil {
+			return nil, err
+		}
+		state, err = parseLegacyCoreState(saved)
+		if err != nil || len(state.UserStats) == 0 {
+			return nil, errors.New("计量已启用，托管记录待重新核对")
+		}
+		raw, doc, err = readCore(ctx, kind, run)
+		if err != nil {
+			return nil, err
+		}
+		stateToken, pendingToken = value(record["coreState"]), value(record["coreUserPending"])
+		before = coreConfigHash(raw)
+	}
 	journal, supersede, err := m.coreUserJournal(pendingToken, key, operation, before)
 	if err != nil {
 		return nil, err

@@ -6,14 +6,19 @@ import (
 	"slices"
 )
 
-func coreCanProvision(kind string, doc, stats Record, protocol string) bool {
+func coreProvisionProtocol(kind, protocol string) bool {
 	switch protocol {
 	case "vless", "vmess", "trojan":
+		return kind == "xray" || kind == "sing-box"
 	case "hysteria2", "tuic":
-		if kind != "sing-box" {
-			return false
-		}
+		return kind == "sing-box"
 	default:
+		return false
+	}
+}
+
+func coreCanProvision(kind string, doc, stats Record, protocol string) bool {
+	if !coreProvisionProtocol(kind, protocol) {
 		return false
 	}
 	if _, err := coreStatsAddress(kind, doc, stats); err != nil {

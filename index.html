@@ -2974,6 +2974,7 @@ async function remoteNodeLinks(id, sourceRows = S.remoteRows, sourceServerId = S
   if(profiles.some(p=>p.id===profile))selected.add(profile);else if(profiles.length===1)selected.add(profiles[0].id);
   if(!profiles.length){openModal('批量导入订阅','<p class="hint">所选节点已导入全部订阅，无需重复导入。</p>');return;}
   openModal(`将 ${ids.length} 个服务器节点导入订阅`, `<form id="sharedUserForm"><p class="hint">每份订阅创建独立 UUID / 密码。已导入全部所选节点的订阅已隐藏；部分导入的只补充缺少的节点。创建结果待核对的仍可重试。</p>
+    ${rows.some(row=>row.needsCoreStats) ? '<p class="note">首次导入会配置并验证独立内核计量，服务器连接可能短暂中断。验证通过后才会创建用户。</p>' : ''}
     <input id="sharedProfileSearch" placeholder="搜索订阅名称" aria-label="搜索订阅名称"><div class="toolbar"><button type="button" id="sharedProfilesAll" class="btn small">全选可见订阅</button><button type="button" id="sharedProfilesClear" class="btn small">取消选择</button></div>
     <div id="sharedProfileList" class="checks" style="max-height:280px;overflow:auto;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px">${profiles.map(p=>`<label class="choice shared-profile" data-profile="${esc(p.id)}"><input type="checkbox" class="sharedProfileChoice" value="${esc(p.id)}"><span>${esc(p.name)} <small data-pending="${esc(p.id)}"></small></span></label>`).join('')}</div>
     <p id="sharedUserProgress" class="hint" aria-live="polite"></p><div id="sharedUserResults" style="max-height:180px;overflow:auto" aria-live="polite"></div><div id="sharedUserError" class="error" role="alert"></div><button id="sharedUserSave" class="btn primary">导入所选订阅</button></form>`);

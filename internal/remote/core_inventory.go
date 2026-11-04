@@ -116,7 +116,7 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		if token := value(record["coreUserPending"]); token != "" {
 			pending, err := m.OpenUser(token)
 			hash := coreConfigHash(raw)
-			statsPending = err == nil && pending["operation"] == coreStatsInit
+			statsPending = err == nil && pending["operation"] == coreStatsInit && (pending["before"] == hash || pending["after"] == hash)
 			if err == nil && pending["operation"] == "add" && (pending["before"] == hash || pending["after"] == hash) {
 				retryID = value(pending["inboundId"])
 			}
@@ -129,15 +129,23 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		for _, row := range state.Inbounds {
 			byID[value(row["id"])] = row
 		}
+		canInitialize := statsPending
+		if len(stats) == 0 && value(record["coreUserPending"]) == "" {
+			_, planErr := planCoreStats(kind, doc)
+			canInitialize = planErr == nil
+		}
 		provision := []any{}
 		for _, row := range anyRecords(inventory["inbounds"]) {
 			id := value(row["id"])
 			available := (row["coreStatus"] == "present" || id == retryID) && coreCanProvision(kind, doc, stats, value(row["protocol"]))
-			row["provisionable"] = available
+			needsStats := len(stats) == 0 && canInitialize && row["coreStatus"] == "present" &&
+				coreProvisionProtocol(kind, value(row["protocol"]))
+			row["provisionable"] = available || needsStats
+			row["needsCoreStats"] = needsStats
 			if withStats && len(stats) == 0 && row["coreStatus"] == "present" && value(record["coreUserPending"]) == "" {
 				inventory["canEnableCoreStats"] = true
 			}
-			if available && !withStats {
+			if (available || needsStats) && !withStats {
 				provision = append(provision, byID[id])
 			}
 		}

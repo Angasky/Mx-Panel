@@ -10,6 +10,15 @@ import (
 )
 
 func TestEnableCoreStatsRecoversAfterInterruptedWrite(t *testing.T) {
+	testCoreStatsRecovery(t, false)
+}
+
+func TestFirstImportEnablesStatsBeforeGrantingUser(t *testing.T) {
+	testCoreStatsRecovery(t, true)
+}
+
+func testCoreStatsRecovery(t *testing.T, importing bool) {
+	t.Helper()
 	for _, kind := range []string{"xray", "sing-box"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
@@ -34,6 +43,12 @@ func TestEnableCoreStatsRecoversAfterInterruptedWrite(t *testing.T) {
 			if err := m.updateCoreUserState(id, "", "", state, ""); err != nil {
 				t.Fatal(err)
 			}
+			client, err := NewUser(row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			binding := bindingFor(t, row, client)
+			binding["inboundId"] = 17
 			native, err := legacyNativeInbound(kind, row)
 			if err != nil {
 				t.Fatal(err)
@@ -53,7 +68,7 @@ func TestEnableCoreStatsRecoversAfterInterruptedWrite(t *testing.T) {
 					return "{}", nil
 				}
 				_, tail, ok := strings.Cut(script, "printf '%s' '")
-				if !ok || !strings.Contains(script, "timeout 2 /usr/local/bin/xray api statsquery") {
+				if !ok || (writes < 2 && !strings.Contains(script, "timeout 2 /usr/local/bin/xray api statsquery")) {
 					t.Fatal("write must verify the running stats service")
 				}
 				encoded, _, _ := strings.Cut(tail, "'")
@@ -73,21 +88,35 @@ func TestEnableCoreStatsRecoversAfterInterruptedWrite(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				_, err = m.enableCoreStats(context.Background(), id, kind, record, run)
+				if importing {
+					_, err = m.changeCoreUser(context.Background(), id, kind, "add", record, binding, run, client)
+				} else {
+					_, err = m.enableCoreStats(context.Background(), id, kind, record, run)
+				}
 				return err
 			}
 			if err := enable(); err == nil || writes != 1 {
 				t.Fatal("unexpected first result", err)
 			}
+			if strings.Contains(string(raw), value(client["id"])) {
+				t.Fatal("user granted before verifying stats")
+			}
 			m, err = Open(root)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := enable(); err != nil || writes != 2 {
+			expectedWrites := 2
+			if importing {
+				expectedWrites++
+			}
+			if err := enable(); err != nil || writes != expectedWrites {
 				t.Fatal("retry did not finalize", err)
 			}
-			if err := enable(); err != nil || writes != 2 {
-				t.Fatal("already enabled should only check service", err)
+			if err := enable(); err != nil || writes != expectedWrites {
+				t.Fatal("retry of completed request must not rewrite configuration", err)
+			}
+			if importing && strings.Count(string(raw), value(client["id"])) != 1 {
+				t.Fatal("exactly one subscription user should exist")
 			}
 		})
 	}
