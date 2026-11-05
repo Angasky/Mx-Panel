@@ -18,6 +18,44 @@ import (
 
 type sniTarget struct{ domain, address string }
 
+func sniProbeKernelScript(kind string) string {
+	script := `command -v curl >/dev/null && command -v timeout >/dev/null || { printf 'MXIOC_REALITY_ERROR tools\n'; exit 0; }
+binary=''
+for candidate in /usr/local/x-ui/bin/xray* /usr/local/bin/xray; do
+ if test -f "$candidate" && test -x "$candidate"; then binary="$candidate"; break; fi
+done
+test -n "$binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }
+server_binary="$binary"; server_flag='-config'; server_config='stdin:'
+`
+	if kind == "sing-box" {
+		script += `server_binary=''
+for candidate in /usr/bin/sing-box /usr/local/bin/sing-box; do
+ if test -f "$candidate" && test -x "$candidate"; then server_binary="$candidate"; break; fi
+done
+test -n "$server_binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }
+server_flag='-c'; server_config='/dev/stdin'
+`
+	}
+	return script
+}
+
+func sniProbeMessage(kind, code string) string {
+	switch code {
+	case "tools":
+		return "服务器缺少 curl 或 timeout"
+	case "kernel":
+		if kind == "sing-box" {
+			return "服务器未安装可用的 sing-box 或 Xray 验证内核"
+		}
+		return "服务器未安装可用的 Xray 验证内核"
+	case "startup":
+		return "隔离测试内核启动失败，请重试扫描"
+	case "ports":
+		return "随机测试端口已占用，请重试扫描"
+	}
+	return "隔离 Reality 验证未完成，请重试"
+}
+
 // Ephemeral Xray pair, loopback listeners only; no production configuration,
 // user, nft counter, or proxy port is read or changed.
 func realityProbeScript(targets []sniTarget) (string, error) {
@@ -121,13 +159,7 @@ func realityProbeScriptForCore(kind string, targets []sniTarget) (string, error)
 	s, _ := json.Marshal(server)
 	c, _ := json.Marshal(client)
 	script := `set -eu
-command -v curl >/dev/null && command -v timeout >/dev/null || { printf 'MXIOC_REALITY_ERROR tools\n'; exit 0; }
-binary=''
-for candidate in /usr/local/x-ui/bin/xray* /usr/local/bin/xray; do
- if test -f "$candidate" && test -x "$candidate"; then binary="$candidate"; break; fi
-done
-test -n "$binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }
-__SERVER_COMMAND__
+__KERNELS__
 ports_hex=__PORTS__
 for table in /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6; do
  test -r "$table" || continue
@@ -173,10 +205,5 @@ probe() {
  printf 'MXIOC_REALITY_RESULT %s OK\n' "$index"
 }
 __JOBS__`
-	serverCommand := `server_binary="$binary"; server_flag='-config'; server_config='stdin:'`
-	if kind == "sing-box" {
-		serverCommand = `server_binary='/usr/local/bin/sing-box'; server_flag='-c'; server_config='/dev/stdin'
-test -x "$server_binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }`
-	}
-	return strings.NewReplacer("__SERVER_COMMAND__", serverCommand, "__PORTS__", quote(portHex), "__SERVER__", string(s), "__CLIENT__", string(c), "__READY__", strings.Join(socksPorts, " "), "__JOBS__", strings.Join(jobs, "")).Replace(script), nil
+	return strings.NewReplacer("__KERNELS__", sniProbeKernelScript(kind), "__PORTS__", quote(portHex), "__SERVER__", string(s), "__CLIENT__", string(c), "__READY__", strings.Join(socksPorts, " "), "__JOBS__", strings.Join(jobs, "")).Replace(script), nil
 }

@@ -307,6 +307,18 @@ func (m *Manager) ScanSNI(ctx context.Context, id string, candidates []string, f
 		return nil, err
 	}
 	defer session.Close()
+	preflight, err := session.Run(ctx, "set -eu\n"+sniProbeKernelScript(value(record["installType"]))+"printf 'MXIOC_SNI_PREFLIGHT_OK\\n'\n", 16<<10)
+	if err != nil {
+		return nil, errors.New("SNI 验证环境预检失败，请检查 SSH 连接")
+	}
+	if strings.TrimSpace(preflight) != "MXIOC_SNI_PREFLIGHT_OK" {
+		_, probeErr := parseRealityResults(preflight, 0)
+		code := ""
+		if probeErr != nil {
+			code = probeErr.Error()
+		}
+		return nil, errors.New(sniProbeMessage(value(record["installType"]), code))
+	}
 	output, err := session.Run(ctx, sniResolveScript(domains), 128<<10)
 	if err != nil {
 		return nil, errors.New("服务器 DNS 读取失败，请检查 curl、getent、timeout 和 SSH 连接")
@@ -394,18 +406,10 @@ func (m *Manager) ScanSNI(ctx context.Context, id string, candidates []string, f
 				break
 			}
 		}
-		messages := map[string]string{"tools": "服务器缺少 curl 或 timeout", "kernel": "服务器未安装可用的 Xray 验证内核", "startup": "隔离测试内核启动失败，请重试扫描", "ports": "随机测试端口已占用，请重试扫描"}
-		if record["installType"] == "sing-box" {
-			messages["kernel"] = "服务器未安装可用的 sing-box 或 Xray 验证内核"
-		}
 		for index, rowIndex := range indices {
 			row := rows[rowIndex]
 			if probeErr != nil {
-				message := messages[probeErr.Error()]
-				if message == "" {
-					message = "隔离 Reality 验证未完成，请重试"
-				}
-				row["error"] = message
+				row["error"] = sniProbeMessage(value(record["installType"]), probeErr.Error())
 				continue
 			}
 			ok, present := readings[index]

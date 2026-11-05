@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +16,8 @@ import (
 
 type fixtureSNISession struct {
 	dns, reality string
+	preflight    string
+	network      atomic.Int32
 	tlsFail      bool
 	probes       atomic.Int32
 	closed       atomic.Int32
@@ -25,6 +29,13 @@ func (f *fixtureSNISession) Run(ctx context.Context, script string, limit int) (
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
+	if strings.Contains(script, "MXIOC_SNI_PREFLIGHT_OK") {
+		if f.preflight != "" {
+			return f.preflight, nil
+		}
+		return "MXIOC_SNI_PREFLIGHT_OK\n", nil
+	}
+	f.network.Add(1)
 	if strings.Contains(script, "MXIOC_SNI_DNS") {
 		return f.dns, nil
 	}
@@ -319,7 +330,7 @@ func TestSingBoxRealityProbeIsolationAndRouting(t *testing.T) {
 		len(anyRecords(client["routing"].(Record)["rules"])) != 3 {
 		t.Fatal("proof traffic escaped loopback routing")
 	}
-	for _, required := range []string{"/usr/local/bin/sing-box", "server_config='/dev/stdin'", "trap cleanup EXIT", "for attempt in 1 2; do", "blackhole", "/proc/net/tcp"} {
+	for _, required := range []string{"/usr/bin/sing-box /usr/local/bin/sing-box", "server_config='/dev/stdin'", "trap cleanup EXIT", "for attempt in 1 2; do", "blackhole", "/proc/net/tcp"} {
 		if !strings.Contains(script, required) {
 			t.Fatal("missing probe invariant", required)
 		}
@@ -332,6 +343,56 @@ func TestSingBoxRealityProbeIsolationAndRouting(t *testing.T) {
 	command.Stdin = strings.NewReader(script)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatal("invalid probe shell", err, string(output))
+	}
+}
+
+func TestSNIPreflightStopsBeforeDNSAndTLSOnMissingToolsOrKernel(t *testing.T) {
+	for _, marker := range []string{"MXIOC_REALITY_ERROR kernel\n", "MXIOC_REALITY_ERROR tools\n", "unexpected-output"} {
+		m, id, fixture := sniFixture(t)
+		fixture.preflight = marker
+		if _, err := m.ScanSNI(context.Background(), id, []string{"one.example.com"}, false); err == nil ||
+			fixture.network.Load() != 0 || fixture.probes.Load() != 0 || len(m.sniState().cache) != 0 {
+			t.Fatal("failed preflight performed network scans or produced cached proof", err)
+		}
+	}
+}
+
+func TestSNIProbeSelectsInstalledSingBoxAndCustomFallback(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		bash = "C:/Program Files/Git/bin/bash.exe"
+	}
+	root := t.TempDir()
+	xray := filepath.ToSlash(filepath.Join(root, "xray"))
+	primary := filepath.ToSlash(filepath.Join(root, "system-sing-box"))
+	fallback := filepath.ToSlash(filepath.Join(root, "custom-sing-box"))
+	for _, path := range []string{xray, primary, fallback} {
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	script := strings.NewReplacer("/usr/local/x-ui/bin/xray*", quote(filepath.ToSlash(filepath.Join(root, "no-panel-xray"))),
+		"/usr/local/bin/xray", quote(xray), "/usr/bin/sing-box", quote(primary), "/usr/local/bin/sing-box", quote(fallback)).Replace(sniProbeKernelScript("sing-box"))
+	for i, expected := range []string{primary, fallback, ""} {
+		if i > 0 {
+			path := primary
+			if i == 2 {
+				path = fallback
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+		}
+		command := exec.Command(bash, "-s")
+		command.Stdin = strings.NewReader("set -eu\n" + script + "printf 'MXIOC_SELECTED %s\\n' \"$server_binary\"\n")
+		output, err := command.CombinedOutput()
+		want := "MXIOC_SELECTED " + expected
+		if expected == "" {
+			want = "MXIOC_REALITY_ERROR kernel"
+		}
+		if err != nil || strings.TrimSpace(string(output)) != want {
+			t.Fatal("incorrect installed kernel discovery", err, string(output), want)
+		}
 	}
 }
 
