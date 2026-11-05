@@ -287,7 +287,55 @@ func TestRealityProbeScriptIsolationAndRouting(t *testing.T) {
 	}
 }
 
-func TestSNIForceFailureDoesNotReviveOldSuccessAndSingBoxIsHidden(t *testing.T) {
+func TestSingBoxRealityProbeIsolationAndRouting(t *testing.T) {
+	script, err := realityProbeScriptForCore("sing-box", []sniTarget{{"one.example.com", "8.8.8.8"}, {"two.example.com", "2606:4700:4700::1111"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, client := probeConfigs(t, script)
+	if len(anyRecords(server["inbounds"])) != 2 || len(anyRecords(client["inbounds"])) != 3 {
+		t.Fatal("missing isolated server, client or proof sink")
+	}
+	ipv6 := anyRecords(server["inbounds"])[1]["tls"].(Record)["reality"].(Record)["handshake"].(Record)
+	if ipv6["server"] != "2606:4700:4700::1111" || ipv6["server_port"] != float64(443) {
+		t.Fatal("Reality handshake retained IPv6 URI brackets")
+	}
+	seen := map[string]bool{}
+	for _, config := range []Record{server, client} {
+		for _, inbound := range anyRecords(config["inbounds"]) {
+			port := fmt.Sprint(inbound["port"])
+			if inbound["port"] == nil {
+				port = fmt.Sprint(inbound["listen_port"])
+			}
+			n, err := parsedPort(port, 0)
+			if err != nil || n <= 20000 || inbound["listen"] != "127.0.0.1" || seen[port] {
+				t.Fatal("nonisolated or duplicate listener")
+			}
+			seen[port] = true
+		}
+	}
+	out := anyRecords(server["outbounds"])[0]
+	if out["type"] != "socks" || out["server"] != "127.0.0.1" || !seen[fmt.Sprint(out["server_port"])] ||
+		len(anyRecords(client["routing"].(Record)["rules"])) != 3 {
+		t.Fatal("proof traffic escaped loopback routing")
+	}
+	for _, required := range []string{"/usr/local/bin/sing-box", "server_config='/dev/stdin'", "trap cleanup EXIT", "for attempt in 1 2; do", "blackhole", "/proc/net/tcp"} {
+		if !strings.Contains(script, required) {
+			t.Fatal("missing probe invariant", required)
+		}
+	}
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		bash = "C:/Program Files/Git/bin/bash.exe"
+	}
+	command := exec.Command(bash, "-n")
+	command.Stdin = strings.NewReader(script)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatal("invalid probe shell", err, string(output))
+	}
+}
+
+func TestSNIForceFailureDoesNotReviveOldSuccessAndSingBoxIsVerified(t *testing.T) {
 	m, id, f := sniFixture(t)
 	domains := []string{"one.example.com"}
 	f.reality = "MXIOC_REALITY_RESULT 0 OK\n"
@@ -313,8 +361,13 @@ func TestSNIForceFailureDoesNotReviveOldSuccessAndSingBoxIsHidden(t *testing.T) 
 	}
 	before := f.probes.Load()
 	result, err := m.ScanSNI(context.Background(), id, domains, false)
-	if err != nil || result["results"].([]Record)[0]["ok"] != false || f.probes.Load() != before {
-		t.Fatal("unsupported verifier became selectable", result, err)
+	if err != nil || result["results"].([]Record)[0]["ok"] != false || f.probes.Load() != before+1 {
+		t.Fatal("missing sing-box verifier became selectable", result, err)
+	}
+	f.reality = "MXIOC_REALITY_RESULT 0 OK\n"
+	result, err = m.ScanSNI(context.Background(), id, domains, true)
+	if err != nil || result["results"].([]Record)[0]["realityVerified"] != true || f.probes.Load() != before+2 {
+		t.Fatal("sing-box verified results unavailable", result, err)
 	}
 }
 

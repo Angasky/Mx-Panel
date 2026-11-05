@@ -7,6 +7,8 @@
 
 ## 已实现并验证
 
+- 2026-11-05：独立 sing-box 开放 Reality / Vision 托管创建与独立用户绑定，中转窗口可选 Reality 入口并保留 VMess TCP；沿用 SNI 缓存、归属核对、断线重试和路由清理。SNI 扫描按服务器内核启动临时验证服务，sing-box 通过临时 Xray 的回环 SOCKS / HTTP blackhole 核对认证后的数据路径，两次成功才可选择，仍不读取生产配置或使用计费端口；缺验证内核时返回明确错误。修复 sing-box Reality IPv6 握手目标的方括号转换。真实本地内核已验证创建配置、正常 UUID 转发、错误 UUID / Short ID 拒绝，以及生成扫描配置的正反数据路径；Linux 脚本语法与扫描缓存测试通过，远端 Linux 脚本执行仍待验收。
+
 - 2026-11-05：独立 Xray / sing-box 增加 VLESS / VMess TCP TLS 模板，沿用自动证书、随机端口、空用户创建、独立用户和写入重试；VMess TLS 导出统一使用明确的 aes-128-gcm。gRPC 服务名编辑与创建采用相同的长度 / 字符校验，并覆盖重启后继续保存。真实内核回环测试已覆盖两种服务端内核的 VLESS / VMess TCP、WS、gRPC TLS：正常用户转发 HTTP，未登记 UUID 以及错误 WS 路径 / gRPC 服务名均拒绝；浏览器验证 TCP TLS 表单和 gRPC 编辑校验。未在远端部署。
 
 - 2026-11-05：独立 Xray / sing-box 增加 VMess WebSocket TLS 托管模板，沿用自动证书、随机端口、空用户创建、订阅独立用户和写入重试；支持 WS 路径编辑。VMess WS TLS 导出明确的 aes-128-gcm，避免跨内核依赖 auto。生产模板与链接转换生成的配置已用本地真实 Xray / sing-box 验证：正常用户转发 HTTP，错误路径和未登记 UUID 均拒绝；浏览器验证自动证书表单及创建参数。这是回环测试，未在远端服务器部署。

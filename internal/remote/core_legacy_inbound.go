@@ -3,8 +3,8 @@ package remote
 import (
 	"errors"
 	"maps"
+	"net"
 	"strconv"
-	"strings"
 )
 
 var invalidCoreInbound = errors.New("invalid legacy core inbound")
@@ -161,19 +161,19 @@ func legacySingTLS(stream Record) (Record, error) {
 		if target == "" {
 			target = value(r["dest"])
 		}
-		split := strings.LastIndexByte(target, ':')
+		host, portText, err := net.SplitHostPort(target)
 		names, _ := r["serverNames"].([]any)
 		ids, _ := r["shortIds"].([]any)
-		if split <= 0 || len(names) == 0 || value(names[0]) == "" || ids == nil || value(r["privateKey"]) == "" {
+		if err != nil || host == "" || len(names) == 0 || value(names[0]) == "" || ids == nil || value(r["privateKey"]) == "" {
 			return nil, invalidCoreInbound
 		}
-		port, err := strconv.Atoi(target[split+1:])
+		port, err := strconv.Atoi(portText)
 		if err != nil || port < 1 || port > 65535 {
 			return nil, invalidCoreInbound
 		}
 		return Record{"enabled": true, "server_name": names[0], "reality": Record{
 			"enabled": true, "private_key": r["privateKey"], "short_id": ids,
-			"handshake": Record{"server": target[:split], "server_port": port},
+			"handshake": Record{"server": host, "server_port": port},
 		}}, nil
 	default:
 		return nil, invalidCoreInbound

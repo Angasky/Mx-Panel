@@ -2,8 +2,10 @@ package remote
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +35,7 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 		defer listener.Close()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
-	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "vless-grpc-tls", "vmess-grpc-tls"} {
+	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "vless-grpc-tls", "vmess-grpc-tls", "vless-reality"} {
 		for _, kind := range []string{"xray", "sing-box"} {
 			t.Run(template+"/"+kind, func(t *testing.T) {
 				binary := xray
@@ -49,12 +51,28 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 				defer target.Close()
 				cert, key := templateTestCertificate(t, "node.example.com", false)
 				row, err := buildInboundTemplate(Record{"template": template, "port": port(), "serverName": "node.example.com",
-					"certFile": "/fixture/cert", "keyFile": "/fixture/key", "path": "/owned-ws"}, "")
+					"certFile": "/fixture/cert", "keyFile": "/fixture/key", "path": "/owned-ws"}, "1.1.1.1")
 				if err != nil {
 					t.Fatal(err)
 				}
 				row["tag"], row["listen"] = "fixture", "127.0.0.1"
-				row["streamSettings"].(Record)["tlsSettings"].(Record)["certificates"] = []any{Record{"certificateFile": cert, "keyFile": key}}
+				stream := row["streamSettings"].(Record)
+				if template == "vless-reality" {
+					pair, err := tls.LoadX509KeyPair(cert, key)
+					if err != nil {
+						t.Fatal(err)
+					}
+					// Replace only the scanned destination with a local TLS 1.3 target.
+					fallback := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404) }))
+					fallback.Config.ErrorLog = log.New(io.Discard, "", 0) // Invalid Reality probes intentionally reach the TLS target.
+					fallback.EnableHTTP2 = true
+					fallback.TLS = &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, CurvePreferences: []tls.CurveID{tls.X25519}}
+					fallback.StartTLS()
+					defer fallback.Close()
+					stream["realitySettings"].(Record)["target"] = fallback.Listener.Addr().String()
+				} else {
+					stream["tlsSettings"].(Record)["certificates"] = []any{Record{"certificateFile": cert, "keyFile": key}}
+				}
 				user, err := NewUser(row)
 				if err != nil {
 					t.Fatal(err)
@@ -118,7 +136,9 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					t.Fatal(err)
 				}
 				scenarios := []string{"owned", "wrong-user"}
-				if !tcpTLSTemplate(template) {
+				if template == "vless-reality" {
+					scenarios = append(scenarios, "wrong-short-id")
+				} else if !tcpTLSTemplate(template) {
 					scenarios = append(scenarios, "wrong-path")
 				}
 				for _, scenario := range scenarios {
@@ -140,6 +160,9 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 						}
 						node["uuid"] = other["id"]
 					}
+					if scenario == "wrong-short-id" {
+						node["reality-opts"].(Record)["short-id"] = "ffffffffffffffff"
+					}
 					out, err := NodeOutbound(node, "proxy")
 					if err != nil {
 						t.Fatal(err)
@@ -151,7 +174,9 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 						settings["address"] = "127.0.0.1"
 					}
 					// Trust only this test's local certificate, keeping verification on.
-					out["streamSettings"].(Record)["tlsSettings"].(Record)["certificates"] = []any{Record{"certificateFile": cert, "usage": "verify"}}
+					if template != "vless-reality" {
+						out["streamSettings"].(Record)["tlsSettings"].(Record)["certificates"] = []any{Record{"certificateFile": cert, "usage": "verify"}}
+					}
 					socks := port()
 					stop, clientLog := start(xray, "xray", Record{"inbounds": []any{Record{"listen": "127.0.0.1", "port": socks, "protocol": "socks", "settings": Record{"auth": "noauth"}}}, "outbounds": []any{out}}, socks)
 					proxy, _ := url.Parse("socks5://127.0.0.1:" + value(socks))

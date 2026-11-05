@@ -18,11 +18,12 @@ func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
 }
 
 func TestStandaloneRealityUsesVerifiedSNI(t *testing.T) {
-	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"}, false)
+	testStandaloneInboundCreate(t, "vless-reality", []string{"xray", "sing-box"}, false)
 }
 
 func TestStandaloneRelayLifecycle(t *testing.T) {
 	testStandaloneInboundCreate(t, "vless-reality", []string{"xray"}, true)
+	testStandaloneInboundCreate(t, "vless-reality", []string{"sing-box"}, true)
 	testStandaloneInboundCreate(t, "vmess-tcp", []string{"sing-box"}, true)
 }
 

@@ -21,12 +21,26 @@ type sniTarget struct{ domain, address string }
 // Ephemeral Xray pair, loopback listeners only; no production configuration,
 // user, nft counter, or proxy port is read or changed.
 func realityProbeScript(targets []sniTarget) (string, error) {
+	return realityProbeScriptForCore("xray", targets)
+}
+
+// sing-box has no HTTP blackhole response, so its only outbound is a loopback
+// SOCKS sink in the temporary Xray process. A 403 then proves Reality transport
+// plus authenticated forwarding, without dialing the requested HTTP destination.
+func realityProbeScriptForCore(kind string, targets []sniTarget) (string, error) {
+	if kind != "sing-box" {
+		kind = "xray"
+	}
 	if len(targets) == 0 || len(targets) > 20 {
 		return "", errors.New("Reality 每批支持 1–20 个目标")
 	}
 	ports := []int{}
 	used := map[int]bool{}
-	for len(ports) < 2*len(targets) {
+	count := 2 * len(targets)
+	if kind == "sing-box" {
+		count++ // An isolated Xray SOCKS/HTTP-blackhole sink confirms the sing-box data path.
+	}
+	for len(ports) < count {
 		n, err := rand.Int(rand.Reader, big.NewInt(45535))
 		if err != nil {
 			return "", err
@@ -42,6 +56,15 @@ func realityProbeScript(targets []sniTarget) (string, error) {
 	jobs := []string{}
 	socksPorts := []string{}
 	portHex := " "
+	if kind == "sing-box" {
+		sink := ports[len(ports)-1]
+		server = Record{"log": Record{"disabled": true}, "inbounds": []any{}, "outbounds": []any{Record{"type": "socks", "tag": "proof-sink", "server": "127.0.0.1", "server_port": sink, "version": "5"}}}
+		client["inbounds"] = []any{Record{"tag": "proof-sink", "listen": "127.0.0.1", "port": sink, "protocol": "socks", "settings": Record{"auth": "noauth"}}}
+		client["outbounds"] = []any{Record{"tag": "proof-sink", "protocol": "blackhole", "settings": Record{"response": Record{"type": "http"}}}}
+		client["routing"].(Record)["rules"] = []any{Record{"type": "field", "inboundTag": []any{"proof-sink"}, "outboundTag": "proof-sink"}}
+		portHex += fmt.Sprintf("%04X ", sink)
+		socksPorts = append(socksPorts, fmt.Sprint(sink))
+	}
 	for i, target := range targets {
 		domain, err := certificateDomain(target.domain)
 		if err != nil {
@@ -68,7 +91,14 @@ func realityProbeScript(targets []sniTarget) (string, error) {
 		}
 		short := hex.EncodeToString(sid)
 		stream := Record{"network": "tcp", "security": "reality", "realitySettings": Record{"target": net.JoinHostPort(ip.Unmap().String(), "443"), "serverNames": []any{domain}, "privateKey": base64.RawURLEncoding.EncodeToString(private.Bytes()), "shortIds": []any{short}, "minClientVer": "1.8.2"}}
-		server["inbounds"] = append(server["inbounds"].([]any), Record{"listen": "127.0.0.1", "port": ports[2*i], "protocol": "vless", "settings": Record{"clients": []any{Record{"id": uuid, "flow": "xtls-rprx-vision"}}, "decryption": "none"}, "streamSettings": stream})
+		inbound := Record{"tag": fmt.Sprintf("probe-server-%d", i), "listen": "127.0.0.1", "port": ports[2*i], "protocol": "vless", "settings": Record{"clients": []any{Record{"id": uuid, "flow": "xtls-rprx-vision"}}, "decryption": "none"}, "streamSettings": stream}
+		if kind == "sing-box" {
+			inbound, err = legacyNativeInbound(kind, inbound)
+			if err != nil {
+				return "", err
+			}
+		}
+		server["inbounds"] = append(server["inbounds"].([]any), inbound)
 		inTag, outTag := fmt.Sprintf("probe-in-%d", i), fmt.Sprintf("probe-out-%d", i)
 		client["inbounds"] = append(client["inbounds"].([]any), Record{"tag": inTag, "listen": "127.0.0.1", "port": ports[2*i+1], "protocol": "socks", "settings": Record{"auth": "noauth"}})
 		user := Record{"id": uuid, "encryption": "none", "flow": "xtls-rprx-vision"}
@@ -97,6 +127,7 @@ for candidate in /usr/local/x-ui/bin/xray* /usr/local/bin/xray; do
  if test -f "$candidate" && test -x "$candidate"; then binary="$candidate"; break; fi
 done
 test -n "$binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }
+__SERVER_COMMAND__
 ports_hex=__PORTS__
 for table in /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6; do
  test -r "$table" || continue
@@ -113,7 +144,7 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM HUP
-timeout 75 "$binary" run -config stdin: <<'MXIOC_TEST_SERVER' >/dev/null 2>&1 &
+timeout 75 "$server_binary" run "$server_flag" "$server_config" <<'MXIOC_TEST_SERVER' >/dev/null 2>&1 &
 __SERVER__
 MXIOC_TEST_SERVER
 server_pid=$!
@@ -142,5 +173,10 @@ probe() {
  printf 'MXIOC_REALITY_RESULT %s OK\n' "$index"
 }
 __JOBS__`
-	return strings.NewReplacer("__PORTS__", quote(portHex), "__SERVER__", string(s), "__CLIENT__", string(c), "__READY__", strings.Join(socksPorts, " "), "__JOBS__", strings.Join(jobs, "")).Replace(script), nil
+	serverCommand := `server_binary="$binary"; server_flag='-config'; server_config='stdin:'`
+	if kind == "sing-box" {
+		serverCommand = `server_binary='/usr/local/bin/sing-box'; server_flag='-c'; server_config='/dev/stdin'
+test -x "$server_binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }`
+	}
+	return strings.NewReplacer("__SERVER_COMMAND__", serverCommand, "__PORTS__", quote(portHex), "__SERVER__", string(s), "__CLIENT__", string(c), "__READY__", strings.Join(socksPorts, " "), "__JOBS__", strings.Join(jobs, "")).Replace(script), nil
 }

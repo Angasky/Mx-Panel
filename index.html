@@ -2569,6 +2569,7 @@ function remoteNodeForm(relay) {
   const randomPort = 20001 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 45535);
   openModal(relay ? '添加服务器中转' : '添加服务器节点', `<form id="remoteNodeForm"><div class="grid">
     <div><label for="rnName">节点名称</label><input id="rnName" required maxlength="100" placeholder="例如 香港中转"></div>
+    ${singRelay ? '<div><label for="rnRelayTemplate">中转入口协议</label><select id="rnRelayTemplate"><option value="vmess-tcp">VMess + TCP</option><option value="vless-reality">VLESS + Reality / Vision</option></select></div>' : ''}
     <div><label for="rnPort">监听端口</label><input id="rnPort" type="number" min="1" max="65535" ${standalone ? 'placeholder="留空自动分配"' : `required value="${randomPort}"`}><p class="hint">默认随机使用 20001–65535，可手动修改；创建时检查冲突。</p></div>
     ${relay ? '' : '<div class="span2"><label for="rnTemplate">节点模板</label><select id="rnTemplate"><option value="vless-reality">VLESS + Reality / Vision（免证书）</option><option value="vmess-tcp">VMess + TCP</option><option value="trojan-tls">Trojan + TLS（自动证书）</option><option value="vless-ws-tls">VLESS + WebSocket + TLS（自动证书）</option></select><p class="hint">模板按所选服务器内核提供。同一入站可供多个订阅使用；每个订阅拥有独立用户、用量和有效期。共用入站暂不支持单用户带宽限制。</p></div>'}
     <div class="span2 ${singRelay ? 'hidden' : ''}" id="rnSniFields"><label id="rnSniLabel" for="rnSni">Reality 伪装域名</label><div class="sni-field"><input id="rnSni" value="raw.githubusercontent.com" ${singRelay ? '' : 'required'}><datalist id="rnTlsDomains">${remoteTlsDomains().map(domain=>`<option value="${esc(domain)}"></option>`).join('')}</datalist><button id="rnSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button></div><p class="hint" id="rnSniHint">Reality 可扫描并选择内置候选域名。</p></div>
@@ -2586,7 +2587,6 @@ function remoteNodeForm(relay) {
       if (S.remoteServer.installType === 'xray') $('rnTemplate').add(new Option('VLESS + XHTTP + TLS', 'vless-xhttp-tls'));
     }
     if (standalone && S.remoteServer.installType === 'sing-box') {
-      $('rnTemplate').querySelector('[value="vless-reality"]').remove();
       $('rnTemplate').add(new Option('TUIC + TLS（自动证书）', 'tuic'));
     }
   }
@@ -2617,6 +2617,15 @@ function remoteNodeForm(relay) {
     $('rnTemplate').onchange();
   }
   $('rnSniTest').onclick = () => openSniScanner(formServerId, 'rnSni');
+  if ($('rnRelayTemplate')) {
+    $('rnRelayTemplate').onchange = () => {
+      const reality=val('rnRelayTemplate')==='vless-reality';
+      $('rnSniFields').classList.toggle('hidden', !reality);
+      $('rnSni').required=reality;
+      $('rnLanding').nextElementSibling.textContent=`将创建 ${reality ? 'Reality' : 'VMess TCP'} 入口、落地出站和专属路由。`;
+    };
+    $('rnRelayTemplate').onchange();
+  }
   let submittedPayload=null;
   $('remoteNodeForm').onsubmit = async e => {
     e.preventDefault(); const form=e.currentTarget, serverId = formServerId, profile = formProfile, autoImport = $('rnImport').checked;
@@ -2624,7 +2633,7 @@ function remoteNodeForm(relay) {
     if(S.profile!==profile || S.serverId!==serverId){$('remoteError').textContent='服务器或订阅已切换，请重新打开创建窗口';return;}
     let created = false;
     $('rnSave').disabled = true;
-    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, xhttpMode:val('rnTemplate') === 'vless-xhttp-tls' ? val('rnXhttpMode') : undefined, grpcService:grpcTemplates.includes(val('rnTemplate')) ? val('rnGrpcService') : undefined, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? 'vmess-tcp' : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
+    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, xhttpMode:val('rnTemplate') === 'vless-xhttp-tls' ? val('rnXhttpMode') : undefined, grpcService:grpcTemplates.includes(val('rnTemplate')) ? val('rnGrpcService') : undefined, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? val('rnRelayTemplate') : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
     try {
       if(!submittedPayload && !relay && tlsTemplates.includes(payload.template) && val('rnCertMode')==='auto') {
         const job=await prepareNodeCertificate(serverId,payload.serverName,form);

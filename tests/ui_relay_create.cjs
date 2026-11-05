@@ -14,6 +14,31 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
   await page.waitForFunction(()=>$('remoteError')?.textContent.includes('待核对'));assert.equal(await page.$eval('#rnLanding',n=>n.disabled),true);
   await page.click('#rnSave');await page.waitForFunction(()=>window.calls.length===2);
   const calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls[0],calls[1]);assert.match(calls[0].operationId,/^[0-9a-f]{32}$/);assert.equal(await page.evaluate(()=>window.legacyImports),0);assert.deepEqual(errors,[]);
+  await page.evaluate(()=>{
+   S.remoteServer={installType:'sing-box'};window.calls=[];window.scans=[];
+   openSniScanner=(serverId,targetId)=>window.scans.push({serverId,targetId});
+   remoteNodeForm(true);
+  });
+  assert.equal(await page.$eval('#rnSniFields',e=>e.classList.contains('hidden')),true);
+  assert.equal(await page.$eval('#rnSni',e=>e.required),false);
+  await page.select('#rnRelayTemplate','vless-reality');
+  assert.equal(await page.$eval('#rnSniFields',e=>e.classList.contains('hidden')),false);
+  assert.equal(await page.$eval('#rnSni',e=>e.required),true);
+  await page.click('#rnSniTest');
+  assert.deepEqual(await page.evaluate(()=>window.scans),[{serverId:'server',targetId:'rnSni'}]);
+  await page.evaluate(()=>{
+   $('rnName').value='sing-reality-relay';$('rnLanding').value='socks5://fixture:password@example.com:1080';
+   $('rnSni').value='example.com';$('rnSni').dataset.sniVerified='example.com';$('rnSni').dataset.sniAddress='1.1.1.1';
+   $('remoteNodeForm').requestSubmit();
+  });
+  await page.waitForFunction(()=>$('remoteError')?.textContent.includes('待核对'));
+  assert.equal(await page.$eval('#rnRelayTemplate',e=>e.disabled),true);
+  await page.evaluate(()=>$('rnRelayTemplate').value='vmess-tcp');
+  await page.click('#rnSave');await page.waitForFunction(()=>window.calls.length===2);
+  const singCalls=await page.evaluate(()=>window.calls);
+  assert.deepEqual(singCalls[0],singCalls[1]);assert.equal(singCalls[0].template,'vless-reality');
+  assert.equal(singCalls[0].sniAddress,'1.1.1.1');assert.equal(singCalls[0].sniVerified,true);
+  assert.deepEqual(errors,[]);
   console.log('PASS: relay retries preserve operation/config; native bound result skips legacy import');
  }finally{await browser.close();await new Promise(resolve=>host.close(resolve))}
 })().catch(error=>{console.error(error);process.exit(1)});

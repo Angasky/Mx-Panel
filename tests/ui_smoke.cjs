@@ -14,7 +14,7 @@ let requests=[];
 t.setApi(async(path,opt)=>{requests.push([path,opt]);if(path==='/servers')return opt?.method ? {server:{id:JSON.parse(opt.body).id}} : {servers:t.S.servers};if(path==='/servers/attach')return {message:'已有内核验证成功'};if(path==='/failovers')return {failovers:[]};if(path==='/server-chains')return {chains:[{name:"quote'chain",entry:'entry',exit:'exit'}]};throw Error('Captured '+path);});
 (async()=>{
  let actualHeaders;
- w.fetch=async(url,opt)=>{actualHeaders=opt.headers;return {ok:true,status:200,json:async()=>({formats:[]})};};
+ w.fetch=async(url,opt)=>{actualHeaders=opt.headers;return {ok:true,status:200,headers:{get:()=>null},json:async()=>({formats:[]})};};
  t.S.profile='clash';await t.nativeApi('/conversions',{headers:{'X-Profile':'other'}});assert.equal(actualHeaders['X-Profile'],'other');
  await t.nativeApi('/conversions');assert.equal(actualHeaders['X-Profile'],'clash');
  const converted=t.conversionRows([{name:'安卓主备',note:'完整 JSON',supported:1,unit:'主备组',available:true,url:'/convert/test/v2rayng-ha'},{name:'小火箭配置',note:'两步导入',supported:0,available:false,error:'请先创建主备组',url:'/convert/test/shadowrocket-config'}]);
@@ -51,7 +51,7 @@ t.setApi(async(path,opt)=>{requests.push([path,opt]);if(path==='/servers')return
  t.S.page='servers';t.renderServers();const manage=[...w.document.querySelectorAll('button')].filter(b=>b.textContent==='节点 / 中转');assert(manage.every(b=>!b.disabled));
  t.S.page='chains';await t.chainModal();$('chainMode').value='server';$('chainMode').onchange();assert(!$('chainServerFields').classList.contains('hidden'));
  $('chainName').value='test-server-chain';const submit=$('editForm').querySelector('button.primary');await $('editForm').onsubmit({preventDefault(){},submitter:submit});
- const sent=JSON.parse(requests.find(r=>r[0]==='/chains')[1].body);assert.equal(sent.mode,'server');assert.equal(sent.port,'24443');assert(!submit.disabled);
+ const sent=JSON.parse(requests.find(r=>r[0]==='/chains')[1].body);assert.equal(sent.mode,'server');assert.equal(sent.port,'');assert(!submit.disabled);
  await t.chains();const remove=w.document.querySelector('[onclick^="deleteServerChain"]');assert(remove.getAttribute('onclick').includes('%27'));
  t.S.data.nodes.push({index:2,name:'backup',server:'198.51.100.3',config:{type:'ss',server:'198.51.100.3',port:443}});
  await t.failoverModal();$('foName').value='HA';$('foExit').value='exit';const entries=w.document.querySelectorAll('.foEntry');entries[0].value='entry';entries[1].value='backup';
@@ -61,9 +61,11 @@ t.setApi(async(path,opt)=>{requests.push([path,opt]);if(path==='/servers')return
   t.S.remoteServer={installType};t.remoteNodeForm(false);assert([...$('rnTemplate').options].some(o=>o.value==='hysteria2'),installType+' HY2 template');
  }
  t.S.remoteServer={installType:'sing-box'};t.S.serverId='native';t.remoteNodeForm(false);assert([...$('rnTemplate').options].some(o=>o.value==='hysteria2'));
- assert(Number($('rnPort').value)>20000 && Number($('rnPort').value)<=65535);
+ assert.equal($('rnPort').value,''); // Standalone core allocates and checks the random port at creation.
+ assert([...$('rnTemplate').options].some(o=>o.value==='vless-reality'));
  $('rnTemplate').value='tuic';$('rnTemplate').onchange();assert(!$('rnTlsFields').classList.contains('hidden'));
- $('rnName').value='tuic-test';$('rnCert').value='/etc/cert.pem';$('rnKey').value='/etc/key.pem';await $('remoteNodeForm').onsubmit({preventDefault(){}});
+ $('rnCertMode').value='manual';$('rnCertMode').onchange();$('rnSni').value='node.example.com';
+ $('rnName').value='tuic-test';$('rnCert').value='/etc/cert.pem';$('rnKey').value='/etc/key.pem';await $('remoteNodeForm').onsubmit({preventDefault(){},currentTarget:$('remoteNodeForm')});
  const node=JSON.parse(requests.find(r=>r[0]==='/servers/users')[1].body);assert.equal(node.template,'tuic');assert.equal(node.certFile,'/etc/cert.pem');
  t.setApi(async(path,opt)=>({results:JSON.parse(opt.body).candidates.map(domain=>({domain,ok:true,realityVerified:true,latencyMs:20,tls:'TLSv1.3',alpn:'h2'}))}));
  assert.equal(t.sniCandidates().length,42);assert(!t.sniCandidates().includes('www.microsoft.com'));assert($('rnSniTest'));assert(!$('rnSniList'));
@@ -76,17 +78,19 @@ t.setApi(async(path,opt)=>{requests.push([path,opt]);if(path==='/servers')return
   if(path==='/servers')return {servers:t.S.servers};
   if(path.startsWith('/servers/inbounds'))return {server:t.S.servers[0],inbounds:[remote]};
   if(path==='/snapshot')return t.S.data;
+  if(path==='/servers/users/targets')return {profiles:[{id:'clash',name:'test',importedInboundIds:[]}]};
+  if(path==='/servers/users/batch')return {results:JSON.parse(opt.body).inboundIds.map(inboundId=>({inboundId,ok:true}))};
   if(path==='/servers/users')return {added:1,existing:0,bound:true,enforcementEnabled:true};
   throw Error(path);
  });
  await t.chooseNodeServer('browse');assert($('pickerServer'));await $('pickerOpen').onclick();
  assert.equal(t.S.page,'serverNodes');assert($('content').textContent.includes('返回总控节点'));
- t.S.data.profile.traffic.enforce=true;t.remoteNodeLinks(7);
+ t.S.data.profile.traffic.enforce=true;await t.remoteNodeLinks(7);
  assert($('sharedUserForm'));assert(!$('remoteDedicated'));
  await $('sharedUserForm').onsubmit({preventDefault(){}});
- const imported=JSON.parse(requests.filter(r=>r[0]==='/servers/users').pop()[1].body);
- assert.equal(imported.inboundId,7);assert.equal(imported.serverId,t.S.serverId);
- t.S.remoteRows=[{...remote,id:8,shareLinks:['vless://a','vless://b']}];t.remoteNodeLinks(8);assert($('sharedUserSave'));assert(!$('remoteBindOnImport'));
+ const imported=JSON.parse(requests.filter(r=>r[0]==='/servers/users/batch').pop()[1].body);
+ assert.deepEqual(imported.inboundIds,[7]);assert.equal(imported.serverId,t.S.serverId);
+ t.S.remoteRows=[{...remote,id:8,shareLinks:['vless://a','vless://b']}];await t.remoteNodeLinks(8);assert($('sharedUserSave'));assert(!$('remoteBindOnImport'));
  t.S.page='traffic';t.S.data.profile.traffic={configured:true,enforce:true,upload:0,download:0,total:10737418240,multiplier:2,bindings:[{serverId:'s',inboundId:1,port:24443,name:'owned',status:'active',bandwidth:{uploadKbps:1000,downloadKbps:2000}}]};
  t.setApi(async(path,opt)=>{requests.push([path,opt]);if(path==='/snapshot')return t.S.data;if(path==='/profiles')return {profiles:t.S.profiles};if(path==='/servers/multiplier')return {node:{multiplier:2.5}};if(path==='/traffic')return {ok:true,traffic:t.S.data.profile.traffic};if(path==='/servers/bandwidth')return {ok:true};throw Error(path);});
  t.traffic();assert.equal($('trafficMultiplier'),null);

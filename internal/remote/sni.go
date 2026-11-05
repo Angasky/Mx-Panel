@@ -367,10 +367,6 @@ func (m *Manager) ScanSNI(ctx context.Context, id string, candidates []string, f
 		if chosen[i] == "" {
 			continue
 		}
-		if value(record["installType"]) == "sing-box" {
-			row["error"] = "当前 sing-box 尚无实际 Reality 验证器，未列入可选结果"
-			continue
-		}
 		key := sniCacheKey{id, revision, domains[i], chosen[i]}
 		if ok, hit := scanner.cached(key, force); hit {
 			row["ok"], row["realityVerified"], row["cached"] = ok, ok, true
@@ -383,7 +379,7 @@ func (m *Manager) ScanSNI(ctx context.Context, id string, candidates []string, f
 	var probeErr error
 	if len(pending) > 0 && ctx.Err() == nil {
 		for attempt := 0; attempt < 2; attempt++ {
-			script, err := realityProbeScript(pending)
+			script, err := realityProbeScriptForCore(value(record["installType"]), pending)
 			if err != nil {
 				probeErr = err
 				break
@@ -399,6 +395,9 @@ func (m *Manager) ScanSNI(ctx context.Context, id string, candidates []string, f
 			}
 		}
 		messages := map[string]string{"tools": "服务器缺少 curl 或 timeout", "kernel": "服务器未安装可用的 Xray 验证内核", "startup": "隔离测试内核启动失败，请重试扫描", "ports": "随机测试端口已占用，请重试扫描"}
+		if record["installType"] == "sing-box" {
+			messages["kernel"] = "服务器未安装可用的 sing-box 或 Xray 验证内核"
+		}
 		for index, rowIndex := range indices {
 			row := rows[rowIndex]
 			if probeErr != nil {

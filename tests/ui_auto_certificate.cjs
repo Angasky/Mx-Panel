@@ -27,6 +27,17 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    const call=await page.evaluate(()=>calls.find(x=>x.url==='/servers/users'));assert.equal(call.body.certificateJobId,'job');assert.equal(call.headers['X-Profile'],'owned-profile');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),true);
   }
+  await setup();await page.evaluate(()=>{
+   S.remoteServer.installType='sing-box';
+   const base=api;api=async(url,opt)=>{const result=await base(url,opt);return url==='/servers/users'?{...result,bound:true}:result};
+   remoteNodeForm(false);
+  });
+  await page.select('#rnTemplate','vless-reality');
+  assert.equal(await page.$eval('#rnSniTest',e=>e.classList.contains('hidden')),false);
+  await page.type('#rnName','sing-box Reality');await page.click('#rnSave');
+  await page.waitForFunction(()=>calls.some(x=>x.url==='/servers/users'));
+  assert.equal(await page.evaluate(()=>calls.some(x=>x.url==='/servers/certificates')),false);
+  assert.equal(await page.evaluate(()=>calls.find(x=>x.url==='/servers/users').body.template),'vless-reality');
   for(const kind of ['xray','sing-box']){
    for(const template of ['vmess-ws-tls','vless-tcp-tls','vmess-tcp-tls']){
    await setup();await page.evaluate(kind=>{

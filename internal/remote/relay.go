@@ -255,8 +255,8 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	}
 	kind := value(record["installType"])
 	if kind == "sing-box" {
-		if templateName(payload) != "vmess-tcp" {
-			return nil, errors.New("独立 sing-box 中转入口需要 VMess TCP 模板")
+		if templateName(payload) != "vmess-tcp" && templateName(payload) != "vless-reality" {
+			return nil, errors.New("独立 sing-box 中转入口需要 Reality 或 VMess TCP 模板")
 		}
 		outbound, err := singRelayOutbound(landing, tag)
 		if err != nil {

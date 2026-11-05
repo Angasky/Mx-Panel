@@ -30,7 +30,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	template := templateName(payload)
 	protocol := standaloneTemplateProtocol(kind, template)
 	if protocol == "" || payload["inbound"] != nil || (payload["landingLink"] != nil && outbound == nil) ||
-		(outbound != nil && ((kind == "xray" && template != "vless-reality") || (kind == "sing-box" && template != "vmess-tcp"))) {
+		(outbound != nil && ((kind == "xray" && template != "vless-reality") || (kind == "sing-box" && template != "vmess-tcp" && template != "vless-reality"))) {
 		return nil, errors.New("当前独立内核不支持此托管入站模板")
 	}
 	stateToken, pending := value(record["coreState"]), value(record["coreUserPending"])
@@ -251,9 +251,9 @@ func standaloneTemplateProtocol(kind, template string) string {
 		return "vmess"
 	case "trojan-tls":
 		return "trojan"
-	case "vless-tcp-tls", "vless-ws-tls", "vless-grpc-tls":
+	case "vless-reality", "vless-tcp-tls", "vless-ws-tls", "vless-grpc-tls":
 		return "vless"
-	case "vless-reality", "vless-xhttp-tls":
+	case "vless-xhttp-tls":
 		if kind == "xray" {
 			return "vless"
 		}
