@@ -20,7 +20,21 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Verify Go backend
+        run: go test ./... && go vet ./...
   systemd:
+    needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -53,7 +67,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test ./... && go vet ./...
       - name: Build and verify both release archives
         run: |
           version="${GITHUB_REF_NAME#go-}"
