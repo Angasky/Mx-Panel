@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,10 +20,10 @@ import (
 
 // Optional real-core regression: use the production template, native mapping,
 // subscription URI and outbound conversion, with all traffic on loopback.
-func TestWebSocketTLSWithRealCores(t *testing.T) {
+func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 	xray := os.Getenv("MXIOC_TEST_XRAY")
 	if xray == "" {
-		t.Skip("set MXIOC_TEST_XRAY for real WebSocket verification")
+		t.Skip("set MXIOC_TEST_XRAY for real TLS transport verification")
 	}
 	port := func() int {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -32,7 +33,7 @@ func TestWebSocketTLSWithRealCores(t *testing.T) {
 		defer listener.Close()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
-	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls"} {
+	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "vless-grpc-tls", "vmess-grpc-tls"} {
 		for _, kind := range []string{"xray", "sing-box"} {
 			t.Run(template+"/"+kind, func(t *testing.T) {
 				binary := xray
@@ -43,7 +44,7 @@ func TestWebSocketTLSWithRealCores(t *testing.T) {
 					}
 				}
 				target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					io.WriteString(w, "owned-websocket-proof")
+					io.WriteString(w, "owned-tls-transport-proof")
 				}))
 				defer target.Close()
 				cert, key := templateTestCertificate(t, "node.example.com", false)
@@ -116,13 +117,21 @@ func TestWebSocketTLSWithRealCores(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				for _, scenario := range []string{"owned", "wrong-path", "wrong-user"} {
+				scenarios := []string{"owned", "wrong-user"}
+				if !tcpTLSTemplate(template) {
+					scenarios = append(scenarios, "wrong-path")
+				}
+				for _, scenario := range scenarios {
 					node, err := links.Parse(uri)
 					if err != nil {
 						t.Fatal(err)
 					}
 					if scenario == "wrong-path" {
-						node["ws-opts"].(Record)["path"] = "/wrong-path"
+						if grpcTemplate(template) {
+							node["grpc-opts"].(Record)["grpc-service-name"] = "wrong-service"
+						} else {
+							node["ws-opts"].(Record)["path"] = "/wrong-path"
+						}
 					}
 					if scenario == "wrong-user" {
 						other, err := NewUser(row)
@@ -136,7 +145,7 @@ func TestWebSocketTLSWithRealCores(t *testing.T) {
 						t.Fatal(err)
 					}
 					settings := out["settings"].(Record)
-					if template == "vmess-ws-tls" {
+					if strings.HasPrefix(template, "vmess-") {
 						settings["vnext"].([]any)[0].(Record)["address"] = "127.0.0.1"
 					} else {
 						settings["address"] = "127.0.0.1"
@@ -155,11 +164,11 @@ func TestWebSocketTLSWithRealCores(t *testing.T) {
 					}
 					transport.CloseIdleConnections()
 					stop()
-					passed := requestErr == nil && string(body) == "owned-websocket-proof"
+					passed := requestErr == nil && string(body) == "owned-tls-transport-proof"
 					if passed != (scenario == "owned") {
 						a, _ := serverLog.result()
 						b, _ := clientLog.result()
-						t.Fatal("WebSocket path or user verification failed", scenario, requestErr, a, b)
+						t.Fatal("TLS transport path or user verification failed", scenario, requestErr, a, b)
 					}
 				}
 			})

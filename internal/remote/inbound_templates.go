@@ -33,8 +33,10 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || wsTemplate(name) || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
+	return name == "trojan-tls" || tcpTLSTemplate(name) || wsTemplate(name) || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
 }
+
+func tcpTLSTemplate(name string) bool { return name == "vless-tcp-tls" || name == "vmess-tcp-tls" }
 
 func wsTemplate(name string) bool { return name == "vless-ws-tls" || name == "vmess-ws-tls" }
 
@@ -112,6 +114,13 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 		alpn := []any{"h2", "http/1.1"}
 		if name == "trojan-tls" {
 			protocol = "trojan"
+		} else if tcpTLSTemplate(name) {
+			if name == "vmess-tcp-tls" {
+				protocol = "vmess"
+				settings["disableInsecureEncryption"] = false
+			} else {
+				settings["decryption"] = "none"
+			}
 		} else if name == "hysteria2" {
 			protocol = "hysteria"
 			settings["version"] = 2

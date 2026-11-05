@@ -27,6 +27,8 @@ func TestStandaloneRelayLifecycle(t *testing.T) {
 }
 
 func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) {
+	testStandaloneInboundCreate(t, "vless-tcp-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "vmess-tcp-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vmess-ws-tls", []string{"xray", "sing-box"}, false)
@@ -252,7 +254,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				}
 				return
 			}
-			if wsTemplate(template) || template == "vless-xhttp-tls" {
+			if wsTemplate(template) || grpcTemplate(template) || template == "vless-xhttp-tls" {
 				id, _ := strconv.Atoi(value(row["id"]))
 				version, err := InboundVersion(row)
 				if err != nil {
@@ -279,13 +281,22 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					t.Fatal("occupied port was accepted")
 				}
 				pathField := "wsPath"
+				newPath := "/go-updated"
+				if grpcTemplate(template) {
+					pathField, newPath = "grpcService", "go-updated"
+					for _, invalid := range []string{"", "/wrong", "with space", strings.Repeat("a", 129)} {
+						if _, err := edit(Record{"grpcService": invalid}); err == nil || writes != 2 {
+							t.Fatal("invalid gRPC service accepted")
+						}
+					}
+				}
 				if template == "vless-xhttp-tls" {
 					pathField = "xhttpPath"
 					if _, err := edit(Record{"xhttpMode": "unknown"}); err == nil || writes != 2 {
 						t.Fatal("unsupported XHTTP mode was accepted")
 					}
 				}
-				patch := Record{"port": 19998, pathField: "/go-updated"}
+				patch := Record{"port": 19998, pathField: newPath}
 				if template == "vless-xhttp-tls" {
 					patch["xhttpMode"] = "packet-up"
 				}
@@ -307,7 +318,11 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := edit(Record{pathField: "/different"}); err == nil || writes != 3 {
+				different := "/different"
+				if grpcTemplate(template) {
+					different = "different"
+				}
+				if _, err := edit(Record{pathField: different}); err == nil || writes != 3 {
 					t.Fatal("different payload accepted during recovery")
 				}
 				if _, err := edit(patch); err != nil || writes != 4 {
@@ -318,7 +333,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					t.Fatal("create replay did not recognize edited node", err)
 				}
 				fields := managedCoreFields(replay["inbound"].(Record))
-				if fields[pathField] != "/go-updated" || value(fields["port"]) != "19998" {
+				if fields[pathField] != newPath || value(fields["port"]) != "19998" {
 					t.Fatal("updated settings were not persisted")
 				}
 				if template == "vless-xhttp-tls" && fields["xhttpMode"] != "packet-up" {

@@ -57,6 +57,16 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
   await page.waitForFunction(()=>calls.length===3);
   calls=await page.evaluate(()=>window.calls);
   assert.deepEqual(calls[2].body.inbound,calls[0].body.inbound,'disabled retry fields lost original payload');
+  const invalid=await page.evaluate(()=>{
+   S.remoteRows=[{id:3,editToken:'grpc-edit',editFields:{remark:'grpc',port:24002,grpcService:'vpn'}}];
+   remoteNodeEditManaged(3);
+   const input=$('coreInboundEdit').elements.grpcService;input.value='/wrong';
+   $('coreInboundEdit').requestSubmit();return input.checkValidity();
+  });
+  assert.equal(invalid,false);assert.equal(await page.evaluate(()=>calls.length),3);
+  await page.evaluate(()=>{$('coreInboundEdit').elements.grpcService.value='vpn-new_1';$('coreInboundEdit').requestSubmit()});
+  await page.waitForFunction(()=>calls.length===4);
+  calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls[3].body.inbound,{grpcService:'vpn-new_1'});
   assert.deepEqual(errors,[]);
   console.log('PASS: edit/toggle/delete preserve identity; XHTTP edits and retries preserve path/mode; pending deletes use delete token');
  }finally{await browser.close();await new Promise(resolve=>host.close(resolve));}

@@ -216,7 +216,7 @@ func TestNativeHY2TemplateWithRealXray(t *testing.T) {
 }
 
 func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
-	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "vless-ws-tls", "vmess-ws-tls"} {
+	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls"} {
 		t.Run(template, func(t *testing.T) {
 			payload := Record{"template": template, "serverName": "node.example.com", "certFile": "/fixture/cert.pem",
 				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1", "path": "/vpn-test"}
@@ -256,6 +256,9 @@ func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
 				if node["network"] != "ws" || ws["path"] != "/vpn-test" {
 					t.Fatal("subscription export lost the WebSocket path")
 				}
+			}
+			if tcpTLSTemplate(template) && (node["network"] != nil || node["ws-opts"] != nil || node["grpc-opts"] != nil) {
+				t.Fatal("TCP TLS export retained a different transport's options")
 			}
 			if strings.HasPrefix(template, "vmess-") && node["cipher"] != "aes-128-gcm" {
 				t.Fatal("VMess TLS must export an explicit cross-core cipher")

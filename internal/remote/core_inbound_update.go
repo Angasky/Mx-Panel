@@ -76,6 +76,9 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 			return nil, errors.New("传输参数过长或包含空白字符")
 		}
 		group, field := "grpcSettings", "serviceName"
+		if key == "grpcService" && !grpcServiceName.MatchString(text) {
+			return nil, errors.New("gRPC 服务名须为 1–128 个字母、数字、点、下划线或连字符")
+		}
 		if key == "wsPath" {
 			if !strings.HasPrefix(text, "/") || strings.ContainsAny(text, "?#") {
 				return nil, errors.New("WebSocket 路径必须以 / 开头，且不能包含查询或片段")

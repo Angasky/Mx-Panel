@@ -7,6 +7,8 @@
 
 ## 已实现并验证
 
+- 2026-11-05：独立 Xray / sing-box 增加 VLESS / VMess TCP TLS 模板，沿用自动证书、随机端口、空用户创建、独立用户和写入重试；VMess TLS 导出统一使用明确的 aes-128-gcm。gRPC 服务名编辑与创建采用相同的长度 / 字符校验，并覆盖重启后继续保存。真实内核回环测试已覆盖两种服务端内核的 VLESS / VMess TCP、WS、gRPC TLS：正常用户转发 HTTP，未登记 UUID 以及错误 WS 路径 / gRPC 服务名均拒绝；浏览器验证 TCP TLS 表单和 gRPC 编辑校验。未在远端部署。
+
 - 2026-11-05：独立 Xray / sing-box 增加 VMess WebSocket TLS 托管模板，沿用自动证书、随机端口、空用户创建、订阅独立用户和写入重试；支持 WS 路径编辑。VMess WS TLS 导出明确的 aes-128-gcm，避免跨内核依赖 auto。生产模板与链接转换生成的配置已用本地真实 Xray / sing-box 验证：正常用户转发 HTTP，错误路径和未登记 UUID 均拒绝；浏览器验证自动证书表单及创建参数。这是回环测试，未在远端服务器部署。
 
 - Go module，最低语言版本 1.26；本次使用 Go 1.27.3 构建测试。

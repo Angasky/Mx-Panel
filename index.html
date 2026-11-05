@@ -2563,7 +2563,8 @@ function remoteNodeForm(relay) {
   const singRelay = relay && S.remoteServer?.installType === 'sing-box';
   const grpcTemplates = ['vless-grpc-tls','vmess-grpc-tls'];
   const wsTemplates = ['vless-ws-tls','vmess-ws-tls'];
-  const tlsTemplates = ['trojan-tls',...wsTemplates,'vless-xhttp-tls','hysteria2','tuic', ...grpcTemplates];
+  const tcpTlsTemplates = ['vless-tcp-tls','vmess-tcp-tls'];
+  const tlsTemplates = ['trojan-tls',...wsTemplates,...tcpTlsTemplates,'vless-xhttp-tls','hysteria2','tuic', ...grpcTemplates];
   const formServerId=S.serverId,formProfile=S.profile,creationOperationId=crypto.randomUUID().replaceAll('-','');
   const randomPort = 20001 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 45535);
   openModal(relay ? '添加服务器中转' : '添加服务器节点', `<form id="remoteNodeForm"><div class="grid">
@@ -2577,6 +2578,8 @@ function remoteNodeForm(relay) {
   if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
     if (standalone) {
+      $('rnTemplate').add(new Option('VLESS + TCP + TLS', 'vless-tcp-tls'));
+      $('rnTemplate').add(new Option('VMess + TCP + TLS', 'vmess-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));
       $('rnTemplate').add(new Option('VLESS + gRPC + TLS', 'vless-grpc-tls'));
       $('rnTemplate').add(new Option('VMess + gRPC + TLS', 'vmess-grpc-tls'));
@@ -2971,7 +2974,7 @@ function remoteNodeEditManaged(id) {
     <p class="muted">${row.editPending ? '继续核对并保存上次提交的配置。' : '修改端口或传输参数前需解除订阅绑定。应用连接配置时会重启内核。'}</p>
     <label>入站名称<input name="remark" required maxlength="100"></label>
     <label>监听端口<input name="port" required type="number" min="1" max="65535"></label>
-    ${transport ? `<label>${transport[1]}<input name="${transport[0]}" maxlength="256"></label>` : ''}
+    ${transport ? `<label>${transport[1]}<input name="${transport[0]}" ${transport[0]==='grpcService' ? 'required maxlength="128" pattern="[A-Za-z0-9._\\-]+"' : 'maxlength="256"'}></label>` : ''}
     ${Object.hasOwn(fields,'xhttpMode') ? `<label>XHTTP 模式<select name="xhttpMode" ${row.editPending ? 'disabled' : ''}>${options(['auto','stream-up','packet-up','stream-one'], fields.xhttpMode)}</select></label>` : ''}
     <div class="error" role="alert"></div><button class="btn primary">保存</button></form>`);
   const form=$('coreInboundEdit'), save=form.querySelector('button'), errorBox=form.querySelector('.error');

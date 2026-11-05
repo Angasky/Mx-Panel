@@ -139,7 +139,7 @@ func InboundNodes(row, record Record) ([]Record, error) {
 			node["flow"] = client["flow"]
 		}
 		network := value(stream["network"])
-		if protocol == "vmess" && (network == "grpc" || network == "ws") && stream["security"] == "tls" {
+		if protocol == "vmess" && stream["security"] == "tls" {
 			node["cipher"] = "aes-128-gcm"
 		}
 		if network != "" && network != "tcp" && network != "raw" && protocol != "hysteria2" {
