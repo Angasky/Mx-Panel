@@ -50,6 +50,9 @@ func TestInboundWriterGuardsAndCleansImportedNodes(t *testing.T) {
 	if _, err := c.WriteInbound(context.Background(), "s", 1, Record{"settings": Record{"clients": []any{}}}, token, false); err == nil || writer.writes != 0 {
 		t.Fatal("bound client removed", err)
 	}
+	if _, err := c.WriteInbound(context.Background(), "s", 1, Record{"protocol": "vmess"}, token, false); err == nil || writer.writes != 0 {
+		t.Fatal("protocol change bypassed subscription binding guard", err)
+	}
 	if _, err := c.WriteInbound(context.Background(), "s", 1, Record{"enable": false}, token, false); err != nil {
 		t.Fatal(err)
 	}

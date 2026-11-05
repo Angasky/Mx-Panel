@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +69,17 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					}
 				}
 				row["tag"], row["listen"] = "fixture", "127.0.0.1"
+				if template != "vless-reality" {
+					row["goCreateKey"] = "fixture"
+					target := "vmess"
+					if row["protocol"] == "vmess" {
+						target = "vless"
+					}
+					row, err = prepareManagedCoreEdit(row, Record{"protocol": target})
+					if err != nil {
+						t.Fatal("protocol switch failed before native test", err)
+					}
+				}
 				stream := row["streamSettings"].(Record)
 				if template == "vless-reality" {
 					pair, err := tls.LoadX509KeyPair(cert, key)
@@ -182,7 +192,7 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 						t.Fatal(err)
 					}
 					settings := out["settings"].(Record)
-					if strings.HasPrefix(template, "vmess-") {
+					if row["protocol"] == "vmess" {
 						settings["vnext"].([]any)[0].(Record)["address"] = "127.0.0.1"
 					} else {
 						settings["address"] = "127.0.0.1"

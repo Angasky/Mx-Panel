@@ -374,6 +374,49 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					if stream["network"] != patch["network"] || stream["wsSettings"] != nil || (patch["network"] == "tcp" && stream["grpcSettings"] != nil) {
 						t.Fatal("switch retained stale transport options")
 					}
+					current = replay["inbound"].(Record)
+					version, err = InboundVersion(current)
+					if err != nil {
+						t.Fatal(err)
+					}
+					target := "vmess"
+					if current["protocol"] == "vmess" {
+						target = "vless"
+					}
+					// Protocol conversion legitimately replaces the empty protocol settings.
+					record, err := m.Record(serverID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					protocolPatch := Record{"protocol": target}
+					interruptWrite = true
+					changeProtocol := func(record Record) (Record, error) {
+						return m.changeManagedCoreInbound(context.Background(), serverID, kind, record, id, version, protocolPatch,
+							func(old, next Record) error {
+								if len(anyRecords(old["settings"].(Record)["clients"])) != 0 || next["protocol"] != target {
+									t.Fatal("protocol switch changed a nonempty inbound")
+								}
+								return nil
+							}, nil, run, false)
+					}
+					if _, err := changeProtocol(record); err == nil || writes != 7 {
+						t.Fatal("protocol switch did not retain pending state")
+					}
+					m, err = Open(root)
+					if err != nil {
+						t.Fatal(err)
+					}
+					record, err = m.Record(serverID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := changeProtocol(record); err != nil || writes != 8 {
+						t.Fatal("protocol switch could not resume", err)
+					}
+					replay, err = create(hash, payload)
+					if err != nil || replay["inbound"].(Record)["protocol"] != target || writes != 8 {
+						t.Fatal("protocol switch lost its creation identity", err)
+					}
 				}
 			}
 			if template != "vmess-tcp" {

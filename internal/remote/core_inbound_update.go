@@ -21,6 +21,9 @@ func managedCoreFields(row Record) Record {
 	if editableCoreTransport(row) {
 		fields["network"] = stream["network"]
 	}
+	if editableCoreProtocol(row) {
+		fields["protocol"] = row["protocol"]
+	}
 	switch value(stream["network"]) {
 	case "ws":
 		ws, _ := object(stream["wsSettings"])
@@ -48,12 +51,16 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	next, err = prepareCoreProtocol(next, payload)
+	if err != nil {
+		return nil, err
+	}
 	fields := managedCoreFields(next)
 	for key, input := range payload {
 		if _, ok := fields[key]; !ok {
 			return nil, errors.New("当前入站不支持修改此字段")
 		}
-		if key == "network" {
+		if key == "network" || key == "protocol" {
 			continue // Applied before dependent path/service fields, independent of map order.
 		}
 		if key == "port" {
