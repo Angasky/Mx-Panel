@@ -10,6 +10,12 @@ import (
 )
 
 func TestFailoverDraftResumesWithOrderedPaths(t *testing.T) {
+	for _, choice := range []string{"", "vless-reality", "vmess-tcp"} {
+		t.Run("choice="+choice, func(t *testing.T) { testFailoverDraftResume(t, choice) })
+	}
+}
+
+func testFailoverDraftResume(t *testing.T, choice string) {
 	c, base, _ := controllerFixture(t)
 	nodes, registry, readings := []any{}, []Record{}, map[string]Record{}
 	names := []string{"first", "second", "exit"}
@@ -34,6 +40,9 @@ func TestFailoverDraftResumesWithOrderedPaths(t *testing.T) {
 	c.Backend = backend
 	request := Record{"name": "ordered", "entries": []any{"second", "first"}, "exit": "exit", "groups": []any{"Proxy"},
 		"interval": 30, "port": "", "serverName": "example.net", "operationId": strings.Repeat("c", 32)}
+	if choice != "" {
+		request["singBoxTemplate"] = choice
+	}
 	first := readings["first"]
 	readings["first"] = Record{"inbounds": []any{}}
 	if _, err := c.CreateFailover(context.Background(), "clash", request); err == nil || backend.creates != 1 || backend.adds != 1 {
@@ -49,6 +58,25 @@ func TestFailoverDraftResumesWithOrderedPaths(t *testing.T) {
 	}
 	readings["first"] = first
 	draft := objects(state["failoverDrafts"])[0]
+	want := choice
+	if want == "" {
+		want = "vmess-tcp"
+	}
+	if backend.templates["second"] != want || text(draft["singBoxTemplate"]) != choice {
+		t.Fatal("failover did not preserve its explicit or legacy sing-box ingress")
+	}
+	altered := Record{}
+	for k, v := range draft {
+		altered[k] = v
+	}
+	if want == "vmess-tcp" {
+		altered["singBoxTemplate"] = "vless-reality"
+	} else {
+		altered["singBoxTemplate"] = "vmess-tcp"
+	}
+	if _, err := c.CreateFailover(context.Background(), "clash", altered); err == nil || backend.creates != 1 {
+		t.Fatal("changed ingress rewrote a partially created failover")
+	}
 	for i := 0; i < 2; i++ {
 		result, err := c.CreateFailover(context.Background(), "clash", draft)
 		if err != nil || result["status"] != "active" || backend.creates != 2 || backend.adds != 2 ||

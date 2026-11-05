@@ -17,6 +17,19 @@ type chainServerRegistry interface {
 	List() ([]remote.Record, error)
 }
 
+// An absent choice keeps old chain requests and saved failover drafts on their
+// original VMess ingress. New forms send an explicit Reality choice.
+func singBoxChainTemplate(input Record) (string, error) {
+	raw, exists := input["singBoxTemplate"]
+	if !exists || raw == nil || raw == "" {
+		return "vmess-tcp", nil
+	}
+	if raw == "vless-reality" || raw == "vmess-tcp" {
+		return raw.(string), nil
+	}
+	return "", errors.New("sing-box 入口协议必须为 Reality 或 VMess TCP")
+}
+
 func chainHost(value string) string {
 	value = strings.Trim(strings.TrimSpace(value), "[]")
 	if address, err := netip.ParseAddr(value); err == nil {
@@ -79,6 +92,10 @@ func matchChainInbound(snapshot, node Record) (string, error) {
 }
 
 func (c *Controller) CreateServerChain(ctx context.Context, profile string, input Record) (Record, error) {
+	singTemplate, err := singBoxChainTemplate(input)
+	if err != nil {
+		return nil, err
+	}
 	registry, ok := c.Backend.(chainServerRegistry)
 	if !ok {
 		return nil, errors.New("服务器链路创建尚未适配")
@@ -113,7 +130,7 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 	switch ingress["installType"] {
 	case "3x-ui", "x-ui", "x-panel", "xray":
 	case "sing-box":
-		template = "vmess-tcp"
+		template = singTemplate
 	default:
 		return nil, errors.New("服务器中转入口需要已接入的 Web 面板或独立内核")
 	}

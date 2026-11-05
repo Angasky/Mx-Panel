@@ -11,10 +11,11 @@ import (
 
 type namedChainBackend struct {
 	*relayBackend
-	registry []Record
-	readings map[string]Record
-	landing  string
-	template string
+	registry  []Record
+	readings  map[string]Record
+	landing   string
+	template  string
+	templates map[string]string
 }
 
 func (b *namedChainBackend) List() ([]remote.Record, error) { return b.registry, nil }
@@ -24,10 +25,20 @@ func (b *namedChainBackend) Inbounds(_ context.Context, server string) (Record, 
 func (b *namedChainBackend) CreateRelay(ctx context.Context, server, profile string, payload Record) (Record, error) {
 	b.landing = text(payload["landingLink"])
 	b.template = text(payload["template"])
+	if b.templates == nil {
+		b.templates = map[string]string{}
+	}
+	b.templates[server] = b.template
 	return b.relayBackend.CreateRelay(ctx, server, profile, payload)
 }
 
 func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *testing.T) {
+	for _, choice := range []string{"", "vless-reality", "vmess-tcp"} {
+		t.Run("choice="+choice, func(t *testing.T) { testNamedChainCreation(t, choice) })
+	}
+}
+
+func testNamedChainCreation(t *testing.T, choice string) {
 	c, base, _ := controllerFixture(t)
 	entry := Record{"name": "entry", "type": "vless", "uuid": "3c5827c6-2f92-4861-a1f8-562d5388bca7",
 		"server": "entry.example.net", "port": 443}
@@ -60,6 +71,16 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 	}
 	request := Record{"name": "named relay", "entry": "entry", "exit": "exit",
 		"operationId": strings.Repeat("b", 32), "groups": []any{"Proxy"}, "serverName": "example.net"}
+	for _, invalid := range []any{"trojan-tls", true, Record{}} {
+		request["singBoxTemplate"] = invalid
+		if _, err := c.CreateServerChain(context.Background(), "clash", request); err == nil || backend.creates != 0 {
+			t.Fatal("invalid ingress choice reached server creation")
+		}
+	}
+	delete(request, "singBoxTemplate")
+	if choice != "" {
+		request["singBoxTemplate"] = choice
+	}
 	exitSnapshot := backend.readings["exit"]
 	backend.readings["exit"] = backend.readings["entry"]
 	if _, err := c.CreateServerChain(context.Background(), "clash", request); err == nil || backend.creates != 0 {
@@ -75,8 +96,12 @@ func TestNamedChainCreationVerifiesSourcesAndRetriesWithoutDuplicateUsers(t *tes
 	if !strings.Contains(backend.landing, "exit.example.net") {
 		t.Fatal("used the wrong landing link")
 	}
-	if backend.template != "vmess-tcp" {
-		t.Fatal("sing-box chain must use the supported VMess TCP ingress")
+	want := choice
+	if want == "" {
+		want = "vmess-tcp"
+	}
+	if backend.template != want {
+		t.Fatal("sing-box chain changed the requested or legacy ingress protocol")
 	}
 	state, err := c.Repository.State("clash")
 	if err != nil || len(objects(state["serverChains"])) != 1 {

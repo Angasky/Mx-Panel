@@ -3783,17 +3783,20 @@ async function failoverModal() {
     <div><label>固定出口</label><select id="foExit">${options(normal.map(n => n.name), normal[normal.length - 1].name)}</select></div>
     <div><label>检测间隔（秒）</label><input id="foInterval" type="number" min="10" max="600" value="30" required></div>
     <div><label>各入口新建端口</label><input id="foPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div>
-    <div><label>Reality SNI</label><input id="foSni" value="raw.githubusercontent.com"><p class="hint">Reality 入口使用同一域名，请在每台入口服务器实测通过。sing-box 使用 VMess TCP。</p></div>
+    <div><label>Reality SNI</label><input id="foSni" value="raw.githubusercontent.com"><p class="hint">Reality 入口使用同一域名，请在每台入口服务器实测通过。</p></div>
+    ${servers.some(s=>s.installType==='sing-box') ? '<div><label for="foSingTemplate">sing-box 入口协议</label><select id="foSingTemplate"><option value="vless-reality">VLESS + Reality / Vision</option><option value="vmess-tcp">VMess + TCP</option></select><p class="hint">仅应用于 sing-box 入口，其余入口使用 Reality。</p></div>' : ''}
   </div><p class="hint">每个入口会新建专属服务器转发，均绑定当前订阅的流量和到期限制。原有节点保持原配置。请确认端口空闲且防火墙放行；创建期间请勿关闭窗口。</p>
   <fieldset class="section"><legend>加入业务策略组</legend>${groupChecks(S.data.groups.filter(g => g.type === 'select').map(g => g.name), 'foGroup')}</fieldset>
   <div id="formError" class="error"></div><button class="btn primary">创建服务器转发和主备组</button></form>`);
   const operationId = crypto.randomUUID().replaceAll('-', '');
+  const refreshEntries=[];
   const addEntry = (name) => {
     const row = document.createElement('div'); row.className = 'toolbar';
     row.innerHTML = `<select class="foEntry">${options(normal.map(n => n.name), name)}</select><button type="button" class="btn small foScan">扫描 SNI</button><button type="button" class="btn small danger">移除</button>`;
     const select = row.querySelector('select'), scan = row.querySelector('.foScan');
     const ingress = () => chainNodeServer(normal.find(n => n.name === select.value), servers);
-    const refresh = () => scan.classList.toggle('hidden', ingress()?.installType === 'sing-box');
+    const refresh = () => scan.classList.toggle('hidden', ingress()?.installType === 'sing-box' && val('foSingTemplate')==='vmess-tcp');
+    refreshEntries.push(refresh);
     select.onchange = refresh;
     scan.onclick = () => {
       const server = ingress();
@@ -3805,18 +3808,22 @@ async function failoverModal() {
     $('foEntries').appendChild(row);
   };
   addEntry(normal[0].name); addEntry(normal[1].name);
+  if($('foSingTemplate'))$('foSingTemplate').onchange=()=>refreshEntries.forEach(refresh=>refresh());
   $('foAdd').onclick = () => { if (document.querySelectorAll('.foEntry').length < 8) addEntry(normal[0].name); };
-  $('failoverForm').onsubmit = async e => {
-    e.preventDefault(); const button = e.submitter; if (button) button.disabled = true;
+  const failoverForm=$('failoverForm'),failoverError=$('formError');let submittedFailover=null;
+  failoverForm.onsubmit = async e => {
+    e.preventDefault(); const button = e.submitter || failoverForm.querySelector('button.primary');if(button.disabled)return;button.disabled = true;
     try {
-      const entries = [...document.querySelectorAll('.foEntry')].map(x => x.value);
-      if (entries.length < 2 || new Set(entries).size !== entries.length || entries.includes(val('foExit'))) throw new Error('请选择至少两个不重复入口，出口不能同时作为入口');
+      const entries = submittedFailover?.entries || [...failoverForm.querySelectorAll('.foEntry')].map(x => x.value);
+      if (!submittedFailover && (entries.length < 2 || new Set(entries).size !== entries.length || entries.includes(val('foExit')))) throw new Error('请选择至少两个不重复入口，出口不能同时作为入口');
       if (S.profile !== profile) throw Error('订阅已切换，请重新打开创建窗口');
-      const options = jsonOpt('POST', {operationId, name: val('foName'), entries, exit: val('foExit'), interval: Number(val('foInterval')), port: val('foPort') ? Number(val('foPort')) : '', serverName: val('foSni'), groups: [...document.querySelectorAll('.foGroup:checked')].map(x => x.value)});
+      const body=submittedFailover || {operationId, name: val('foName'), entries, exit: val('foExit'), interval: Number(val('foInterval')), port: val('foPort') ? Number(val('foPort')) : '', serverName: val('foSni'), singBoxTemplate:$('foSingTemplate')?.value, groups: [...failoverForm.querySelectorAll('.foGroup:checked')].map(x => x.value)};
+      if(S.idempotentCreate){submittedFailover=structuredClone(body);failoverForm.querySelectorAll('input,select,textarea,button').forEach(control=>{if(control!==button)control.disabled=true;});}
+      const options = jsonOpt('POST',body);
       options.headers['X-Profile'] = profile;
       await api('/failovers', options);
-      if (S.profile === profile) { closeModal(); await reload(); notice('多入口主备组已配置'); }
-    } catch (err) { if ($('formError')) $('formError').textContent = err.message; }
+      if (S.profile === profile) { if(failoverForm.isConnected)closeModal(); await reload(); notice('多入口主备组已配置'); }
+    } catch (err) { if(failoverForm.isConnected){failoverError.textContent = err.message;if(submittedFailover)button.textContent='继续核对';} }
     finally { if (button?.isConnected) button.disabled = false; }
   };
 }
@@ -3873,10 +3880,12 @@ function groupChecks(selected, klass = 'chainGroup', choices = S.data.groups) {
 }
 
 async function chainModal(index) {
+  const openingProfile=S.profile;
   let x = index == null ? null : S.data.nodes.find(n => n.index === index);
   let normal = ordinaryNodes();
   if (normal.length < 2) return alert('至少需要两个普通节点才能创建链式代理');
   const serverData = await api('/servers');
+  if(S.profile!==openingProfile)return;
   const managedServers = serverData.servers || [];
   let selected = x
     ? S.data.groups.filter(g => (g.config.proxies || []).includes(x.name)).map(g => g.name)
@@ -3904,7 +3913,7 @@ async function chainModal(index) {
         </div>
       </div>
     </fieldset>
-    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button><p class="hint">独立 sing-box 新建 VMess TCP 入站，其余服务器使用 Reality。新入口拥有专属路由。新入站自动绑定当前订阅，用于到期和流量撤销。</p></fieldset>
+    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div><div id="chainSingTemplateField" class="hidden"><label for="chainSingTemplate">sing-box 入口协议</label><select id="chainSingTemplate"><option value="vless-reality">VLESS + Reality / Vision</option><option value="vmess-tcp">VMess + TCP</option></select></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button><p class="hint">新入口拥有专属路由，并绑定当前订阅的流量与到期限制。Reality 入口须先在入口服务器实测 SNI。</p></fieldset>
     <fieldset class="section">
       <legend>加入策略组</legend>
       <p class="hint">默认自动勾选非广告组，保存后该链式节点会自动添加至对应策略组中。</p>
@@ -3914,39 +3923,51 @@ async function chainModal(index) {
     <button class="btn primary" style="margin-top:16px;">${uiIcon('file-code')}保存链式代理配置</button>
   </form>`);
 
-  const chainProfile = S.profile, chainOperationId = crypto.randomUUID().replaceAll('-', '');
+  const chainProfile = openingProfile, chainOperationId = crypto.randomUUID().replaceAll('-', '');
   const entryServer = () => chainNodeServer(normal.find(n => n.name === val('chainEntry')), managedServers);
-  $('chainMode').onchange = () => $('chainServerFields').classList.toggle('hidden', val('chainMode') !== 'server');
+  const refreshChainIngress=()=>{
+    const serverMode=val('chainMode')==='server',sing=entryServer()?.installType==='sing-box';
+    const reality=!sing || val('chainSingTemplate')==='vless-reality';
+    $('chainServerFields').classList.toggle('hidden',!serverMode);
+    $('chainSingTemplateField').classList.toggle('hidden',!sing);
+    $('chainSniTest').classList.toggle('hidden',!reality);
+    $('chainSni').disabled=!serverMode || !reality;
+    $('chainSni').required=serverMode && reality;
+  };
+  $('chainMode').onchange=$('chainEntry').onchange=$('chainSingTemplate').onchange=refreshChainIngress;
+  refreshChainIngress();
   $('chainSniTest').onclick = () => {
     const ingress = entryServer();
     if (!ingress) return $('formError').textContent = '入口节点未添加到服务器，请选择 Mihomo 客户端专用链式代理模式';
     openSniScanner(ingress.id, 'chainSni');
   };
-  $('editForm').onsubmit = async e => {
+  const chainForm=$('editForm'),chainError=$('formError');let submittedChain=null;
+  chainForm.onsubmit = async e => {
     e.preventDefault();
-    const button = e.submitter;
-    if (button) button.disabled = true;
+    const button = e.submitter || chainForm.querySelector('button.primary');if(button.disabled)return;button.disabled = true;
     try {
-      let body = {
+      let body = submittedChain || {
         operationId: chainOperationId,
         mode: val('chainMode'), port: val('chainPort'), serverName: val('chainSni'), sniVerified:$('chainSni')?.dataset.sniVerified === val('chainSni'),sniAddress:$('chainSni')?.dataset.sniVerified === val('chainSni') ? $('chainSni')?.dataset.sniAddress : undefined,
         name: val('chainName'),
         entry: val('chainEntry'),
+        singBoxTemplate:val('chainMode')==='server' && entryServer()?.installType==='sing-box' ? val('chainSingTemplate') : undefined,
         exit: val('chainExit'),
         oldName: x?.name,
         groups: [...document.querySelectorAll('.chainGroup:checked')].map(z => z.value)
       };
       if (S.profile !== chainProfile) throw Error('订阅已切换，请重新打开创建窗口');
+      if(S.idempotentCreate && body.mode==='server' && !x){submittedChain=structuredClone(body);chainForm.querySelectorAll('input,select,textarea,button').forEach(control=>{if(control!==button)control.disabled=true;});}
       const options = jsonOpt(x ? 'PUT' : 'POST', body);
       options.headers['X-Profile'] = chainProfile;
       await api('/chains', options);
       if (S.profile === chainProfile) {
-        closeModal();
+        if(chainForm.isConnected)closeModal();
         await reload();
       }
       notice('链式代理已保存');
     } catch (err) {
-      if ($('formError')) $('formError').textContent = err.message;
+      if(chainForm.isConnected){chainError.textContent=err.message;if(submittedChain)button.textContent='继续核对';}
     } finally { if (button?.isConnected) button.disabled = false; }
   };
 }

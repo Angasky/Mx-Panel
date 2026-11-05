@@ -15,6 +15,9 @@ import (
 )
 
 func (c *Controller) CreateFailover(ctx context.Context, profile string, input Record) (Record, error) {
+	if _, err := singBoxChainTemplate(input); err != nil {
+		return nil, err
+	}
 	if profile == "" {
 		profile = "clash"
 	}
@@ -45,6 +48,10 @@ func (c *Controller) CreateFailover(ctx context.Context, profile string, input R
 	plan := Record{"name": name, "entries": entries, "exit": exit, "groups": groups, "interval": int(interval),
 		"port": port, "serverName": text(input["serverName"]), "operationId": operation,
 		"requestId": operation, "status": "creating"}
+	// Do not add a default field to older drafts: their request hash must stay unchanged.
+	if input["singBoxTemplate"] != nil && input["singBoxTemplate"] != "" {
+		plan["singBoxTemplate"] = input["singBoxTemplate"]
+	}
 	payload, err := json.Marshal(plan)
 	if err != nil {
 		return nil, err
@@ -81,6 +88,9 @@ func (c *Controller) CreateFailover(ctx context.Context, profile string, input R
 		requestID := config.FailoverPathRequest(operation, i)
 		request := Record{"name": path, "entry": entryName, "exit": exit, "operationId": requestID,
 			"groups": []any{}, "port": plan["port"], "serverName": plan["serverName"]}
+		if plan["singBoxTemplate"] != nil {
+			request["singBoxTemplate"] = plan["singBoxTemplate"]
+		}
 		entry, landing, err := c.Repository.ServerChainSources(profile, &config.ServerChainImport{
 			Name: path, Entry: entryName, Exit: exit, Request: requestID, Groups: request["groups"],
 		})
