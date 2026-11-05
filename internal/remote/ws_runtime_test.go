@@ -55,6 +55,20 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				if wsTemplate(template) || grpcTemplate(template) {
+					row["goCreateKey"] = "fixture"
+					row, err = prepareManagedCoreEdit(row, Record{"network": "tcp"})
+					if err == nil {
+						patch := Record{"network": "ws", "wsPath": "/owned-ws"}
+						if grpcTemplate(template) {
+							patch = Record{"network": "grpc", "grpcService": "vpn"}
+						}
+						row, err = prepareManagedCoreEdit(row, patch)
+					}
+					if err != nil {
+						t.Fatal("transport switch failed before native test", err)
+					}
+				}
 				row["tag"], row["listen"] = "fixture", "127.0.0.1"
 				stream := row["streamSettings"].(Record)
 				if template == "vless-reality" {

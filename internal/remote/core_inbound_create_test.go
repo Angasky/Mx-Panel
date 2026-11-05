@@ -340,6 +340,41 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				if template == "vless-xhttp-tls" && fields["xhttpMode"] != "packet-up" {
 					t.Fatal("editing path and mode together lost a change")
 				}
+				if wsTemplate(template) || grpcTemplate(template) {
+					current := replay["inbound"].(Record)
+					version, err = InboundVersion(current)
+					if err != nil {
+						t.Fatal(err)
+					}
+					patch := Record{"network": "grpc", "grpcService": "switched-service"}
+					if grpcTemplate(template) {
+						patch = Record{"network": "tcp"}
+					}
+					hasMeter = true
+					if _, err := edit(patch); err == nil || writes != 4 {
+						t.Fatal("transport switch bypassed the associated resource guard")
+					}
+					hasMeter = false
+					interruptWrite = true
+					if _, err := edit(patch); err == nil || writes != 5 {
+						t.Fatal("transport switch did not retain an interrupted intent")
+					}
+					m, err = Open(root)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := edit(patch); err != nil || writes != 6 {
+						t.Fatal("transport switch could not resume after restart", err)
+					}
+					replay, err = create(hash, payload)
+					if err != nil || replay["reused"] != true || writes != 6 {
+						t.Fatal("transport switch lost its original creation identity", err)
+					}
+					stream := replay["inbound"].(Record)["streamSettings"].(Record)
+					if stream["network"] != patch["network"] || stream["wsSettings"] != nil || (patch["network"] == "tcp" && stream["grpcSettings"] != nil) {
+						t.Fatal("switch retained stale transport options")
+					}
+				}
 			}
 			if template != "vmess-tcp" {
 				return
