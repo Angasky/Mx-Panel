@@ -251,16 +251,20 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				}
 				return
 			}
-			if template == "vless-ws-tls" {
+			if template == "vless-ws-tls" || template == "vless-xhttp-tls" {
 				id, _ := strconv.Atoi(value(row["id"]))
 				version, err := InboundVersion(row)
 				if err != nil {
 					t.Fatal(err)
 				}
+				hasMeter := false
 				edit := func(payload Record) (Record, error) {
 					record, err := m.Record(serverID)
 					if err != nil {
 						return nil, err
+					}
+					if hasMeter {
+						record["meters"] = Record{strconv.Itoa(id): row["port"]}
 					}
 					return m.changeManagedCoreInbound(context.Background(), serverID, kind, record, id, version, payload,
 						func(old, next Record) error {
@@ -273,7 +277,22 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				if _, err := edit(Record{"port": 443}); err == nil || writes != 2 {
 					t.Fatal("occupied port was accepted")
 				}
-				patch := Record{"port": 19998, "wsPath": "/go-updated"}
+				pathField := "wsPath"
+				if template == "vless-xhttp-tls" {
+					pathField = "xhttpPath"
+					if _, err := edit(Record{"xhttpMode": "unknown"}); err == nil || writes != 2 {
+						t.Fatal("unsupported XHTTP mode was accepted")
+					}
+				}
+				patch := Record{"port": 19998, pathField: "/go-updated"}
+				if template == "vless-xhttp-tls" {
+					patch["xhttpMode"] = "packet-up"
+				}
+				hasMeter = true
+				if _, err := edit(patch); err == nil || writes != 2 {
+					t.Fatal("edit left a legacy meter on the old port")
+				}
+				hasMeter = false
 				rejectWrite = true
 				if _, err := edit(patch); !errors.Is(err, errCoreValidation) || writes != 2 {
 					t.Fatal("rejected candidate should leave remote unchanged", err)
@@ -287,7 +306,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := edit(Record{"wsPath": "/different"}); err == nil || writes != 3 {
+				if _, err := edit(Record{pathField: "/different"}); err == nil || writes != 3 {
 					t.Fatal("different payload accepted during recovery")
 				}
 				if _, err := edit(patch); err != nil || writes != 4 {
@@ -298,8 +317,11 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					t.Fatal("create replay did not recognize edited node", err)
 				}
 				fields := managedCoreFields(replay["inbound"].(Record))
-				if fields["wsPath"] != "/go-updated" || value(fields["port"]) != "19998" {
+				if fields[pathField] != "/go-updated" || value(fields["port"]) != "19998" {
 					t.Fatal("updated settings were not persisted")
+				}
+				if template == "vless-xhttp-tls" && fields["xhttpMode"] != "packet-up" {
+					t.Fatal("editing path and mode together lost a change")
 				}
 			}
 			if template != "vmess-tcp" {

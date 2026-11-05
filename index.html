@@ -2964,12 +2964,13 @@ async function remoteNodeToggle(id) {
 function remoteNodeEditManaged(id) {
   const row=S.remoteRows.find(x=>x.id===id);if(!row?.editToken || !row.editFields)return;
   const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken, fields=row.editFields;
-  const transport=Object.hasOwn(fields,'wsPath') ? ['wsPath','WebSocket 路径'] : Object.hasOwn(fields,'grpcService') ? ['grpcService','gRPC 服务名'] : null;
+  const transport=Object.hasOwn(fields,'wsPath') ? ['wsPath','WebSocket 路径'] : Object.hasOwn(fields,'grpcService') ? ['grpcService','gRPC 服务名'] : Object.hasOwn(fields,'xhttpPath') ? ['xhttpPath','XHTTP 路径'] : null;
   openModal(row.editPending ? '重试保存托管入站' : '编辑托管入站', `<form id="coreInboundEdit">
     <p class="muted">${row.editPending ? '继续核对并保存上次提交的配置。' : '修改端口或传输参数前需解除订阅绑定。应用连接配置时会重启内核。'}</p>
     <label>入站名称<input name="remark" required maxlength="100"></label>
     <label>监听端口<input name="port" required type="number" min="1" max="65535"></label>
     ${transport ? `<label>${transport[1]}<input name="${transport[0]}" maxlength="256"></label>` : ''}
+    ${Object.hasOwn(fields,'xhttpMode') ? `<label>XHTTP 模式<select name="xhttpMode" ${row.editPending ? 'disabled' : ''}>${options(['auto','stream-up','packet-up','stream-one'], fields.xhttpMode)}</select></label>` : ''}
     <div class="error" role="alert"></div><button class="btn primary">保存</button></form>`);
   const form=$('coreInboundEdit'), save=form.querySelector('button'), errorBox=form.querySelector('.error');
   for(const input of form.querySelectorAll('input')){
@@ -2995,8 +2996,9 @@ function remoteNodeEditManaged(id) {
 
 async function remoteNodeDelete(id) {
   const row=S.remoteRows.find(x=>x.id===id);if(!row)return;
-  const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
-  if (!confirm('删除整个远端入站及其中全部用户？其他订阅也会断开。本面板为其创建的中转路由也会清理；仅删除本地绑定记录请到流量与有效期操作。')) return;
+  const serverId=S.serverId,page=S.page,expectedIdentity=row.deleteToken || row.editToken;
+  const message = row.deletePending ? '重试删除此托管入站及其订阅绑定？' : '删除整个远端入站及其中全部用户？其他订阅也会断开。本面板为其创建的中转路由也会清理；仅删除本地绑定记录请到流量与有效期操作。';
+  if (!confirm(message)) return;
   try { await api('/servers/inbounds',jsonOpt('DELETE',{serverId,inboundId:id,expectedIdentity})); if(S.serverId===serverId && S.page===page)await serverNodes(true); notice('远端入站已删除'); }
   catch (error) { alert(error.message); }
 }

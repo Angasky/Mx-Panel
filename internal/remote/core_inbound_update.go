@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
 )
 
 const coreInboundEdit = "core-inbound-edit"
@@ -26,6 +29,10 @@ func managedCoreFields(row Record) Record {
 	case "grpc":
 		grpc, _ := object(stream["grpcSettings"])
 		fields["grpcService"] = value(grpc["serviceName"])
+	case "xhttp":
+		if opts, err := links.XHTTPOptions(stream["xhttpSettings"]); err == nil {
+			fields["xhttpPath"], fields["xhttpMode"] = opts["path"], opts["mode"]
+		}
 	}
 	return fields
 }
@@ -75,7 +82,13 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 			}
 			group, field = "wsSettings", "path"
 		}
-		stream, err := object(old["streamSettings"])
+		switch key {
+		case "xhttpPath":
+			group, field = "xhttpSettings", "path"
+		case "xhttpMode":
+			group, field = "xhttpSettings", "mode"
+		}
+		stream, err := object(next["streamSettings"])
 		if err != nil {
 			return nil, err
 		}
@@ -85,6 +98,11 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 		}
 		stream, options = maps.Clone(stream), maps.Clone(options)
 		options[field] = text
+		if group == "xhttpSettings" {
+			if _, err := links.XHTTPOptions(options); err != nil {
+				return nil, errors.New("XHTTP 路径或传输模式无效")
+			}
+		}
 		stream[group] = options
 		next["streamSettings"] = stream
 	}
@@ -129,6 +147,10 @@ func (m *Manager) editManagedCoreInbound(ctx context.Context, server, kind strin
 		return nil, err
 	}
 	remoteChange := oldEndpoint != nextEndpoint
+	id, _ := strconv.Atoi(value(old["id"])) // The managed inventory already validated the ID.
+	if remoteChange && dependentInbound(record, id) {
+		return nil, errors.New("入站仍关联限速、计量或中转配置，请先清理关联资源")
+	}
 	tag := value(old["tag"])
 	next := maps.Clone(doc)
 	if remoteChange {

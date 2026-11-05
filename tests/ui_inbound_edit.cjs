@@ -34,6 +34,30 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
   assert.equal(await page.$eval('#remoteSave',n=>n.disabled),false);
   await page.evaluate(()=>{api=()=>new Promise(resolve=>{window.finishSave=resolve});$('remoteEdit').requestSubmit();closeModal();openModal('新窗口','<p id="newDialog">保留此窗口</p>');window.finishSave({updated:true});});
   await page.waitForFunction(()=>window.refreshes===4);assert(await page.$('#newDialog'),'late save closed a newer dialog');assert.deepEqual(errors,[]);
-  console.log('PASS: edit/toggle/delete preserve server and compare token; stale saves remain retryable; Python compatibility retained');
+  await page.evaluate(()=>{
+   window.calls=[];
+   S.remoteRows=[{id:1,editToken:'edit',editFields:{remark:'fixture',port:24001,xhttpPath:'/old',xhttpMode:'stream-up'}},
+                 {id:2,deletePending:true,deleteToken:'delete'}];
+   api=async(url,opt)=>{calls.push({url,method:opt.method,body:JSON.parse(opt.body)});return {updated:true}};
+   remoteNodeEditManaged(1);
+   $('coreInboundEdit').elements.xhttpPath.value='/new';
+   $('coreInboundEdit').elements.xhttpMode.value='packet-up';
+   $('coreInboundEdit').requestSubmit();
+  });
+  await page.waitForFunction(()=>calls.length===1);
+  await page.evaluate(()=>remoteNodeDelete(2));
+  calls=await page.evaluate(()=>window.calls);
+  assert.deepEqual(calls[0].body.inbound,{xhttpPath:'/new',xhttpMode:'packet-up'});
+  assert.equal(calls[1].body.expectedIdentity,'delete');assert.equal(calls[1].method,'DELETE');
+  await page.evaluate(()=>{
+   S.remoteRows[0].editPending=true;
+   S.remoteRows[0].editPatch={xhttpPath:'/new',xhttpMode:'packet-up'};
+   remoteNodeEditManaged(1);$('coreInboundEdit').requestSubmit();
+  });
+  await page.waitForFunction(()=>calls.length===3);
+  calls=await page.evaluate(()=>window.calls);
+  assert.deepEqual(calls[2].body.inbound,calls[0].body.inbound,'disabled retry fields lost original payload');
+  assert.deepEqual(errors,[]);
+  console.log('PASS: edit/toggle/delete preserve identity; XHTTP edits and retries preserve path/mode; pending deletes use delete token');
  }finally{await browser.close();await new Promise(resolve=>host.close(resolve));}
 })().catch(error=>{console.error(error);process.exit(1)});
