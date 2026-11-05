@@ -33,8 +33,10 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || name == "vless-ws-tls" || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
+	return name == "trojan-tls" || wsTemplate(name) || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
 }
+
+func wsTemplate(name string) bool { return name == "vless-ws-tls" || name == "vmess-ws-tls" }
 
 func grpcTemplate(name string) bool { return name == "vless-grpc-tls" || name == "vmess-grpc-tls" }
 
@@ -152,7 +154,12 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			stream["grpcSettings"] = Record{"serviceName": service}
 			alpn = []any{"h2"}
 		} else {
-			settings["decryption"] = "none"
+			if name == "vmess-ws-tls" {
+				protocol = "vmess"
+				settings["disableInsecureEncryption"] = false
+			} else {
+				settings["decryption"] = "none"
+			}
 			ws := value(payload["path"])
 			if ws == "" {
 				ws = "/"

@@ -29,6 +29,7 @@ func TestStandaloneRelayLifecycle(t *testing.T) {
 func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) {
 	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "vmess-ws-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-grpc-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vmess-grpc-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-xhttp-tls", []string{"xray"}, false)
@@ -251,7 +252,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				}
 				return
 			}
-			if template == "vless-ws-tls" || template == "vless-xhttp-tls" {
+			if wsTemplate(template) || template == "vless-xhttp-tls" {
 				id, _ := strconv.Atoi(value(row["id"]))
 				version, err := InboundVersion(row)
 				if err != nil {

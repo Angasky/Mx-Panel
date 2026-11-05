@@ -7,6 +7,8 @@
 
 ## 已实现并验证
 
+- 2026-11-05：独立 Xray / sing-box 增加 VMess WebSocket TLS 托管模板，沿用自动证书、随机端口、空用户创建、订阅独立用户和写入重试；支持 WS 路径编辑。VMess WS TLS 导出明确的 aes-128-gcm，避免跨内核依赖 auto。生产模板与链接转换生成的配置已用本地真实 Xray / sing-box 验证：正常用户转发 HTTP，错误路径和未登记 UUID 均拒绝；浏览器验证自动证书表单及创建参数。这是回环测试，未在远端服务器部署。
+
 - Go module，最低语言版本 1.26；本次使用 Go 1.27.3 构建测试。
 - `internal/legacycrypto`：旧版 PBKDF2-HMAC-SHA256 密码格式，240000 / 600000 次迭代；Fernet 的 AES-CBC / HMAC-SHA256 加解密兼容，不改变凭据密钥。
 - 测试向量由 Python `cryptography.fernet` 和 `hashlib.pbkdf2_hmac` 生成，只包含固定示例密钥，不读取生产凭据。验证中文、特殊字符、空值、块边界、错误密码、篡改签名及截断数据。

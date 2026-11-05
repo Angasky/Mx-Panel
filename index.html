@@ -2562,7 +2562,8 @@ function remoteNodeForm(relay) {
   const standalone = ['xray','sing-box'].includes(S.remoteServer?.installType);
   const singRelay = relay && S.remoteServer?.installType === 'sing-box';
   const grpcTemplates = ['vless-grpc-tls','vmess-grpc-tls'];
-  const tlsTemplates = ['trojan-tls','vless-ws-tls','vless-xhttp-tls','hysteria2','tuic', ...grpcTemplates];
+  const wsTemplates = ['vless-ws-tls','vmess-ws-tls'];
+  const tlsTemplates = ['trojan-tls',...wsTemplates,'vless-xhttp-tls','hysteria2','tuic', ...grpcTemplates];
   const formServerId=S.serverId,formProfile=S.profile,creationOperationId=crypto.randomUUID().replaceAll('-','');
   const randomPort = 20001 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 45535);
   openModal(relay ? '添加服务器中转' : '添加服务器节点', `<form id="remoteNodeForm"><div class="grid">
@@ -2576,6 +2577,7 @@ function remoteNodeForm(relay) {
   if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
     if (standalone) {
+      $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));
       $('rnTemplate').add(new Option('VLESS + gRPC + TLS', 'vless-grpc-tls'));
       $('rnTemplate').add(new Option('VMess + gRPC + TLS', 'vmess-grpc-tls'));
       if (S.remoteServer.installType === 'xray') $('rnTemplate').add(new Option('VLESS + XHTTP + TLS', 'vless-xhttp-tls'));
@@ -2596,7 +2598,7 @@ function remoteNodeForm(relay) {
       if(tls)$('rnSni').setAttribute('list','rnTlsDomains');else $('rnSni').removeAttribute('list');
       $('rnSniHint').textContent=tls ? '从已使用的证书域名中选择，或输入新的自有域名。GitHub 等第三方域名不能申请到你的服务器证书。' : 'Reality 扫描保留全部内置候选，只有实测通过的域名可选。';
       const xhttp = val('rnTemplate') === 'vless-xhttp-tls';
-      $('rnWsField').classList.toggle('hidden', !xhttp && val('rnTemplate')!=='vless-ws-tls');
+      $('rnWsField').classList.toggle('hidden', !xhttp && !wsTemplates.includes(val('rnTemplate')));
       $('rnPathLabel').textContent = xhttp ? 'XHTTP 路径' : 'WebSocket 路径';
       $('rnXhttpField').classList.toggle('hidden', !xhttp);
       const grpc = grpcTemplates.includes(val('rnTemplate'));

@@ -27,6 +27,22 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    const call=await page.evaluate(()=>calls.find(x=>x.url==='/servers/users'));assert.equal(call.body.certificateJobId,'job');assert.equal(call.headers['X-Profile'],'owned-profile');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),true);
   }
+  for(const kind of ['xray','sing-box']){
+   await setup();await page.evaluate(kind=>{
+    S.remoteServer.installType=kind;
+    const base=api;api=async(url,opt)=>{const result=await base(url,opt);return url==='/servers/users'?{...result,bound:true}:result};
+    remoteNodeForm(false);
+   },kind);
+   await page.select('#rnTemplate','vmess-ws-tls');
+   assert.equal(await page.$eval('#rnWsField',e=>e.classList.contains('hidden')),false);
+   assert.equal(await page.$eval('#rnGrpcField',e=>e.classList.contains('hidden')),true);
+   assert.equal(await page.$eval('#rnSni',e=>e.value),'node.example.com');
+   assert.equal(await page.$eval('#rnPort',e=>e.value),'');
+   await page.type('#rnName','VMess WebSocket');await page.$eval('#rnPath',e=>e.value='/owned-ws');await page.click('#rnSave');
+   await page.waitForFunction(()=>calls.some(x=>x.url==='/servers/users'));
+   const call=await page.evaluate(()=>calls.find(x=>x.url==='/servers/users'));
+   assert.equal(call.body.template,'vmess-ws-tls');assert.equal(call.body.path,'/owned-ws');assert.equal(call.body.certificateJobId,'job');
+  }
   await setup('fail');await page.select('#rnTemplate','hysteria2');await page.type('#rnName','HY2');await page.click('#rnSave');await page.waitForFunction(()=>$('remoteError').textContent.includes('TCP 80'));
   assert.equal(await page.evaluate(()=>calls.some(x=>x.url==='/servers/users')),false);
   await setup('retry');await page.select('#rnTemplate','hysteria2');await page.type('#rnName','HY2');await page.click('#rnSave');await page.waitForFunction(()=>$('remoteError').textContent.includes('待核对'));

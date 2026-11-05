@@ -215,17 +215,17 @@ func TestNativeHY2TemplateWithRealXray(t *testing.T) {
 	t.Log("real HY2: empty clients denied; owned auth connected; empty clients denied again; all traffic loopback")
 }
 
-func TestGRPCTemplatesExportAndValidateNativeConfig(t *testing.T) {
-	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls"} {
+func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
+	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "vless-ws-tls", "vmess-ws-tls"} {
 		t.Run(template, func(t *testing.T) {
 			payload := Record{"template": template, "serverName": "node.example.com", "certFile": "/fixture/cert.pem",
-				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1"}
+				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1", "path": "/vpn-test"}
 			row, err := buildInboundTemplate(payload, "")
 			if err != nil {
 				t.Fatal(err)
 			}
 			payload["grpcService"] = "/not-a-shared-service-name"
-			if _, err := buildInboundTemplate(payload, ""); err == nil {
+			if _, err := buildInboundTemplate(payload, ""); grpcTemplate(template) && err == nil {
 				t.Fatal("invalid service name accepted")
 			}
 			row["tag"], row["listen"] = "mxioc-inbound-1", "127.0.0.1"
@@ -247,12 +247,18 @@ func TestGRPCTemplatesExportAndValidateNativeConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 			options, _ := node["grpc-opts"].(Record)
-			if node["network"] != "grpc" || node["tls"] != true || node["servername"] != "node.example.com" ||
-				options["grpc-service-name"] != "vpn-test_1" || strings.Join(anyStrings(node["alpn"]), ",") != "h2" {
+			if node["tls"] != true || node["servername"] != "node.example.com" || (grpcTemplate(template) &&
+				(node["network"] != "grpc" || options["grpc-service-name"] != "vpn-test_1" || strings.Join(anyStrings(node["alpn"]), ",") != "h2")) {
 				t.Fatal("subscription export lost the service, SNI or HTTP/2 ALPN")
 			}
-			if template == "vmess-grpc-tls" && node["cipher"] != "aes-128-gcm" {
-				t.Fatal("VMess gRPC must export an explicit cross-core cipher")
+			if wsTemplate(template) {
+				ws, _ := node["ws-opts"].(Record)
+				if node["network"] != "ws" || ws["path"] != "/vpn-test" {
+					t.Fatal("subscription export lost the WebSocket path")
+				}
+			}
+			if strings.HasPrefix(template, "vmess-") && node["cipher"] != "aes-128-gcm" {
+				t.Fatal("VMess TLS must export an explicit cross-core cipher")
 			}
 			for kind, variable := range map[string]string{"xray": "MXIOC_TEST_XRAY", "sing-box": "MXIOC_TEST_SING_BOX"} {
 				t.Run(kind, func(t *testing.T) {
