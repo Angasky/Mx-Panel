@@ -294,6 +294,9 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 				job["status"] = "interrupted"
 				job["error"] = "安装超时或总控退出，远端状态待核对；未自动重放"
 			}
+			if strings.Contains(output, "MXIOC_ROLLBACK_FAILED") {
+				job["error"] = value(job["error"]) + "；原安装恢复未确认，请核对服务器服务和配置"
+			}
 		}
 	}
 	_ = m.flush(data)

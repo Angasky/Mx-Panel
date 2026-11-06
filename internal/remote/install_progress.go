@@ -13,7 +13,7 @@ func installStage(line string) string {
 	stage, ok := strings.CutPrefix(strings.TrimSuffix(line, "\r"), "MXIOC_STAGE=")
 	if ok {
 		switch stage {
-		case "preflight", "download", "install", "config", "credentials", "service", "installed", "api-check":
+		case "preflight", "download", "build", "install", "config", "credentials", "service", "installed", "api-check":
 			return stage
 		}
 	}
@@ -95,6 +95,8 @@ func installFailure(stage string, code int) string {
 		return "安装环境检查失败，请检查 root 权限、系统和依赖"
 	case "download":
 		return "下载安装脚本失败，请检查远端 DNS、网络和下载地址"
+	case "build":
+		return "计量内核编译或验证失败，请查看下载、内存、磁盘和配置错误；此阶段尚未替换原安装"
 	case "install":
 		return "安装脚本执行失败，请查看日志中的软件包或安装错误"
 	case "config":

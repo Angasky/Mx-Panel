@@ -141,3 +141,18 @@ func TestNativeInstallScriptsValidateWithoutPython(t *testing.T) {
 		t.Fatal("invalid config accepted")
 	}
 }
+
+func TestInstallRollbackFailureIsReported(t *testing.T) {
+	m, id := installFixture(t)
+	m.installRun = func(context.Context, Connection, string) (string, error) {
+		return "MXIOC_STAGE=service\nMXIOC_ROLLBACK_FAILED\n", remoteExitError(35)
+	}
+	job, err := m.StartInstall(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := waitInstall(t, m, value(job["id"]))
+	if result["status"] != "failed" || !strings.Contains(value(result["error"]), "原安装恢复未确认") {
+		t.Fatal("rollback failure hidden", result)
+	}
+}
