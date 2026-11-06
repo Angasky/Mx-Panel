@@ -126,7 +126,11 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		if err != nil {
 			return nil, err
 		}
-		row, err = buildInboundTemplate(prepared, address)
+		if protocol == "shadowsocks" {
+			row, err = buildStandaloneSS2022Template(prepared)
+		} else {
+			row, err = buildInboundTemplate(prepared, address)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -247,6 +251,10 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 
 func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
+	case "ss2022-aes-128", "ss2022-aes-256":
+		if kind == "xray" {
+			return "shadowsocks"
+		}
 	case "vmess-tcp", "vmess-tcp-tls", "vmess-grpc-tls", "vmess-ws-tls":
 		return "vmess"
 	case "trojan-tls", "trojan-ws-tls", "trojan-grpc-tls":

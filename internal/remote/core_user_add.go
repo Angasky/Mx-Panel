@@ -8,6 +8,8 @@ import (
 
 func coreProvisionProtocol(kind, protocol string) bool {
 	switch protocol {
+	case "shadowsocks":
+		return kind == "xray"
 	case "vless", "vmess", "trojan":
 		return kind == "xray" || kind == "sing-box"
 	case "hysteria2", "tuic":
@@ -23,6 +25,10 @@ func coreProvisionInbound(kind string, row Record) bool {
 	protocol := value(row["protocol"])
 	if !coreProvisionProtocol(kind, protocol) {
 		return false
+	}
+	if protocol == "shadowsocks" {
+		_, err := guardedSS2022Settings(row)
+		return err == nil
 	}
 	if protocol != "hysteria" {
 		return true

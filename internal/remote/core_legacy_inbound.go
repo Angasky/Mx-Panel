@@ -38,6 +38,16 @@ func legacyNativeInbound(kind string, row Record) (Record, error) {
 		}
 	}
 	protocol, listen := value(row["protocol"]), value(row["listen"])
+	if protocol == "shadowsocks" {
+		if _, guarded := row["goSS2022Guard"]; guarded {
+			clients, err = ss2022NativeClients(row, clients)
+			if err != nil {
+				return nil, err
+			}
+		} else if clients != nil && len(clients) == 0 {
+			return nil, invalidCoreInbound
+		}
+	}
 	if kind == "xray" {
 		if listen == "" {
 			listen = "0.0.0.0"

@@ -152,7 +152,17 @@ func EndpointIdentity(row Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return identity(Record{"id": row["id"], "port": row["port"], "protocol": row["protocol"], "tag": row["tag"], "listen": value(row["listen"]), "streamSettings": stream})
+	data := Record{"id": row["id"], "port": row["port"], "protocol": row["protocol"], "tag": row["tag"], "listen": value(row["listen"]), "streamSettings": stream}
+	if row["protocol"] == "shadowsocks" {
+		if _, guarded := row["goSS2022Guard"]; guarded {
+			settings, err := guardedSS2022Settings(row)
+			if err != nil {
+				return "", err
+			}
+			data["ss2022"] = Record{"method": settings["method"], "password": settings["password"], "guard": row["goSS2022Guard"], "owner": row["goCreateKey"]}
+		}
+	}
+	return identity(data)
 }
 func UserIdentity(user Record) (string, error) {
 	data := Record{}

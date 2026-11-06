@@ -40,7 +40,7 @@ func credentialField(row, user Record) string {
 	if protocol == "hysteria" || protocol == "hysteria2" && value(user["auth"]) != "" {
 		return "auth"
 	}
-	if protocol == "trojan" || protocol == "hysteria2" {
+	if protocol == "trojan" || protocol == "hysteria2" || protocol == "shadowsocks" {
 		return "password"
 	}
 	return "id"
@@ -112,8 +112,13 @@ func FindUser(row, binding Record, missingOK bool) (Record, error) {
 }
 func NewUser(row Record) (Record, error) {
 	protocol := value(row["protocol"])
-	if protocol != "vless" && protocol != "vmess" && protocol != "trojan" && protocol != "hysteria" && protocol != "hysteria2" && protocol != "tuic" {
+	if protocol != "vless" && protocol != "vmess" && protocol != "trojan" && protocol != "hysteria" && protocol != "hysteria2" && protocol != "tuic" && protocol != "shadowsocks" {
 		return nil, errors.New("该协议不支持共用入站独立用户")
+	}
+	if protocol == "shadowsocks" {
+		if _, err := guardedSS2022Settings(row); err != nil {
+			return nil, err
+		}
 	}
 	random := make([]byte, 64)
 	if _, err := rand.Read(random); err != nil {
@@ -129,6 +134,14 @@ func NewUser(row Record) (Record, error) {
 	}
 	if protocol == "trojan" || protocol == "hysteria2" || protocol == "tuic" {
 		user["password"] = base64.RawURLEncoding.EncodeToString(random[36:60])
+	}
+	if protocol == "shadowsocks" {
+		settings, _ := object(row["settings"])
+		size := 32
+		if settings["method"] == "2022-blake3-aes-128-gcm" {
+			size = 16
+		}
+		user["password"] = base64.StdEncoding.EncodeToString(random[32 : 32+size])
 	}
 	if protocol == "hysteria" {
 		model, err := object(row["settings"])

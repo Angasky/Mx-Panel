@@ -2342,7 +2342,7 @@ async function batchServerImport() {
   const form = $('batchServerForm'), groups = new Map(), selectedServers = new Set(), selected = new Set(), queue = [], expanded = new Set();
   let busy = false, activeLoads = 0;
   const key = (serverId, inboundId) => JSON.stringify([serverId, inboundId]);
-  const eligible = row => ['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol) && row.enable !== false;
+  const eligible = row => remoteSupportsIndependentUser(row) && row.enable !== false;
   const t = S.data?.profile?.traffic || {};
   $('batchSubscriptionInfo').textContent = `总额度：${t.total == null ? '不限' : formatBytes(t.total)} · 到期：${t.expire ? new Date(t.expire*1000).toLocaleString('zh-CN') : '长期有效'}。未设置额度或日期时，导入后先统计用量，可在“流量与有效期”继续设置。`;
   const selectable = group => group.status === 'loaded' ? group.rows.filter(eligible) : [];
@@ -2496,7 +2496,7 @@ async function batchServerImport() {
 }
 
 function sharedUserPicker() {
-  const choices = (S.remoteRows || []).filter(r => ['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(r.protocol));
+  const choices = (S.remoteRows || []).filter(r => remoteSupportsIndependentUser(r));
   openModal('为订阅添加服务器节点', `<p class="hint">复用现有入站，为当前订阅创建独立 UUID / 密码；到期或流量用尽只处理此用户，不删除共用入站。</p>
     ${choices.length ? `<label for="sharedInbound">已有入站</label><select id="sharedInbound">${choices.map(r=>`<option value="${r.id}">${esc(r.remark || r.protocol)} · ${esc(r.protocol)} : ${r.port}</option>`).join('')}</select><button id="sharedChoose" class="btn primary">选择要加入的订阅</button>` : '<p>暂无支持多用户的入站，请先创建一个。</p>'}
     <button id="sharedNew" class="btn">创建新共用入站</button>`);
@@ -2516,14 +2516,14 @@ function renderRemoteNodes() {
   const readOnly = !!S.remoteRowsReadOnly;
   const live=new Set(S.remoteRows.filter(row=>!readOnly || row.provisionable).map(row=>row.id));S.remoteNodeSelection=new Set([...S.remoteNodeSelection].filter(id=>live.has(id)));
   const coreStatus = {unverified:'\u5b58\u5728\u4f46\u8eab\u4efd\u672a\u6838\u5bf9',present:'\u914d\u7f6e\u4e2d\u5b58\u5728',missing:'\u914d\u7f6e\u4e2d\u7f3a\u5931',disabled:'\u505c\u7528',mismatch:'\u914d\u7f6e\u4e0e\u8bb0\u5f55\u4e0d\u4e00\u81f4'};
-  const canImport=row=>readOnly ? row.provisionable === true : ['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol)&&row.enable!==false;
+  const canImport=row=>readOnly ? row.provisionable === true : remoteSupportsIndependentUser(row)&&row.enable!==false;
   const q = S.filters.remoteNodes || '', s = S.remoteServer;
   const page = tableSlice(S.remoteRows.filter(x => `${x.remark} ${x.protocol} ${x.port}`.toLowerCase().includes(q.toLowerCase())), 'serverNodes');
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${['xray','sing-box'].includes(s.installType) ? '<button class="btn primary" onclick="remoteNodeForm(true)">添加中转</button>' : ''}${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
     <div class="toolbar"><button id="remoteBatchImport" class="btn" onclick="remoteNodeBatchLinks()">批量导入订阅</button><button id="remoteSelectionClear" class="btn small">取消节点选择</button><input id="search" aria-label="搜索远端节点" placeholder="搜索节点名称、协议、端口…" value="${esc(q)}"></div>
     <div class="tablewrap"><table><thead><tr><th><input id="remoteNodesAll" type="checkbox" aria-label="全选本页可导入节点"></th><th>ID</th><th>名称</th><th>协议 / 端口</th><th>状态</th><th>上传 / 下载</th><th>订阅联动</th><th>操作</th></tr></thead><tbody>
     ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}${x.coreRelay ? ' <span class="pill">中转</span>' : ''}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : x.editPending ? '编辑待核对' : coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
-      ${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(x.protocol) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
+      ${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${remoteSupportsIndependentUser(x) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
     </tbody></table></div>${pagination(page)}</section>`;
   const updateSelection=()=>{const selected=S.remoteNodeSelection.size,available=page.rows.filter(canImport);$('remoteBatchImport').disabled=!selected;$('remoteBatchImport').textContent=`将所选 ${selected} 个节点导入订阅`;$('remoteSelectionClear').disabled=!selected;$('remoteNodesAll').checked=!!available.length&&available.every(row=>S.remoteNodeSelection.has(row.id));$('remoteNodesAll').indeterminate=available.some(row=>S.remoteNodeSelection.has(row.id))&&!$('remoteNodesAll').checked;};
   document.querySelectorAll('.remoteNodeChoice').forEach(input=>input.onchange=()=>{const id=Number(input.value);if(input.checked&&S.remoteNodeSelection.size>=50){input.checked=false;return notice('一次最多选择 50 个节点');}input.checked?S.remoteNodeSelection.add(id):S.remoteNodeSelection.delete(id);updateSelection();});
@@ -2579,6 +2579,10 @@ function remoteNodeForm(relay) {
   if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
     if (standalone) {
+      if (S.remoteServer.installType === 'xray') {
+      $('rnTemplate').add(new Option('Shadowsocks 2022 AES-128', 'ss2022-aes-128'));
+      $('rnTemplate').add(new Option('Shadowsocks 2022 AES-256', 'ss2022-aes-256'));
+      }
       $('rnTemplate').add(new Option('VLESS + TCP + TLS', 'vless-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + TCP + TLS', 'vmess-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));
@@ -3045,7 +3049,7 @@ async function importRemoteLinks(links, source) {
 async function remoteNodeLinks(id, sourceRows = S.remoteRows, sourceServerId = S.serverId) {
   const ids = [...new Set(Array.isArray(id) ? id : [id])], rows = ids.map(id=>sourceRows.find(row=>row.id===id));
   if (!rows.length || rows.some(row=>!row)) return;
-  if (rows.some(row=>!['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol))) {
+  if (rows.some(row=>!remoteSupportsIndependentUser(row))) {
     if (ids.length===1) return remoteNodeLegacyLinks(ids[0]);
     return alert('请选择支持独立订阅用户的节点');
   }
@@ -3499,8 +3503,12 @@ async function overview() {
   }
 }
 
+function remoteSupportsIndependentUser(row) {
+  return !!row && (['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol) || row.protocol==='shadowsocks' && row.provisionable===true);
+}
+
 function nodeSubscriptionBinding(node) {
-  if(!['vless','vmess','trojan','hysteria2','tuic'].includes(node?.type))return null;
+  if(!['vless','vmess','trojan','hysteria2','tuic','ss'].includes(node?.type))return null;
   return (S.data?.profile?.traffic?.bindings || []).find(binding=>binding.scope==='user' && binding.status==='active' && binding.importedNames?.includes(node.name)) || null;
 }
 
@@ -3514,11 +3522,19 @@ async function nodeSubscriptionImport(index) {
     const data=await api('/servers/inbounds?id='+encodeURIComponent(binding.serverId));
     if(!active())return;
     const row=(data.inbounds || []).find(row=>row.id===binding.inboundId);
-    if(!row || !['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol))throw Error('来源入站已不存在或不支持独立用户，请刷新服务器节点后选择。');
+    if(!row || !remoteSupportsIndependentUser(row))throw Error('来源入站已不存在或不支持独立用户，请刷新服务器节点后选择。');
+    if(data.readOnly===true) {
+      const shared=await api('/nodes/share?name='+encodeURIComponent(node.name));
+      if(!active())return;
+      const connection=uri=>typeof uri==='string' ? uri.split('#')[0] : '';
+      if(row.coreStatus!=='present' || row.enable===false || !connection(shared.uri) || !(row.shareLinks || []).some(uri=>connection(uri)===connection(shared.uri)))throw Error('节点参数与来源入站已不一致，请从服务器节点页核对后导入；未复制任何连接。');
+      remoteNodeLinks(row.id,data.inbounds,binding.serverId);
+      return;
+    }
     const settings=typeof row.settings==='string' ? JSON.parse(row.settings) : row.settings || {};
-    const protocol=row.protocol==='hysteria' ? 'hysteria2' : row.protocol;
+    const protocol=row.protocol==='hysteria' ? 'hysteria2' : row.protocol==='shadowsocks' ? 'ss' : row.protocol;
     const users=settings.clients || settings.users || [];
-    const matches=client=>client.enable!==false && (['vless','vmess','tuic'].includes(node.type) ? !!node.config?.uuid && client.id===node.config.uuid && (node.type!=='tuic' || client.password===node.config.password) : !!node.config?.password && (client.auth || client.password)===node.config.password);
+    const matches=client=>client.enable!==false && (node.type==='ss' ? node.config?.cipher===settings.method && node.config?.password===settings.password+':'+client.password : ['vless','vmess','tuic'].includes(node.type) ? !!node.config?.uuid && client.id===node.config.uuid && (node.type!=='tuic' || client.password===node.config.password) : !!node.config?.password && (client.auth || client.password)===node.config.password);
     const expectedAddress=data.server?.nodeAddress || data.server?.domain || data.server?.host;
     if(row.enable===false || protocol!==node.type || Number(row.port)!==Number(node.port) || !users.some(matches) || (expectedAddress && expectedAddress!==node.server))throw Error('节点参数与来源入站已不一致，请从服务器节点页核对后导入；未复制任何连接。');
     remoteNodeLinks(row.id,data.inbounds,binding.serverId);

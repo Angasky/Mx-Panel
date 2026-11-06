@@ -57,6 +57,39 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    if(template.includes('-grpc-'))assert.equal(call.body.grpcService,'vpn');
    }
   }
+  for(const kind of ['xray']) {
+   for(const template of ['ss2022-aes-128','ss2022-aes-256']) {
+    await setup();await page.evaluate(kind=>{S.remoteServer.installType=kind;const base=api;api=async(url,opt)=>{const result=await base(url,opt);return url==='/servers/users'?{...result,bound:true}:result};remoteNodeForm(false);},kind);
+    await page.select('#rnTemplate',template);
+    assert.equal(await page.$eval('#rnSniFields',e=>e.classList.contains('hidden')),true);
+    assert.equal(await page.$eval('#rnTlsFields',e=>e.classList.contains('hidden')),true);
+    assert.equal(await page.$eval('#rnSni',e=>e.required),false);
+    await page.type('#rnName','SS2022');await page.click('#rnSave');await page.waitForFunction(()=>calls.some(x=>x.url==='/servers/users'));
+    assert.equal(await page.evaluate(()=>calls.some(x=>x.url==='/servers/certificates')),false);
+    assert.equal(await page.evaluate(()=>calls.find(x=>x.url==='/servers/users').body.template),template);
+   }
+  }
+  await setup();assert.equal(await page.evaluate(()=>Array.from($('rnTemplate').options).some(x=>x.value.startsWith('ss2022-'))),false);
+  await page.evaluate(()=>{S.remoteServer.installType='sing-box';remoteNodeForm(false)});assert.equal(await page.evaluate(()=>Array.from($('rnTemplate').options).some(x=>x.value.startsWith('ss2022-'))),false);
+  assert.deepEqual(await page.evaluate(()=>[remoteSupportsIndependentUser({protocol:'shadowsocks',provisionable:true}),remoteSupportsIndependentUser({protocol:'shadowsocks'}),remoteSupportsIndependentUser({protocol:'shadowsocks',provisionable:false})]),[true,false,false]);
+  for(const changed of [false,true]) {
+   const result=await page.evaluate(async changed=>{
+    S.profile='owned-profile';S.page='nodes';S.data={nodes:[{index:0,name:'SS2022',type:'ss',port:23456,server:'example.com',config:{cipher:'2022-blake3-aes-128-gcm',password:'root:user'}}],profile:{traffic:{bindings:[{scope:'user',status:'active',serverId:'server',inboundId:17,importedNames:['SS2022']}]}}};
+    const row={id:17,protocol:'shadowsocks',provisionable:true,enable:true,port:23456,settings:{method:'2022-blake3-aes-128-gcm',password:changed?'changed-root':'root',clients:[{email:'owner',password:'user'}]}};
+    api=async()=>({inbounds:[row],server:{host:'example.com'}});let linked=false;remoteNodeLinks=()=>{linked=true};
+    await nodeSubscriptionImport(0);return {linked,error:$('nodeSubscriptionError').textContent};
+   },changed);
+   assert.equal(result.linked,!changed);assert.equal(result.error.length>0,changed);
+  }
+  for(const changed of [false,true]) {
+   const result=await page.evaluate(async changed=>{
+    S.profile='owned-profile';S.data={nodes:[{index:0,name:'SS2022',type:'ss',port:23456,server:'example.com',config:{cipher:'2022-blake3-aes-128-gcm',password:'root:user'}}],profile:{traffic:{bindings:[{scope:'user',status:'active',serverId:'server',inboundId:17,importedNames:['SS2022']}]}}};
+    const row={id:17,protocol:'shadowsocks',provisionable:true,enable:true,coreStatus:'present',port:23456,shareLinks:[changed?'ss://different@example.com:23456#peer':'ss://valid@example.com:23456#peer']};
+    api=async url=>url.startsWith('/nodes/share')?{uri:'ss://valid@example.com:23456#renamed'}:{inbounds:[row],server:{host:'example.com'},readOnly:true};let linked=false;remoteNodeLinks=()=>{linked=true};
+    await nodeSubscriptionImport(0);return {linked,error:$('nodeSubscriptionError').textContent};
+   },changed);
+   assert.equal(result.linked,!changed);assert.equal(result.error.length>0,changed);
+  }
   await setup('fail');await page.select('#rnTemplate','hysteria2');await page.type('#rnName','HY2');await page.click('#rnSave');await page.waitForFunction(()=>$('remoteError').textContent.includes('TCP 80'));
   assert.equal(await page.evaluate(()=>calls.some(x=>x.url==='/servers/users')),false);
   await setup('retry');await page.select('#rnTemplate','hysteria2');await page.type('#rnName','HY2');await page.click('#rnSave');await page.waitForFunction(()=>$('remoteError').textContent.includes('待核对'));

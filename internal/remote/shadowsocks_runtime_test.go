@@ -85,7 +85,7 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 						t.Skip("set MXIOC_TEST_SING_BOX for sing-box SS2022 verification")
 					}
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 				defer cancel()
 				target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ss2022-user-proof") }))
 				defer target.Close()
@@ -96,7 +96,31 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 					}
 					anyRecords(row["settings"].(Record)["clients"])[1]["method"] = "aes-256-gcm"
 				}
-				row["port"], row["listen"] = port(), "127.0.0.1"
+				modern := strings.HasPrefix(method, "2022-")
+				withStats := modern && kind == "xray"
+				if modern {
+					template := "ss2022-aes-128"
+					if method == "2022-blake3-aes-256-gcm" {
+						template = "ss2022-aes-256"
+					}
+					row = managedSS2022Fixture(t, template)
+					users := []any{}
+					for _, name := range []string{"first", "second", "disabled"} {
+						user, err := NewUser(row)
+						if err != nil {
+							t.Fatal(err)
+						}
+						user["email"] = name
+						if name == "disabled" {
+							user["enable"] = false
+						}
+						users = append(users, user)
+					}
+					row["settings"].(Record)["clients"] = users
+				}
+				row["port"], row["listen"], row["id"], row["tag"] = port(), "127.0.0.1", 1, "mxioc-inbound-1"
+				apiAddress := "127.0.0.1:" + value(port())
+				var serverDoc Record
 				nodes, err := InboundNodes(row, Record{"host": "node.example.com"})
 				if err != nil || len(nodes) != 2 {
 					t.Fatal(err)
@@ -110,7 +134,22 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					return startSSFixtureCore(t, ctx, binary, kind, Record{"inbounds": []any{native}, "outbounds": []any{out}}, row["port"].(int))
+					serverDoc = Record{"inbounds": []any{native}, "outbounds": []any{out}}
+					if withStats {
+						serverDoc, err = planCoreStats(kind, serverDoc)
+						if err != nil {
+							t.Fatal(err)
+						}
+						api := serverDoc["api"]
+						if kind == "sing-box" {
+							api = serverDoc["experimental"].(Record)["v2ray_api"]
+						}
+						api.(Record)["listen"] = apiAddress
+						if kind == "sing-box" {
+							api.(Record)["stats"].(Record)["users"] = []any{"first", "second"}
+						}
+					}
+					return startSSFixtureCore(t, ctx, binary, kind, serverDoc, row["port"].(int))
 				}
 				stopServer, serverLog := startServer()
 				request := func(node Record, allowed bool) {
@@ -146,8 +185,38 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 						t.Fatal("SS2022 user export/authentication mismatch", allowed, requestErr, a, b)
 					}
 				}
+				readCounts := func() map[string]coreTraffic {
+					t.Helper()
+					for attempt := 0; attempt < 40; attempt++ {
+						output, err := exec.CommandContext(ctx, xray, "api", "statsquery", "--server="+apiAddress, "--pattern=user>>>").Output()
+						if err == nil {
+							counters, err := parseCoreCounters(string(output))
+							if err != nil {
+								t.Fatal("invalid native counter reply", err)
+							}
+							return counters
+						}
+						time.Sleep(25 * time.Millisecond)
+					}
+					t.Fatal("native stats API not available")
+					return nil
+				}
 				request(nodes[0], true)
+				var first coreTraffic
+				if withStats {
+					counts := readCounts()
+					first = counts["first"]
+					if first.up <= 0 || first.down <= 0 || counts["second"] != (coreTraffic{}) {
+						t.Fatal("first user counters not isolated", counts)
+					}
+				}
 				request(nodes[1], true)
+				if withStats {
+					counts := readCounts()
+					if counts["first"] != first || counts["second"].up <= 0 || counts["second"].down <= 0 {
+						t.Fatal("second user counters not isolated", counts)
+					}
+				}
 				invalid := Record{}
 				for key, v := range nodes[0] {
 					invalid[key] = v
@@ -160,11 +229,53 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 				invalid["password"] = value(settings["password"]) + ":" + base64.StdEncoding.EncodeToString(key)
 				request(invalid, false)
 				stopServer()
-				settings["clients"] = []any{anyRecords(settings["clients"])[1]}
-				stopServer, serverLog = startServer()
-				request(nodes[0], false)
-				request(nodes[1], true)
-				stopServer()
+				if modern {
+					users := anyRecords(settings["clients"])
+					apply := func(operation string, user Record) {
+						t.Helper()
+						binding := bindingFor(t, row, user)
+						binding["inboundId"] = row["id"]
+						if operation == "resume" {
+							binding["monthlyPaused"] = true
+						}
+						next, rows, err := planCoreUserChange(kind, operation, legacyCoreState{Inbounds: []Record{row}}, serverDoc, binding, false)
+						if err != nil || next == nil || len(rows) != 1 {
+							t.Fatal("SS2022 lifecycle failed", operation, err)
+						}
+						row, serverDoc = rows[0], next
+					}
+					apply("remove", users[0])
+					stopServer, serverLog = startServer()
+					request(nodes[0], false)
+					request(nodes[1], true)
+					stopServer()
+					apply("pause", users[1])
+					if exported, err := InboundNodes(row, Record{}); err != nil || len(exported) != 0 {
+						t.Fatal("guard leaked into links", err)
+					}
+					stopServer, serverLog = startServer()
+					request(nodes[0], false)
+					request(nodes[1], false)
+					invalid["password"] = settings["password"]
+					request(invalid, false)
+					stopServer()
+					apply("resume", anyRecords(row["settings"].(Record)["clients"])[0])
+					stopServer, serverLog = startServer()
+					request(nodes[1], true)
+					stopServer()
+					apply("remove", anyRecords(row["settings"].(Record)["clients"])[0])
+					stopServer, serverLog = startServer()
+					request(nodes[0], false)
+					request(nodes[1], false)
+					request(invalid, false)
+					stopServer()
+				} else {
+					settings["clients"] = []any{anyRecords(settings["clients"])[1]}
+					stopServer, serverLog = startServer()
+					request(nodes[0], false)
+					request(nodes[1], true)
+					stopServer()
+				}
 			})
 		}
 	}
