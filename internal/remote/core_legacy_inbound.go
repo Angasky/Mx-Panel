@@ -70,6 +70,28 @@ func legacyNativeInbound(kind string, row Record) (Record, error) {
 			return nil, invalidCoreInbound
 		}
 		native["method"], native["password"] = settings["method"], settings["password"]
+		if _, exists := settings["users"]; exists {
+			return nil, invalidCoreInbound // Legacy metadata uses clients; do not ignore a second user model.
+		}
+		if _, multi := settings["clients"]; multi {
+			method := value(settings["method"])
+			if len(clients) == 0 || !shadowsocks2022Key(method, value(settings["password"]), true) {
+				return nil, invalidCoreInbound // Empty SS2022 users must not fall back to server-key authentication.
+			}
+			users := []any{}
+			for _, raw := range clients {
+				client := raw.(Record)
+				if value(client["method"]) != "" || !shadowsocks2022Key(method, value(client["password"]), true) {
+					return nil, invalidCoreInbound
+				}
+				name := value(client["email"])
+				if name == "" {
+					name = value(client["name"])
+				}
+				users = append(users, Record{"name": name, "password": client["password"]})
+			}
+			native["users"] = users
+		}
 	case "vless", "vmess", "trojan", "hysteria2", "tuic":
 		users := []any{}
 		for _, raw := range clients {

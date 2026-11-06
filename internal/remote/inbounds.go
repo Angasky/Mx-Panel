@@ -83,14 +83,7 @@ func InboundNodes(row, record Record) ([]Record, error) {
 		return result, nil
 	}
 	if protocol == "shadowsocks" {
-		if value(settings["password"]) == "" || value(settings["method"]) == "" {
-			return []Record{}, nil
-		}
-		node := makeNode()
-		node["type"] = "ss"
-		node["cipher"] = settings["method"]
-		node["password"] = settings["password"]
-		return []Record{node}, nil
+		return shadowsocksInboundNodes(settings, stream, makeNode)
 	}
 	if protocol != "vless" && protocol != "vmess" && protocol != "trojan" && protocol != "hysteria2" && protocol != "tuic" {
 		return []Record{}, nil
