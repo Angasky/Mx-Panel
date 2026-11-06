@@ -99,6 +99,9 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 		return Record{"enabled": err == nil}, err
 	}
 	stats := Record{"listen": coreStatsListen, "binary": "/usr/local/bin/xray", "users": []any{}}
+	if kind == "sing-box" {
+		stats["binary"] = "go-ssh-grpc"
+	}
 	if err := checkCoreStatsTools(ctx, kind, run); err != nil {
 		return nil, err
 	}
@@ -158,6 +161,13 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 	verify := "ready=0\nfor attempt in 1 2 3 4 5; do\n" +
 		" if timeout 2 /usr/local/bin/xray api statsquery --server=127.0.0.1:10085 --pattern='user>>>' >/dev/null 2>&1; then ready=1; break; fi\n" +
 		" sleep 1\ndone\ntest \"$ready\" = 1"
+	if kind == "sing-box" {
+		// The remote shell verifies listener readiness. The following pinned-SSH
+		// gRPC query must also succeed before committing state or granting users.
+		verify = "ready=0\nfor attempt in 1 2 3 4 5; do\n" +
+			" if timeout 2 bash -c 'true </dev/tcp/127.0.0.1/10085' 2>/dev/null; then ready=1; break; fi\n" +
+			" sleep 1\ndone\ntest \"$ready\" = 1"
+	}
 	if _, err := applyCoreVerified(ctx, kind, raw, next, "", verify, run); err != nil {
 		if errors.Is(err, errCoreRolledBack) && journal["before"] == before {
 			err = errors.Join(err, m.updateCoreUserState(id, stateToken, pending, stateToken, ""))
@@ -176,11 +186,14 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 func checkCoreStatsTools(ctx context.Context, kind string, run coreRunner) error {
 	check := "test -x /usr/local/bin/xray"
 	if kind == "sing-box" {
-		check += " && /usr/bin/sing-box version"
+		check = "test -x /usr/bin/sing-box && /usr/bin/sing-box version"
 	}
 	output, err := run(ctx, check, 64<<10)
 	if err != nil || (kind == "sing-box" && !strings.Contains(output, "with_v2ray_api")) {
-		return errors.New("缺少 Xray 统计查询工具，或 sing-box 构建缺少 with_v2ray_api")
+		if kind == "sing-box" {
+			return errors.New("sing-box 不可执行或构建缺少 with_v2ray_api")
+		}
+		return errors.New("缺少 Xray 统计查询工具")
 	}
 	return nil
 }

@@ -195,6 +195,9 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		return nil, err
 	}
 	defer client.Close()
+	ctx = context.WithValue(ctx, coreStatsQueryKey{}, coreStatsQuery(func(ctx context.Context, address string) (string, error) {
+		return querySingStats(ctx, address, client.DialContext)
+	}))
 	done := make(chan struct{})
 	defer close(done)
 	go func() {

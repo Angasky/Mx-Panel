@@ -18,8 +18,8 @@ func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
 }
 
 func TestStandaloneSS2022CreateRecoversAfterInterruptedWrite(t *testing.T) {
-	testStandaloneInboundCreate(t, "ss2022-aes-128", []string{"xray"}, false)
-	testStandaloneInboundCreate(t, "ss2022-aes-256", []string{"xray"}, false)
+	testStandaloneInboundCreate(t, "ss2022-aes-128", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "ss2022-aes-256", []string{"xray", "sing-box"}, false)
 }
 
 func TestStandaloneRealityUsesVerifiedSNI(t *testing.T) {

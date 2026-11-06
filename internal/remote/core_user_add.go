@@ -9,7 +9,7 @@ import (
 func coreProvisionProtocol(kind, protocol string) bool {
 	switch protocol {
 	case "shadowsocks":
-		return kind == "xray"
+		return kind == "xray" || kind == "sing-box"
 	case "vless", "vmess", "trojan":
 		return kind == "xray" || kind == "sing-box"
 	case "hysteria2", "tuic":

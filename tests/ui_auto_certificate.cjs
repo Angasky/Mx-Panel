@@ -57,7 +57,7 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    if(template.includes('-grpc-'))assert.equal(call.body.grpcService,'vpn');
    }
   }
-  for(const kind of ['xray']) {
+  for(const kind of ['xray','sing-box']) {
    for(const template of ['ss2022-aes-128','ss2022-aes-256']) {
     await setup();await page.evaluate(kind=>{S.remoteServer.installType=kind;const base=api;api=async(url,opt)=>{const result=await base(url,opt);return url==='/servers/users'?{...result,bound:true}:result};remoteNodeForm(false);},kind);
     await page.select('#rnTemplate',template);
@@ -70,7 +70,7 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    }
   }
   await setup();assert.equal(await page.evaluate(()=>Array.from($('rnTemplate').options).some(x=>x.value.startsWith('ss2022-'))),false);
-  await page.evaluate(()=>{S.remoteServer.installType='sing-box';remoteNodeForm(false)});assert.equal(await page.evaluate(()=>Array.from($('rnTemplate').options).some(x=>x.value.startsWith('ss2022-'))),false);
+  await page.evaluate(()=>{S.remoteServer.installType='sing-box';remoteNodeForm(false)});assert.equal(await page.evaluate(()=>Array.from($('rnTemplate').options).some(x=>x.value.startsWith('ss2022-'))),true);
   assert.deepEqual(await page.evaluate(()=>[remoteSupportsIndependentUser({protocol:'shadowsocks',provisionable:true}),remoteSupportsIndependentUser({protocol:'shadowsocks'}),remoteSupportsIndependentUser({protocol:'shadowsocks',provisionable:false})]),[true,false,false]);
   for(const changed of [false,true]) {
    const result=await page.evaluate(async changed=>{

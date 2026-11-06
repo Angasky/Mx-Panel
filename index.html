@@ -2579,10 +2579,8 @@ function remoteNodeForm(relay) {
   if ($('rnTemplate')) {
     $('rnTemplate').add(new Option('Hysteria2 + TLS（自动证书）', 'hysteria2'));
     if (standalone) {
-      if (S.remoteServer.installType === 'xray') {
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-128', 'ss2022-aes-128'));
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-256', 'ss2022-aes-256'));
-      }
       $('rnTemplate').add(new Option('VLESS + TCP + TLS', 'vless-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + TCP + TLS', 'vmess-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));

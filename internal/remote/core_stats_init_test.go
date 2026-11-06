@@ -68,7 +68,7 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 					return "{}", nil
 				}
 				_, tail, ok := strings.Cut(script, "printf '%s' '")
-				if !ok || (writes < 2 && !strings.Contains(script, "timeout 2 /usr/local/bin/xray api statsquery")) {
+				if !ok || (writes < 2 && kind == "xray" && !strings.Contains(script, "timeout 2 /usr/local/bin/xray api statsquery")) || (writes < 2 && kind == "sing-box" && !strings.Contains(script, "true </dev/tcp/127.0.0.1/10085")) {
 					t.Fatal("write must verify the running stats service")
 				}
 				encoded, _, _ := strings.Cut(tail, "'")
@@ -83,15 +83,22 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 				}
 				return "MXIOC_CORE_APPLIED", nil
 			}
+			failQuery := false
+			ctx := context.WithValue(context.Background(), coreStatsQueryKey{}, coreStatsQuery(func(context.Context, string) (string, error) {
+				if failQuery {
+					return "", errors.New("stats unavailable")
+				}
+				return "{}", nil
+			}))
 			enable := func() error {
 				record, err := m.Record(id)
 				if err != nil {
 					return err
 				}
 				if importing {
-					_, err = m.changeCoreUser(context.Background(), id, kind, "add", record, binding, run, client)
+					_, err = m.changeCoreUser(ctx, id, kind, "add", record, binding, run, client)
 				} else {
-					_, err = m.enableCoreStats(context.Background(), id, kind, record, run)
+					_, err = m.enableCoreStats(ctx, id, kind, record, run)
 				}
 				return err
 			}
@@ -105,7 +112,32 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expectedWrites := 2
+			baseWrites := 2
+			if kind == "sing-box" {
+				failQuery = true
+				if err := enable(); err == nil || writes != 2 {
+					t.Fatal("failed query did not stop initialization", err)
+				}
+				record, err := m.Record(id)
+				if err != nil || value(record["coreUserPending"]) == "" {
+					t.Fatal("failed query lost recovery journal", err)
+				}
+				saved, err := m.Secret(record, "coreState")
+				if err != nil {
+					t.Fatal(err)
+				}
+				state, err := parseLegacyCoreState(saved)
+				if err != nil || len(state.UserStats) != 0 || strings.Contains(string(raw), value(client["id"])) {
+					t.Fatal("stats or user committed before gRPC verification", err)
+				}
+				m, err = Open(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				failQuery = false
+				baseWrites = 3
+			}
+			expectedWrites := baseWrites
 			if importing {
 				expectedWrites++
 			}

@@ -17,7 +17,7 @@ func managedSS2022Fixture(t *testing.T, template string) Record {
 }
 
 func TestManagedSS2022IndependentUsersAndEmptyGuard(t *testing.T) {
-	for _, kind := range []string{"xray"} {
+	for _, kind := range []string{"xray", "sing-box"} {
 		for _, template := range []string{"ss2022-aes-128", "ss2022-aes-256"} {
 			t.Run(kind+"/"+template, func(t *testing.T) {
 				row := managedSS2022Fixture(t, template)
@@ -83,15 +83,15 @@ func TestManagedSS2022IndependentUsersAndEmptyGuard(t *testing.T) {
 func TestManagedSS2022IdentityAndCredentialGuards(t *testing.T) {
 	row := managedSS2022Fixture(t, "ss2022-aes-128")
 	for _, template := range []string{"ss2022-aes-128", "ss2022-aes-256"} {
-		if standaloneTemplateProtocol("sing-box", template) != "" {
-			t.Fatal("sing-box template opened before stats compatibility verification")
+		if standaloneTemplateProtocol("sing-box", template) != "shadowsocks" {
+			t.Fatal("sing-box SS2022 template missing")
 		}
 		if _, err := buildInboundTemplate(Record{"template": template}, ""); err == nil {
 			t.Fatal("standalone SS2022 template accepted for an external panel")
 		}
 	}
-	if coreProvisionInbound("sing-box", row) {
-		t.Fatal("sing-box SS2022 provisioning opened before stats verification")
+	if !coreProvisionInbound("sing-box", row) {
+		t.Fatal("guarded sing-box SS2022 provisioning missing")
 	}
 	user, err := NewUser(row)
 	if err != nil {

@@ -97,7 +97,7 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 					anyRecords(row["settings"].(Record)["clients"])[1]["method"] = "aes-256-gcm"
 				}
 				modern := strings.HasPrefix(method, "2022-")
-				withStats := modern && kind == "xray"
+				withStats := modern
 				if modern {
 					template := "ss2022-aes-128"
 					if method == "2022-blake3-aes-256-gcm" {
@@ -188,7 +188,14 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 				readCounts := func() map[string]coreTraffic {
 					t.Helper()
 					for attempt := 0; attempt < 40; attempt++ {
-						output, err := exec.CommandContext(ctx, xray, "api", "statsquery", "--server="+apiAddress, "--pattern=user>>>").Output()
+						var output []byte
+						var err error
+						if kind == "sing-box" {
+							raw, queryErr := querySingStats(ctx, apiAddress, (&net.Dialer{}).DialContext)
+							output, err = []byte(raw), queryErr
+						} else {
+							output, err = exec.CommandContext(ctx, xray, "api", "statsquery", "--server="+apiAddress, "--pattern=user>>>").Output()
+						}
 						if err == nil {
 							counters, err := parseCoreCounters(string(output))
 							if err != nil {

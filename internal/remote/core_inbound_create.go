@@ -252,7 +252,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
 	case "ss2022-aes-128", "ss2022-aes-256":
-		if kind == "xray" {
+		if kind == "xray" || kind == "sing-box" {
 			return "shadowsocks"
 		}
 	case "vmess-tcp", "vmess-tcp-tls", "vmess-grpc-tls", "vmess-ws-tls":

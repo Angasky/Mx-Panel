@@ -13,9 +13,12 @@ import (
 
 var errCoreStats = errors.New("独立内核统计接口或用户计数无法核对")
 
-// Only the legacy managed loopback API may be queried. The executable is
-// fixed, and its address must agree with the server's current config.
+// Only a managed loopback API may be queried. The adapter marker is fixed,
+// and its address must agree with the server's current config.
 func coreStatsAddress(kind string, doc, saved Record) (string, error) {
+	if kind != "xray" && kind != "sing-box" {
+		return "", errCoreStats
+	}
 	api := doc["api"]
 	if kind == "sing-box" {
 		experimental, _ := doc["experimental"].(Record)
@@ -25,7 +28,8 @@ func coreStatsAddress(kind string, doc, saved Record) (string, error) {
 	listen := value(saved["listen"])
 	address, err := netip.ParseAddrPort(listen)
 	if err != nil || !address.Addr().IsLoopback() || address.Port() == 0 ||
-		value(settings["listen"]) != listen || value(saved["binary"]) != "/usr/local/bin/xray" {
+		value(settings["listen"]) != listen ||
+		(value(saved["binary"]) != "/usr/local/bin/xray" && !(kind == "sing-box" && saved["binary"] == "go-ssh-grpc")) {
 		return "", errCoreStats
 	}
 	if kind == "xray" {
@@ -188,6 +192,17 @@ func queryCoreCounters(ctx context.Context, kind string, doc, stats Record, run 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
+	if kind == "sing-box" {
+		query, ok := ctx.Value(coreStatsQueryKey{}).(coreStatsQuery)
+		if !ok || query == nil {
+			return nil, errCoreStats
+		}
+		raw, err := query(ctx, address)
+		if err != nil {
+			return nil, errCoreStats
+		}
+		return parseCoreCounters(raw)
+	}
 	raw, err := run(ctx, "/usr/local/bin/xray api statsquery --server="+quote(address)+" --pattern='user>>>'", 2<<20)
 	if err != nil {
 		return nil, errCoreStats
