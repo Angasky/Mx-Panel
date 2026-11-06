@@ -127,7 +127,11 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 			return nil, err
 		}
 		if protocol == "shadowsocks" {
-			row, err = buildStandaloneSS2022Template(prepared)
+			if ssAEADTemplateMethod(template) != "" {
+				row, err = buildStandaloneSSAEADTemplate(prepared)
+			} else {
+				row, err = buildStandaloneSS2022Template(prepared)
+			}
 		} else {
 			row, err = buildInboundTemplate(prepared, address)
 		}
@@ -251,6 +255,10 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 
 func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
+	case "ss-aes-128-gcm", "ss-aes-256-gcm", "ss-chacha20-poly1305":
+		if kind == "xray" {
+			return "shadowsocks"
+		}
 	case "ss2022-aes-128", "ss2022-aes-256":
 		if kind == "xray" || kind == "sing-box" {
 			return "shadowsocks"

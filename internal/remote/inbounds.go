@@ -83,6 +83,11 @@ func InboundNodes(row, record Record) ([]Record, error) {
 		return result, nil
 	}
 	if protocol == "shadowsocks" {
+		if _, classic := row["goSSAEADGuard"]; classic {
+			if _, err := guardedSSAEADSettings(row); err != nil {
+				return nil, err
+			}
+		}
 		if _, guarded := row["goSS2022Guard"]; guarded {
 			if _, err := guardedSS2022Settings(row); err != nil {
 				return nil, err

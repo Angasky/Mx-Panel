@@ -154,6 +154,13 @@ func EndpointIdentity(row Record) (string, error) {
 	}
 	data := Record{"id": row["id"], "port": row["port"], "protocol": row["protocol"], "tag": row["tag"], "listen": value(row["listen"]), "streamSettings": stream}
 	if row["protocol"] == "shadowsocks" {
+		if _, classic := row["goSSAEADGuard"]; classic {
+			settings, err := guardedSSAEADSettings(row)
+			if err != nil {
+				return "", err
+			}
+			data["ssAEAD"] = Record{"method": settings["method"], "password": settings["password"], "guard": row["goSSAEADGuard"], "owner": row["goCreateKey"]}
+		}
 		if _, guarded := row["goSS2022Guard"]; guarded {
 			settings, err := guardedSS2022Settings(row)
 			if err != nil {

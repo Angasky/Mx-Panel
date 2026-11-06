@@ -12,7 +12,7 @@
 | 模块 | 当前状态 | 尚需完成 |
 | --- | --- | --- |
 | 独立 Xray / sing-box 配置 | 已有整配置 SSH 读写、校验、回滚接口、旧托管入站只读列表与原生配置比对、核对通过后可查看连接及整配置托管入站保护、手工原生入站的新建、编辑和引用检查删除，以及 VMess TCP、VLESS / VMess TCP TLS、Trojan TLS、VLESS / VMess / Trojan WS TLS、VLESS / VMess / Trojan gRPC TLS、Xray XHTTP TLS、Xray / sing-box Reality、Xray / sing-box Hysteria2 和 sing-box TUIC 托管创建与订阅绑定；已核对的托管入站支持改名、带重试的端口 / WS 路径 / gRPC 服务名 / XHTTP 路径和模式编辑、基础 TLS 的 TCP / WS / gRPC 传输互换及无用户入站的 VLESS / VMess / Trojan 协议互换、删除和订阅节点清理，并在刷新及后台同步时按绑定身份清理手动删除的入站 | 其余托管模板、其他协议切换及高级传输配置编辑、其余配置映射及实机回滚 |
-| 独立内核用户与计量 | 面板独立用户已实现；独立内核已有 StatsService、首次导入启用统计、到期撤销与月额度暂停恢复流程，以及认证用户旧绑定迁移。Xray / sing-box 均开放 SS2022 独立用户模板；sing-box 经 Go / SSH 查询真实统计服务，已验证 SS2022 与另外 12 组常用协议 / 传输的双用户计数隔离和末用户撤销保护，另修复空 WebSocket Host 导致 HTTP 400 | 传统 SS 独立用户、缺少身份凭证的绑定迁移、Reality 真实计量整链路复验、UDP 目标报文与实机验收 |
+| 独立内核用户与计量 | 面板独立用户已实现；独立内核已有 StatsService、首次导入启用统计、到期撤销与月额度暂停恢复流程，以及认证用户旧绑定迁移。Xray / sing-box 均开放 SS2022 独立用户，Xray 另有传统 SS 三种 AEAD 独立用户模板；真实内核已验证独立计数与末用户撤销，sing-box 另外 12 组常用协议 / 传输也完成本地回归 | 缺少身份凭证的旧 SS / 其他绑定迁移、sing-box 传统 SS 的替代隔离方案、Reality 真实计量整链路复验、UDP 目标报文与实机验收 |
 | 服务器中转 | Web 面板创建与带身份摘要的中转删除清理已接入，支持中断后继续清理，早期 Go 中转可依据创建记录恢复归属摘要，链式代理页可创建和删除已核对的独占链路，支持选择 sing-box Reality / VMess TCP 入口；独立 Xray 和 sing-box 支持 Reality 中转入口、落地出站及专属路由的原子写入、核对与删除，sing-box 支持 HY2 / TUIC 落地 | 缺少可信创建记录的旧中转迁移、限速 / 计量关联资源及实机验收 |
 | 多入口主备 | 已支持固定出口的有序路径创建、保存草稿与继续创建，全部确认后激活；已激活主备组可逐路径删除并重试；可取消未下发或已确认路径的草稿，支持 Web 面板及独立 Xray / sing-box 入口，新增 sing-box Reality 协议选择并兼容旧草稿 | 直接取消已下发但结果不明的草稿（含 SSH 断开后仍运行的远端写入）、缺少归属的旧路径清理、客户端 App 与真实节点链路验收 |
 | 高级客户端转换 | 通用链接（含 VMess gRPC、基础 VLESS XHTTP、ALPN 与 TLS 参数）、Shadowsocks / SS2022 多用户连接读取及导出、小火箭主备配套导出、Xray 主备 JSON 已实现 | 其余高级传输参数、客户端 App 导入与真实节点链路切换验收 |

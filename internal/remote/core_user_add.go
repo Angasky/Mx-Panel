@@ -27,6 +27,10 @@ func coreProvisionInbound(kind string, row Record) bool {
 		return false
 	}
 	if protocol == "shadowsocks" {
+		if _, classic := row["goSSAEADGuard"]; classic {
+			_, err := guardedSSAEADSettings(row)
+			return kind == "xray" && err == nil
+		}
 		_, err := guardedSS2022Settings(row)
 		return err == nil
 	}

@@ -2581,6 +2581,11 @@ function remoteNodeForm(relay) {
     if (standalone) {
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-128', 'ss2022-aes-128'));
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-256', 'ss2022-aes-256'));
+      if (S.remoteServer.installType === 'xray') {
+        $('rnTemplate').add(new Option('Shadowsocks AES-128-GCM', 'ss-aes-128-gcm'));
+        $('rnTemplate').add(new Option('Shadowsocks AES-256-GCM', 'ss-aes-256-gcm'));
+        $('rnTemplate').add(new Option('Shadowsocks ChaCha20-Poly1305', 'ss-chacha20-poly1305'));
+      }
       $('rnTemplate').add(new Option('VLESS + TCP + TLS', 'vless-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + TCP + TLS', 'vmess-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));

@@ -14,6 +14,9 @@ const ss2022GuardEmail = "mxioc-ss2022-empty-guard"
 // unreachable credential in an otherwise empty native list prevents single-user
 // fallback with the server key that is already present in exported client links.
 func guardedSS2022Settings(row Record) (Record, error) {
+	if _, classic := row["goSSAEADGuard"]; classic {
+		return nil, errors.New("Shadowsocks 托管认证模式冲突")
+	}
 	settings, err := object(row["settings"])
 	method := value(settings["method"])
 	root, guard := value(settings["password"]), value(row["goSS2022Guard"])

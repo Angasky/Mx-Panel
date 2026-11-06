@@ -33,6 +33,9 @@ func startSSFixtureCore(t *testing.T, ctx context.Context, binary, kind string, 
 	if kind == "sing-box" {
 		args = []string{"run", "-c", file}
 	}
+	if kind == "mihomo" {
+		args = []string{"-d", filepath.Dir(file), "-f", file}
+	}
 	command := exec.CommandContext(ctx, binary, args...)
 	log := &capture{limit: 64 << 10}
 	command.Stdout, command.Stderr = log, log
@@ -60,6 +63,14 @@ func startSSFixtureCore(t *testing.T, ctx context.Context, binary, kind string, 
 }
 
 func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
+	testShadowsocksUsersWithRealCores(t, []string{"2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "aes-128-gcm"})
+}
+
+func TestManagedSSAEADUsersWithRealCore(t *testing.T) {
+	testShadowsocksUsersWithRealCores(t, []string{"managed:aes-128-gcm", "managed:aes-256-gcm", "managed:chacha20-ietf-poly1305"})
+}
+
+func testShadowsocksUsersWithRealCores(t *testing.T, methods []string) {
 	xray := os.Getenv("MXIOC_TEST_XRAY")
 	if xray == "" {
 		t.Skip("set MXIOC_TEST_XRAY for real SS2022 export verification")
@@ -72,12 +83,15 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 		defer listener.Close()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
-	for _, method := range []string{"2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "aes-128-gcm"} {
+	for _, method := range methods {
+		caseName := method
+		managedAEAD := strings.HasPrefix(method, "managed:")
+		method = strings.TrimPrefix(method, "managed:")
 		for _, kind := range []string{"xray", "sing-box"} {
 			if kind == "sing-box" && !strings.HasPrefix(method, "2022-") {
 				continue // sing-box classic AEAD is not a multi-user inbound.
 			}
-			t.Run(method+"/"+kind, func(t *testing.T) {
+			t.Run(caseName+"/"+kind, func(t *testing.T) {
 				binary := xray
 				if kind == "sing-box" {
 					binary = os.Getenv("MXIOC_TEST_SING_BOX")
@@ -97,13 +111,21 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 					anyRecords(row["settings"].(Record)["clients"])[1]["method"] = "aes-256-gcm"
 				}
 				modern := strings.HasPrefix(method, "2022-")
-				withStats := modern
-				if modern {
+				withStats := modern || managedAEAD
+				if modern || managedAEAD {
 					template := "ss2022-aes-128"
 					if method == "2022-blake3-aes-256-gcm" {
 						template = "ss2022-aes-256"
 					}
-					row = managedSS2022Fixture(t, template)
+					if managedAEAD {
+						aeadTemplate := "ss-" + method
+						if method == "chacha20-ietf-poly1305" {
+							aeadTemplate = "ss-chacha20-poly1305"
+						}
+						row = managedSSAEADFixture(t, aeadTemplate)
+					} else {
+						row = managedSS2022Fixture(t, template)
+					}
 					users := []any{}
 					for _, name := range []string{"first", "second", "disabled"} {
 						user, err := NewUser(row)
@@ -231,12 +253,20 @@ func TestSS2022MultiUserExportWithRealCores(t *testing.T) {
 				settings := row["settings"].(Record)
 				invalid["password"] = settings["password"]
 				request(invalid, false) // Root key alone must not authenticate in multi-user mode.
-				key, _ := base64.StdEncoding.DecodeString(value(settings["password"]))
-				key[0] ^= 0xff
-				invalid["password"] = value(settings["password"]) + ":" + base64.StdEncoding.EncodeToString(key)
+				if managedAEAD {
+					unknown, err := NewUser(row)
+					if err != nil {
+						t.Fatal(err)
+					}
+					invalid["password"] = unknown["password"]
+				} else {
+					key, _ := base64.StdEncoding.DecodeString(value(settings["password"]))
+					key[0] ^= 0xff
+					invalid["password"] = value(settings["password"]) + ":" + base64.StdEncoding.EncodeToString(key)
+				}
 				request(invalid, false)
 				stopServer()
-				if modern {
+				if modern || managedAEAD {
 					users := anyRecords(settings["clients"])
 					apply := func(operation string, user Record) {
 						t.Helper()

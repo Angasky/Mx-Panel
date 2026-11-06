@@ -17,6 +17,12 @@ func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
 	testStandaloneInboundCreate(t, "vmess-tcp", []string{"xray", "sing-box"}, false)
 }
 
+func TestStandaloneSSAEADCreateRecoversAfterInterruptedWrite(t *testing.T) {
+	for _, template := range []string{"ss-aes-128-gcm", "ss-aes-256-gcm", "ss-chacha20-poly1305"} {
+		testStandaloneInboundCreate(t, template, []string{"xray"}, false)
+	}
+}
+
 func TestStandaloneSS2022CreateRecoversAfterInterruptedWrite(t *testing.T) {
 	testStandaloneInboundCreate(t, "ss2022-aes-128", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "ss2022-aes-256", []string{"xray", "sing-box"}, false)

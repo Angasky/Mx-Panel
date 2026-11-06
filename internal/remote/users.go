@@ -116,7 +116,13 @@ func NewUser(row Record) (Record, error) {
 		return nil, errors.New("该协议不支持共用入站独立用户")
 	}
 	if protocol == "shadowsocks" {
-		if _, err := guardedSS2022Settings(row); err != nil {
+		var err error
+		if _, classic := row["goSSAEADGuard"]; classic {
+			_, err = guardedSSAEADSettings(row)
+		} else {
+			_, err = guardedSS2022Settings(row)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -141,7 +147,12 @@ func NewUser(row Record) (Record, error) {
 		if settings["method"] == "2022-blake3-aes-128-gcm" {
 			size = 16
 		}
-		user["password"] = base64.StdEncoding.EncodeToString(random[32 : 32+size])
+		if _, classic := row["goSSAEADGuard"]; classic {
+			user["password"] = base64.RawURLEncoding.EncodeToString(random[32:64])
+			user["method"] = settings["method"]
+		} else {
+			user["password"] = base64.StdEncoding.EncodeToString(random[32 : 32+size])
+		}
 	}
 	if protocol == "hysteria" {
 		model, err := object(row["settings"])
