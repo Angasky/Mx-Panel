@@ -39,21 +39,22 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
   assert.equal(await page.evaluate(()=>calls.some(x=>x.url==='/servers/certificates')),false);
   assert.equal(await page.evaluate(()=>calls.find(x=>x.url==='/servers/users').body.template),'vless-reality');
   for(const kind of ['xray','sing-box']){
-   for(const template of ['vmess-ws-tls','vless-tcp-tls','vmess-tcp-tls']){
+   for(const template of ['vmess-ws-tls','vless-tcp-tls','vmess-tcp-tls','trojan-ws-tls','trojan-grpc-tls']){
    await setup();await page.evaluate(kind=>{
     S.remoteServer.installType=kind;
     const base=api;api=async(url,opt)=>{const result=await base(url,opt);return url==='/servers/users'?{...result,bound:true}:result};
     remoteNodeForm(false);
    },kind);
    await page.select('#rnTemplate',template);
-   assert.equal(await page.$eval('#rnWsField',e=>e.classList.contains('hidden')),template!=='vmess-ws-tls');
-   assert.equal(await page.$eval('#rnGrpcField',e=>e.classList.contains('hidden')),true);
+   assert.equal(await page.$eval('#rnWsField',e=>e.classList.contains('hidden')),!template.includes('-ws-'));
+   assert.equal(await page.$eval('#rnGrpcField',e=>e.classList.contains('hidden')),!template.includes('-grpc-'));
    assert.equal(await page.$eval('#rnSni',e=>e.value),'node.example.com');
    assert.equal(await page.$eval('#rnPort',e=>e.value),'');
    await page.type('#rnName','VMess WebSocket');await page.$eval('#rnPath',e=>e.value='/owned-ws');await page.click('#rnSave');
    await page.waitForFunction(()=>calls.some(x=>x.url==='/servers/users'));
    const call=await page.evaluate(()=>calls.find(x=>x.url==='/servers/users'));
    assert.equal(call.body.template,template);assert.equal(call.body.path,'/owned-ws');assert.equal(call.body.certificateJobId,'job');
+   if(template.includes('-grpc-'))assert.equal(call.body.grpcService,'vpn');
    }
   }
   await setup('fail');await page.select('#rnTemplate','hysteria2');await page.type('#rnName','HY2');await page.click('#rnSave');await page.waitForFunction(()=>$('remoteError').textContent.includes('TCP 80'));

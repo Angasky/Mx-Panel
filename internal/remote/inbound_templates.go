@@ -33,14 +33,20 @@ func templateName(payload Record) string {
 	return "vless-reality"
 }
 func tlsTemplate(name string) bool {
-	return name == "trojan-tls" || tcpTLSTemplate(name) || wsTemplate(name) || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
+	return tcpTLSTemplate(name) || wsTemplate(name) || name == "vless-xhttp-tls" || grpcTemplate(name) || name == "hysteria2" || name == "tuic"
 }
 
-func tcpTLSTemplate(name string) bool { return name == "vless-tcp-tls" || name == "vmess-tcp-tls" }
+func tcpTLSTemplate(name string) bool {
+	return name == "vless-tcp-tls" || name == "vmess-tcp-tls" || name == "trojan-tls"
+}
 
-func wsTemplate(name string) bool { return name == "vless-ws-tls" || name == "vmess-ws-tls" }
+func wsTemplate(name string) bool {
+	return name == "vless-ws-tls" || name == "vmess-ws-tls" || name == "trojan-ws-tls"
+}
 
-func grpcTemplate(name string) bool { return name == "vless-grpc-tls" || name == "vmess-grpc-tls" }
+func grpcTemplate(name string) bool {
+	return name == "vless-grpc-tls" || name == "vmess-grpc-tls" || name == "trojan-grpc-tls"
+}
 
 var grpcServiceName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
@@ -156,6 +162,8 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			if name == "vmess-grpc-tls" {
 				protocol = "vmess"
 				settings["disableInsecureEncryption"] = false
+			} else if name == "trojan-grpc-tls" {
+				protocol = "trojan"
 			} else {
 				settings["decryption"] = "none"
 			}
@@ -166,6 +174,8 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			if name == "vmess-ws-tls" {
 				protocol = "vmess"
 				settings["disableInsecureEncryption"] = false
+			} else if name == "trojan-ws-tls" {
+				protocol = "trojan"
 			} else {
 				settings["decryption"] = "none"
 			}

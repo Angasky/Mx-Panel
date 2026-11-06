@@ -17,7 +17,7 @@ import (
 )
 
 func TestInboundTemplatesNoUnownedCredentials(t *testing.T) {
-	for _, name := range []string{"vless-reality", "vmess-tcp", "vless-tcp-tls", "vmess-tcp-tls", "trojan-tls", "vless-ws-tls", "vmess-ws-tls", "hysteria2"} {
+	for _, name := range []string{"vless-reality", "vmess-tcp", "vless-tcp-tls", "vmess-tcp-tls", "trojan-tls", "trojan-ws-tls", "trojan-grpc-tls", "vless-ws-tls", "vmess-ws-tls", "hysteria2"} {
 		t.Run(name, func(t *testing.T) {
 			payload := Record{"template": name, "serverName": "node.example.com", "certFile": "/etc/cert/fullchain.pem", "keyFile": "/etc/cert/key.pem", "path": "/vpn"}
 			row, err := buildInboundTemplate(payload, "1.1.1.1")

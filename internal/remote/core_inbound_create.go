@@ -249,7 +249,7 @@ func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
 	case "vmess-tcp", "vmess-tcp-tls", "vmess-grpc-tls", "vmess-ws-tls":
 		return "vmess"
-	case "trojan-tls":
+	case "trojan-tls", "trojan-ws-tls", "trojan-grpc-tls":
 		return "trojan"
 	case "vless-reality", "vless-tcp-tls", "vless-ws-tls", "vless-grpc-tls":
 		return "vless"

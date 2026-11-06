@@ -34,7 +34,7 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 		defer listener.Close()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
-	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "vless-grpc-tls", "vmess-grpc-tls", "vless-reality"} {
+	for _, template := range []string{"vless-ws-tls", "vmess-ws-tls", "trojan-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "trojan-tls", "vless-grpc-tls", "vmess-grpc-tls", "trojan-grpc-tls", "vless-reality"} {
 		for _, kind := range []string{"xray", "sing-box"} {
 			t.Run(template+"/"+kind, func(t *testing.T) {
 				binary := xray
@@ -71,10 +71,7 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 				row["tag"], row["listen"] = "fixture", "127.0.0.1"
 				if template != "vless-reality" {
 					row["goCreateKey"] = "fixture"
-					target := "vmess"
-					if row["protocol"] == "vmess" {
-						target = "vless"
-					}
+					target := map[string]string{"vless": "trojan", "trojan": "vmess", "vmess": "vless"}[value(row["protocol"])]
 					row, err = prepareManagedCoreEdit(row, Record{"protocol": target})
 					if err != nil {
 						t.Fatal("protocol switch failed before native test", err)
@@ -182,7 +179,11 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
-						node["uuid"] = other["id"]
+						if row["protocol"] == "trojan" {
+							node["password"] = other["password"]
+						} else {
+							node["uuid"] = other["id"]
+						}
 					}
 					if scenario == "wrong-short-id" {
 						node["reality-opts"].(Record)["short-id"] = "ffffffffffffffff"
@@ -194,6 +195,8 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					settings := out["settings"].(Record)
 					if row["protocol"] == "vmess" {
 						settings["vnext"].([]any)[0].(Record)["address"] = "127.0.0.1"
+					} else if row["protocol"] == "trojan" {
+						settings["servers"].([]any)[0].(Record)["address"] = "127.0.0.1"
 					} else {
 						settings["address"] = "127.0.0.1"
 					}

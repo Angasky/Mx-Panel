@@ -2561,8 +2561,8 @@ async function prepareNodeCertificate(serverId,domain,form) {
 function remoteNodeForm(relay) {
   const standalone = ['xray','sing-box'].includes(S.remoteServer?.installType);
   const singRelay = relay && S.remoteServer?.installType === 'sing-box';
-  const grpcTemplates = ['vless-grpc-tls','vmess-grpc-tls'];
-  const wsTemplates = ['vless-ws-tls','vmess-ws-tls'];
+  const grpcTemplates = ['vless-grpc-tls','vmess-grpc-tls','trojan-grpc-tls'];
+  const wsTemplates = ['vless-ws-tls','vmess-ws-tls','trojan-ws-tls'];
   const tcpTlsTemplates = ['vless-tcp-tls','vmess-tcp-tls'];
   const tlsTemplates = ['trojan-tls',...wsTemplates,...tcpTlsTemplates,'vless-xhttp-tls','hysteria2','tuic', ...grpcTemplates];
   const formServerId=S.serverId,formProfile=S.profile,creationOperationId=crypto.randomUUID().replaceAll('-','');
@@ -2582,6 +2582,8 @@ function remoteNodeForm(relay) {
       $('rnTemplate').add(new Option('VLESS + TCP + TLS', 'vless-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + TCP + TLS', 'vmess-tcp-tls'));
       $('rnTemplate').add(new Option('VMess + WebSocket + TLS', 'vmess-ws-tls'));
+      $('rnTemplate').add(new Option('Trojan + WebSocket + TLS', 'trojan-ws-tls'));
+      $('rnTemplate').add(new Option('Trojan + gRPC + TLS', 'trojan-grpc-tls'));
       $('rnTemplate').add(new Option('VLESS + gRPC + TLS', 'vless-grpc-tls'));
       $('rnTemplate').add(new Option('VMess + gRPC + TLS', 'vmess-grpc-tls'));
       if (S.remoteServer.installType === 'xray') $('rnTemplate').add(new Option('VLESS + XHTTP + TLS', 'vless-xhttp-tls'));
@@ -2983,7 +2985,7 @@ function remoteNodeEditManaged(id) {
     <p class="muted">${row.editPending ? '继续核对并保存上次提交的配置。' : '修改端口或传输参数前需解除订阅绑定。应用连接配置时会重启内核。'}</p>
     <label>入站名称<input name="remark" required maxlength="100"></label>
     <label>监听端口<input name="port" required type="number" min="1" max="65535"></label>
-    ${fields.protocol ? `<label>节点协议<select name="protocol" ${row.editPending ? 'disabled' : ''}>${options(['vless','vmess'],fields.protocol)}</select></label><p class="hint">协议切换要求入站没有用户；保存后重新导入订阅会创建新的独立 UUID。</p>` : ''}
+    ${fields.protocol ? `<label>节点协议<select name="protocol" ${row.editPending ? 'disabled' : ''}>${options(['vless','vmess','trojan'],fields.protocol)}</select></label><p class="hint">协议切换要求入站没有用户；保存后重新导入订阅会创建新的独立 UUID 或密码。</p>` : ''}
     ${fields.network ? `<label>传输方式<select name="network" ${row.editPending ? 'disabled' : ''}>${options(['tcp','ws','grpc'],fields.network)}</select></label><div id="coreTransportFields"></div>` : ''}
     ${!fields.network && transport ? `<label>${transport[1]}<input name="${transport[0]}" ${transport[0]==='grpcService' ? 'required maxlength="128" pattern="[A-Za-z0-9._\\-]+"' : 'maxlength="256"'}></label>` : ''}
     ${Object.hasOwn(fields,'xhttpMode') ? `<label>XHTTP 模式<select name="xhttpMode" ${row.editPending ? 'disabled' : ''}>${options(['auto','stream-up','packet-up','stream-one'], fields.xhttpMode)}</select></label>` : ''}

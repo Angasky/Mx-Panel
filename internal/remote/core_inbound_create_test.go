@@ -31,6 +31,8 @@ func TestStandaloneTLSInboundCreateChecksCertificateBeforeWriting(t *testing.T) 
 	testStandaloneInboundCreate(t, "vless-tcp-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vmess-tcp-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "trojan-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "trojan-ws-tls", []string{"xray", "sing-box"}, false)
+	testStandaloneInboundCreate(t, "trojan-grpc-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-ws-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vmess-ws-tls", []string{"xray", "sing-box"}, false)
 	testStandaloneInboundCreate(t, "vless-grpc-tls", []string{"xray", "sing-box"}, false)
@@ -379,10 +381,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					if err != nil {
 						t.Fatal(err)
 					}
-					target := "vmess"
-					if current["protocol"] == "vmess" {
-						target = "vless"
-					}
+					target := map[string]string{"vless": "trojan", "trojan": "vmess", "vmess": "vless"}[value(current["protocol"])]
 					// Protocol conversion legitimately replaces the empty protocol settings.
 					record, err := m.Record(serverID)
 					if err != nil {

@@ -8,7 +8,7 @@ import (
 // Only basic Go-created TLS transports can be switched without losing options.
 // Legacy, Reality, Vision and advanced transports keep their existing editor.
 func editableCoreTransport(row Record) bool {
-	if value(row["goCreateKey"]) == "" || (row["protocol"] != "vless" && row["protocol"] != "vmess") {
+	if value(row["goCreateKey"]) == "" || (row["protocol"] != "vless" && row["protocol"] != "vmess" && row["protocol"] != "trojan") {
 		return false
 	}
 	stream, err := object(row["streamSettings"])

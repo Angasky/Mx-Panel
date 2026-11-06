@@ -73,7 +73,7 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
    api=async(url,opt)=>{calls.push({url,body:JSON.parse(opt.body)});if(calls.length===1)throw Error('写入结果待核对');return {updated:true}};
    remoteNodeEditManaged(4);
   });
-  await page.select('#coreInboundEdit select[name="protocol"]','vmess');
+  await page.select('#coreInboundEdit select[name="protocol"]','trojan');
   await page.select('#coreInboundEdit select[name="network"]','ws');
   await page.$eval('#coreInboundEdit input[name="wsPath"]',e=>e.value='/remembered');
   await page.select('#coreInboundEdit select[name="network"]','grpc');
@@ -88,7 +88,7 @@ const puppeteer=require('puppeteer-core'),fs=require('fs'),path=require('path'),
   await page.evaluate(()=>{$('coreInboundEdit').elements.grpcService.value='changed-after-send';$('coreInboundEdit').elements.protocol.value='vless'});
   await page.click('#coreInboundEdit button');await page.waitForFunction(()=>calls.length===2);
   calls=await page.evaluate(()=>window.calls);
-  assert.deepEqual(calls[0].body.inbound,{protocol:'vmess',network:'grpc',grpcService:'switched-service'});
+  assert.deepEqual(calls[0].body.inbound,{protocol:'trojan',network:'grpc',grpcService:'switched-service'});
   assert.deepEqual(calls[1].body,calls[0].body,'transport retry changed its original payload');
   assert.deepEqual(errors,[]);
   console.log('PASS: edit/toggle/delete preserve identity; XHTTP edits and retries preserve path/mode; pending deletes use delete token');

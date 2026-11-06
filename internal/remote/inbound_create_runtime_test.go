@@ -216,7 +216,7 @@ func TestNativeHY2TemplateWithRealXray(t *testing.T) {
 }
 
 func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
-	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "vless-ws-tls", "vmess-ws-tls", "vless-tcp-tls", "vmess-tcp-tls"} {
+	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "trojan-grpc-tls", "vless-ws-tls", "vmess-ws-tls", "trojan-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "trojan-tls"} {
 		t.Run(template, func(t *testing.T) {
 			payload := Record{"template": template, "serverName": "node.example.com", "certFile": "/fixture/cert.pem",
 				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1", "path": "/vpn-test"}
