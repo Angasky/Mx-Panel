@@ -172,7 +172,7 @@ func Parse(value string) (map[string]any, error) {
 			credential = decoded
 		}
 		cipher, password, ok := strings.Cut(credential, ":")
-		if !ok {
+		if !ok || strings.HasPrefix(cipher, "2022-") && ValidateSS2022Password(cipher, password) != nil {
 			return nil, ErrURI
 		}
 		node["cipher"] = cipher
@@ -348,6 +348,9 @@ func Export(n map[string]any) (string, error) {
 	case "tuic":
 		u.User = url.UserPassword(text(n["uuid"]), text(n["password"]))
 	case "ss":
+		if strings.HasPrefix(text(n["cipher"]), "2022-") && ValidateSS2022Password(text(n["cipher"]), text(n["password"])) != nil {
+			return "", ErrURI
+		}
 		u.User = url.User(base64.RawURLEncoding.EncodeToString([]byte(text(n["cipher"]) + ":" + text(n["password"]))))
 	case "socks5", "http":
 		if text(n["username"]) != "" || text(n["password"]) != "" {

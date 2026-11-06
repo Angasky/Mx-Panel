@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -82,13 +81,8 @@ func ValidateNode(node map[string]any) error {
 			return errors.New("Shadowsocks 加密方式不能为空")
 		}
 		if strings.HasPrefix(cipher, "2022-") {
-			key, err := base64.StdEncoding.DecodeString(stringValue(node["password"]))
-			size := 32
-			if strings.Contains(cipher, "aes-128") {
-				size = 16
-			}
-			if err != nil || len(key) != size {
-				return errors.New("Shadowsocks 2022 密钥长度无效")
+			if err := links.ValidateSS2022Password(cipher, stringValue(node["password"])); err != nil {
+				return errors.New("Shadowsocks 2022 \u5bc6\u94a5\u6216\u52a0\u5bc6\u65b9\u5f0f\u65e0\u6548")
 			}
 		}
 	}

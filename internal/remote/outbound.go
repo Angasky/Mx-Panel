@@ -2,6 +2,7 @@ package remote
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Angasky/dingzhi-ban/internal/links"
 )
@@ -80,6 +81,9 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 			protocol = "shadowsocks"
 			if value(node["cipher"]) == "" {
 				return nil, errors.New("Shadowsocks 加密方式缺失")
+			}
+			if strings.HasPrefix(value(node["cipher"]), "2022-") && links.ValidateSS2022Password(value(node["cipher"]), value(node["password"])) != nil {
+				return nil, links.ErrURI
 			}
 			endpoint["method"] = node["cipher"]
 		}

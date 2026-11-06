@@ -1,26 +1,18 @@
 package remote
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Angasky/dingzhi-ban/internal/links"
 )
 
 func shadowsocks2022Key(method, key string, multi bool) bool {
-	size := 0
-	switch method {
-	case "2022-blake3-aes-128-gcm":
-		size = 16
-	case "2022-blake3-aes-256-gcm":
-		size = 32
-	case "2022-blake3-chacha20-poly1305":
-		if !multi {
-			size = 32
-		}
+	if strings.Contains(key, ":") || multi && method != "2022-blake3-aes-128-gcm" && method != "2022-blake3-aes-256-gcm" {
+		return false
 	}
-	decoded, err := base64.StdEncoding.DecodeString(key)
-	return size != 0 && err == nil && len(decoded) == size && base64.StdEncoding.EncodeToString(decoded) == key
+	return links.ValidateSS2022Password(method, key) == nil
 }
 
 func shadowsocksInboundNodes(settings, stream Record, makeNode func() Record) ([]Record, error) {
