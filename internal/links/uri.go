@@ -247,7 +247,11 @@ func Parse(value string) (map[string]any, error) {
 		node["network"] = network
 		switch network {
 		case "ws":
-			node["ws-opts"] = map[string]any{"path": q.Get("path"), "headers": map[string]any{"Host": q.Get("host")}}
+			headers := map[string]any{}
+			if host := q.Get("host"); host != "" {
+				headers["Host"] = host
+			}
+			node["ws-opts"] = map[string]any{"path": q.Get("path"), "headers": headers}
 		case "grpc":
 			node["grpc-opts"] = map[string]any{"grpc-service-name": q.Get("serviceName")}
 		case "xhttp":

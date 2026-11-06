@@ -2,7 +2,9 @@ package remote
 
 import (
 	"errors"
+	"maps"
 	"strconv"
+	"strings"
 )
 
 func singRelayOutbound(node Record, tag string) (Record, error) {
@@ -61,7 +63,17 @@ func singRelayOutbound(node Record, tag string) (Record, error) {
 		}
 		if stream["network"] == "ws" {
 			ws := stream["wsSettings"].(Record)
-			next["transport"] = Record{"type": "ws", "path": ws["path"], "headers": ws["headers"]}
+			headers, err := object(ws["headers"])
+			if err != nil {
+				return nil, err
+			}
+			headers = maps.Clone(headers)
+			for name, header := range headers {
+				if strings.EqualFold(name, "Host") && header == "" {
+					delete(headers, name)
+				}
+			}
+			next["transport"] = Record{"type": "ws", "path": ws["path"], "headers": headers}
 		} else {
 			grpc := stream["grpcSettings"].(Record)
 			next["transport"] = Record{"type": "grpc", "service_name": grpc["serviceName"]}

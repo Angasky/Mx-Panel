@@ -7,6 +7,8 @@
 
 ## 已实现并验证
 
+- 2026-11-06：补齐 sing-box 其余常用模板的真实计量与认证生命周期回归。使用 v1.14.4、`with_v2ray_api,with_quic` 构建，覆盖 VMess TCP、VLESS / VMess TCP TLS、Trojan TLS、三协议 WebSocket TLS、三协议 gRPC TLS、HY2 与 TUIC，共 12 组；从 Go 模板、独立用户、分享链接再解析、sing-box 出站转换到本地真实连接，再经生产统计查询验证双用户计数隔离、空闲查询不清零、删除一个用户不影响另一个，以及末用户暂停 / 恢复 / 删除。HY2 / TUIC 验证的是 QUIC 承载的 TCP 代理请求，UDP 目标报文转发仍待验收。测试发现并修复无 Host 参数的 VLESS / Trojan WebSocket 链接被解析成空 `Host` 请求头、在 sing-box 中返回 HTTP 400 的问题；解析时省略未指定 Host，转换已有 YAML 节点时清除空 Host，保留非空自定义 Host 和其他请求头且不改源记录。未改动 ALPN 配置。复测方式：配置带上述构建标签的 `MXIOC_TEST_SING_BOX` 后运行 `go test ./internal/remote -run TestSingBoxProtocolsAccountingAndRevocationWithRealCore -count=1 -v`。Reality 计量、远端环境和客户端 App 仍待验收。
+
 - 2026-11-06：补齐 sing-box 统计查询适配，并开放独立 SS2022 AES-128 / AES-256 模板。总控使用 Go HTTP/2 + Protobuf 经已校验指纹的现有 SSH 连接查询服务器回环接口，不再要求节点服务器安装 Xray 查询工具；兼容旧统计元数据，新记录使用 `go-ssh-grpc` 标识。按 sing-box 实际注册的 `v2ray.core.app.stats.command.StatsService` 查询，读取不重置计数；校验 gRPC 状态、单消息长度、响应上限、计数形状及重复项，失败不会当作零流量。启用统计先验证远端监听，再完成真实 gRPC 查询，查询失败保留待核对记录且不授予订阅用户，重开后可恢复。测试覆盖真实 SSH 转发、错误响应 / 超限 / 截断 / 取消、超过 JavaScript 安全整数的计数、失败初始化重试，以及模板页面。真实本地 sing-box v1.14.4（`with_v2ray_api` 构建）与 Xray 均通过 SS2022 双用户计数隔离、TCP 连通、最后一个用户暂停 / 恢复和删除后的认证保护。远端服务器、UDP 与客户端 App 整链路仍待验收。
 
 - 2026-11-06：独立 Xray 增加 SS2022 AES-128 / AES-256 托管模板，页面仅对 Xray 提供；沿用随机端口、创建前身份记录、持久化写入与重试。每份订阅生成独立 PSK，接入认证用户计量、到期撤销及月额度暂停 / 恢复。空用户时使用保存于加密托管状态与远端内核配置的随机占位凭据维持多用户模式，不向订阅或分享链接导出；端点身份包含服务端密钥、加密方式、占位密钥与创建归属，拒绝共享密钥及错误身份。已有 SS 入站维持读取，不自动开通独立用户。修复节点页批量加入订阅时对独立内核列表误读用户明细的问题，改为核对服务器确认的连接链接（忽略名称片段）。测试覆盖创建中断重试、双订阅独立密码、重开后幂等导入、计量隔离与到期只撤销所属用户。真实本地 Xray 验证生成模板的 TCP 连接、双用户计数隔离、末用户暂停 / 恢复及删除后根密钥与旧密钥均拒绝；sing-box 仅验证相同空用户保护和认证生命周期，未开放 SS2022 独立计费模板。UDP、远端服务器和客户端 App 尚待验收。
