@@ -440,6 +440,8 @@ func (m *Manager) Metrics(ctx context.Context, id string) (Record, error) {
 		}
 		raw, e := parseHostSample(output, time.Now())
 		if e == nil {
+			epoch := sha256.Sum256([]byte(raw.boot + "\x00" + connection.Host + "\x00" + connection.Fingerprint))
+			raw.view["counterEpoch"] = fmt.Sprintf("%x", epoch[:])
 			raw.view["serverId"] = id
 			raw.view["name"] = record["name"]
 			raw.view["managementIp"] = connection.Host

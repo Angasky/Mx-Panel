@@ -53,6 +53,7 @@ func (s *Server) RunBackground(ctx context.Context) error {
 	if err := c.Start(ctx); err != nil {
 		return err
 	}
+	s.startMonitorHistory(ctx)
 	if releaseupdate.ValidVersion(s.options.Version) {
 		go s.updates.watch(ctx, goUpdateCheckInterval, s.now, fetchGoRelease)
 	}
@@ -61,6 +62,13 @@ func (s *Server) RunBackground(ctx context.Context) error {
 
 // WaitAccountingStopped joins an existing worker without initializing services.
 func (s *Server) WaitAccountingStopped(ctx context.Context) error {
+	if s.historyDone != nil {
+		select {
+		case <-s.historyDone:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if v, ok := subscriptionControllers.Load(s.repository); ok {
 		return v.(*subscriptions.Controller).WaitStopped(ctx)
 	}

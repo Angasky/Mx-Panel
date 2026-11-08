@@ -2976,9 +2976,41 @@ async function monitoring() {
   if (!S.servers.some(s => s.id === S.monitorId)) S.monitorId = '';
   if (!S.monitorId) return renderMonitorOverview();
   const server = S.servers.find(s => s.id === S.monitorId);
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><button class="btn small" onclick="S.monitorId='';void monitoring()">${uiIcon('chevron-right')}全部服务器</button><h3 class="host-detail-title">${esc(server.name)}</h3><p class="muted">${esc(server.host)} · ${esc(server.installType || '3x-ui')} · 5 秒采样</p></div><div class="toolbar"><button type="button" id="monitorRefresh" class="btn">${uiIcon('refresh-cw')}刷新</button></div></div><div class="toolbar"><span id="monitorStatus" class="pill" role="status">正在读取 ${esc(server.host)}…</span><span id="monitorTimestamp" class="hint"></span></div><div id="monitorError" class="error" role="alert"></div></section><div id="monitorBody"><div class="empty" role="status">首次采样中，CPU 与网速将在第二次采样后显示。</div></div>`;
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><button class="btn small" onclick="S.monitorId='';void monitoring()">${uiIcon('chevron-right')}全部服务器</button><h3 class="host-detail-title">${esc(server.name)}</h3><p class="muted">${esc(server.host)} · ${esc(server.installType || '3x-ui')} · 5 秒采样</p></div><div class="toolbar"><button type="button" id="monitorHistoryOpen" class="btn primary">历史记录</button><button type="button" id="monitorRefresh" class="btn">${uiIcon('refresh-cw')}刷新</button></div></div><div class="toolbar"><span id="monitorStatus" class="pill" role="status">正在读取 ${esc(server.host)}…</span><span id="monitorTimestamp" class="hint"></span></div><div id="monitorError" class="error" role="alert"></div></section><div id="monitorBody"><div class="empty" role="status">首次采样中，CPU 与网速将在第二次采样后显示。</div></div>`;
+  $('monitorHistoryOpen').onclick = () => openMonitorHistory(S.monitorId).catch(e=>notice(e.message));
   $('monitorRefresh').onclick = () => refreshHostMetrics(generation);
   await refreshHostMetrics(generation);
+}
+
+
+function historyChart(points, fields, ceiling) {
+  const now=Date.now()/1000, recent=points.filter(p=>p.time>=now-86400&&p.time<=now);
+  const start=recent.length?Math.max(now-86400,Math.min(now-60,recent[0].time-30)):now-86400;
+  const max=ceiling||Math.max(1,...points.flatMap(p=>fields.map(f=>Number(p[f])||0)));
+  const paths=fields.map((field,index)=>{
+    let lines=[],segment=[],last=null;
+    const flush=()=>{if(segment.length)lines.push(`<polyline class="${index?'tx-line':'rx-line'}" points="${segment.join(' ')}"/>`);segment=[];};
+    for(const p of points){
+      if(!p.ok||p[field]==null||p.time<start||p.time>now){flush();last=null;continue;}
+      if(last!=null&&p.time-last>90)flush();
+      segment.push(`${((p.time-start)/(now-start)*600).toFixed(2)},${(140-Math.min(1,Number(p[field])/max)*130).toFixed(2)}`);last=p.time;
+    }
+    flush();return lines.join('');
+  }).join('');
+  return `<svg class="monitor-chart" style="height:140px" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="最近 24 小时内已采集区间的历史趋势；空白表示没有有效采样"><path class="chart-grid" d="M0 10H600 M0 75H600 M0 140H600"/>${paths}</svg><div class="chart-axis"><span>${esc(new Date(start*1000).toLocaleString('zh-CN'))}</span><span>现在</span></div><p class="hint">展示已采集区间（最多 24 小时） · 纵轴上限 ${ceiling?max+'%':formatBytes(max)+'/s'} · 空白段表示未采集或数据不可用</p>`;
+}
+async function openMonitorHistory(id) {
+  const path='/servers/history?id='+encodeURIComponent(id),data=await api(path);
+  if(S.role==='user'||!S.token&&$('app').classList.contains('hidden'))return;
+  const server=S.servers.find(s=>s.id===id);
+  openModal((server?.name||'服务器')+' · 历史监控',`<p class="note">启用后，无需保持网页打开，后台约每 30 秒通过已配置的 SSH 采样；最多 3 台并发，服务器较多时周期会延长。保留 24 小时资源曲线和最近 30 个 UTC 自然日的网卡流量观测。</p><div class="toolbar"><button class="btn ${data.enabled?'':'primary'}" id="historyToggle">${data.enabled?'暂停后台采样':'启用后台采样'}</button><button class="btn" id="historyRefresh">刷新记录</button><button class="btn danger" id="historyClear">清空并停用</button><span class="pill">${data.enabled?'采样已启用':'采样未启用'}</span></div><p id="historyError" class="error" role="alert"></p>${data.points.length?`<h4>CPU / 内存 · 最近 24 小时</h4><p><span class="monitor-rx">CPU</span> / <span class="monitor-tx">内存</span></p>${historyChart(data.points,['cpu','memory'],100)}<h4>网络速率 · 默认路由网卡</h4><p><span class="monitor-rx">接收</span> / <span class="monitor-tx">发送</span></p>${historyChart(data.points,['rxRate','txRate'])}`:'<p class="empty">暂无历史记录。启用后等待首轮采样；CPU 和网速需要至少两轮有效采样。</p>'}<h4>30 天流量观测</h4><p class="muted">这是服务器网卡流量，不是订阅计费流量。断线、计数器重置、网卡变化和跨日间隔不补算；只累计可验证的区间，不能视为完整账单。每天按 UTC 分组。</p><div class="tablewrap"><table><thead><tr><th>日期 UTC</th><th>接收</th><th>发送</th><th>有效观测</th><th>缺口次数</th></tr></thead><tbody>${[...data.days].reverse().map(d=>`<tr><td>${esc(d.date)}</td><td>${formatBytes(d.rx)}</td><td>${formatBytes(d.tx)}</td><td>${(d.seconds/3600).toFixed(2)} 小时</td><td>${d.gaps}</td></tr>`).join('')||'<tr><td colspan="5">暂无流量观测</td></tr>'}</tbody></table></div>`);
+  const action=async(method,body)=>{
+    ['historyToggle','historyRefresh','historyClear'].forEach(key=>$(key).disabled=true);
+    try{await api(path,jsonOpt(method,body));await openMonitorHistory(id);}catch(e){if($('historyError')){$('historyError').textContent=e.message;['historyToggle','historyRefresh','historyClear'].forEach(key=>$(key).disabled=false);}}
+  };
+  $('historyToggle').onclick=()=>action('PUT',{enabled:!data.enabled});
+  $('historyRefresh').onclick=()=>openMonitorHistory(id).catch(e=>notice(e.message));
+  $('historyClear').onclick=()=>{if(confirm('清空这台服务器的全部历史监控记录并停止后台采样？此操作无法撤销。'))void action('DELETE',{});};
 }
 
 function renderMonitorOverview() {

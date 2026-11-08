@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.6` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.7` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.6-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.7-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -170,3 +170,13 @@ bash install.sh local-build
 - 用户记录保存在数据目录 `panel-users.json`，文件权限为 `0600`。完整迁移/备份时应保留该文件；单份订阅 YAML 备份不包含账号。
 
 设置中还提供原创 **暖橙主题**；节点页支持协议筛选；客户端导出新增 **sing-box**。详细适配边界见[功能对照记录](docs/go/MMWX-COMPARISON.md)。
+
+### 历史监控
+
+进入 **服务器监控 → 选择服务器 → 历史记录**，点击 **启用后台采样**。默认关闭；启用后无需保持网页打开，后台约每 30 秒使用已核对指纹的 SSH 采样，最多 3 台并发，服务器较多时周期会延长。
+
+- 保留最近 24 小时 CPU、内存和网速曲线，以及最近 30 个 UTC 自然日的网卡流量观测。
+- 失败或不可确认的区间显示为缺口；不把停机、重启、计数器回退、网卡切换和跨日间隔补算成完整流量。
+- 网卡流量与订阅计费分开，表中显示有效观测时长与缺口次数，不应当作完整账单。
+- 暂停采样保留尚未过期的记录；“清空并停用”删除该服务器历史并停止采样。
+- 数据保存在 `monitor-history/`，文件权限 `0600`；普通用户无法读取或修改。服务器删除后，残留记录在 30 天未更新后清理。
