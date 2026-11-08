@@ -21,6 +21,7 @@ var certificateShell string
 type certificateTask struct {
 	id, server, domain, revision, status, message string
 	created, finished                             time.Time
+	dns                                           bool
 }
 
 func certificateDomain(domain string) (string, error) {
@@ -95,7 +96,14 @@ func certificatePublic(task *certificateTask) Record {
 }
 
 func (m *Manager) StartCertificate(server, domain string) (Record, error) {
-	domain, err := certificateDomain(domain)
+	return m.StartDNSCertificate(server, domain, "", nil)
+}
+func (m *Manager) StartDNSCertificate(server, domain, provider string, credentials map[string]string) (Record, error) {
+	prefix, err := certificateDNSPrefix(provider, credentials)
+	if err != nil {
+		return nil, err
+	}
+	domain, err = certificateDomain(domain)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +121,11 @@ func (m *Manager) StartCertificate(server, domain string) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	script = prefix + script
 	revision := certificateRevision(record)
 	for _, task := range m.certificates {
 		if task.server == server && (task.status == "queued" || task.status == "running") {
-			if task.domain == domain && task.revision == revision {
+			if provider == "" && !task.dns && task.domain == domain && task.revision == revision {
 				return certificatePublic(task), nil
 			}
 			return nil, errors.New("此服务器正在准备另一张证书，请稍后重试")
@@ -179,7 +188,7 @@ func (m *Manager) StartCertificate(server, domain string) (Record, error) {
 		return nil, errors.New("证书任务繁忙，请稍后重试")
 	}
 	guard <- struct{}{}
-	task := &certificateTask{id: hex.EncodeToString(raw), server: server, domain: domain, revision: revision, status: "queued", created: time.Now()}
+	task := &certificateTask{dns: provider != "", id: hex.EncodeToString(raw), server: server, domain: domain, revision: revision, status: "queued", created: time.Now()}
 	m.certificates[task.id] = task
 	runner := m.certificateRun
 	if runner == nil {
@@ -194,7 +203,7 @@ func (m *Manager) StartCertificate(server, domain string) (Record, error) {
 
 func (m *Manager) runCertificate(parent context.Context, task *certificateTask, record Record, script string, guard, slots chan struct{}, runner func(context.Context, Connection, string) (string, error)) {
 	defer func() { <-guard; <-slots }()
-	ctx, cancel := context.WithTimeout(parent, 290*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 600*time.Second)
 	defer cancel()
 	m.mu.Lock()
 	task.status = "running"
@@ -254,6 +263,10 @@ func (m *Manager) runCertificate(parent context.Context, task *certificateTask, 
 	task.finished = time.Now()
 	if err != nil {
 		message := err.Error()
+		if task.dns {
+			message = "DNS 验证签发失败，请核对 DNS API 权限、域名、网络和远端 ACME 状态后重试"
+			output = ""
+		}
 		if output != "" {
 			message += "：" + output
 		}
@@ -310,4 +323,29 @@ func (m *Manager) ReadyCertificate(server, identity, domain string) (Record, err
 		return nil, errors.New("证书尚未就绪或域名不匹配")
 	}
 	return Record{"serverName": domain, "certFile": job["certFile"], "keyFile": job["keyFile"]}, nil
+}
+
+// Provider names, environment keys and plugin digests are fixed; no user-controlled shell identifiers.
+func certificateDNSPrefix(provider string, credentials map[string]string) (string, error) {
+	if provider == "" {
+		return "cert_dns=''\ncert_dns_hash=''\n", nil
+	}
+	keys := map[string][]string{"dns_cf": {"CF_Token"}, "dns_ali": {"Ali_Key", "Ali_Secret"}, "dns_dp": {"DP_Id", "DP_Key"}}
+	hashes := map[string]string{"dns_cf": "a908b175d0347c2a5d76d631e509318cb73d1e552fdedb27fd5e83a4354b5dcc", "dns_ali": "6cfcca209d54747dc7b48fea9aa4a2c04a6017c4464f8f23a077e3eaa187c427", "dns_dp": "a4b5b70c81235a033c6892359b09000097b88a0792b7029d14653a5494d282de"}
+	required, ok := keys[provider]
+	if !ok {
+		return "", errors.New("不支持的 DNS 提供商")
+	}
+	if len(credentials) != len(required) {
+		return "", errors.New("DNS 凭据字段不完整或含未知字段")
+	}
+	prefix := "cert_dns=" + quote(provider) + "\ncert_dns_hash=" + quote(hashes[provider]) + "\n"
+	for _, key := range required {
+		value := credentials[key]
+		if len(value) < 1 || len(value) > 4096 || strings.ContainsAny(value, "\x00\r\n") {
+			return "", errors.New("DNS 凭据无效")
+		}
+		prefix += "export " + key + "=" + quote(value) + "\n"
+	}
+	return prefix, nil
 }

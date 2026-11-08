@@ -88,7 +88,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	if method == "GET" {
 		if path == "/admin/api/servers/metrics" {
-			result, err := manager.Metrics(r.Context(), r.URL.Query().Get("id"))
+			result, err := s.serverMetrics(r.Context(), r.URL.Query().Get("id"))
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {

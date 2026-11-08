@@ -47,8 +47,12 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	agentMu           sync.Mutex
+	agentViews        map[string]agentObservation
+	agentSlots        chan struct{}
 	shareMu           sync.Mutex
 	shareSlots        chan struct{}
+	shareStreamSlots  chan struct{}
 	history           *monitorhistory.Store
 	historyOnce       sync.Once
 	historyDone       chan struct{}
@@ -97,7 +101,7 @@ func New(options Options) (*Server, error) {
 	}
 	repository := &config.Repository{Root: options.Root}
 	ignored, _ := doc["goIgnoredRelease"].(string)
-	return &Server{shareSlots: make(chan struct{}, 4), history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
+	return &Server{agentViews: map[string]agentObservation{}, agentSlots: make(chan struct{}, 128), shareSlots: make(chan struct{}, 4), shareStreamSlots: make(chan struct{}, 32), history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -189,6 +193,10 @@ func (s *Server) authorized(r *http.Request) bool {
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
+		if r.Header.Get("Upgrade") != "" {
+			problem(w, 405, "升级连接必须使用 GET")
+			return
+		}
 		w = headResponse{w}
 		copy := r.Clone(r.Context())
 		copy.Method = http.MethodGet
@@ -215,6 +223,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
+		if s.agentPublic(w, r) {
+			return
+		}
 		if s.monitorSharePublic(w, r) {
 			return
 		}
@@ -242,6 +253,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.agentAdmin(w, r) {
 		return
 	}
 	if s.monitorShareAdmin(w, r) {

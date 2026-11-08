@@ -18,6 +18,11 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"quantumult-x", "Quantumult X 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
+	{"stash", "Stash 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
+	{"surfboard", "Surfboard 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
+	{"egern", "Egern 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
+
 	{"loon", "Loon 客户端配置", "手动选择兼容节点；不包含原 Mihomo 分流、DNS、策略组及主备链路。", false, false},
 	{"surge", "Surge 客户端配置", "手动选择节点；仅导出兼容协议，不包含原 Mihomo 策略组、规则或主备关系。", true, false},
 	{"sing-box", "sing-box 完整客户端配置", "本地 mixed 端口 2080，手动选择节点；不包含 Mihomo 策略组、规则及远端主备关系。", false, true},
@@ -103,6 +108,9 @@ func usageLabel(info Record) string {
 }
 
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "quantumult-x" || format == "stash" || format == "surfboard" || format == "egern" {
+		return convertOtherClient(source, format)
+	}
 	if format == "loon" {
 		return convertLoon(source)
 	}

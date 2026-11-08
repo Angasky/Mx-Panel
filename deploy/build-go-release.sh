@@ -13,6 +13,7 @@ for arch in amd64 arm64; do
     stage=$(mktemp -d)
     trap 'rm -rf -- "$stage"' EXIT
     CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "${MXIOC_GO_BIN:-go}" build -trimpath -ldflags "-s -w -X main.releaseVersion=$version" -o "$stage/mxioc" ./cmd/mxioc
+    CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "${MXIOC_GO_BIN:-go}" build -trimpath -ldflags "-s -w" -o "$stage/mxioc-agent" ./cmd/mxioc-agent
     cp index.html deploy/mxioc-go-release.service deploy/install-go.sh "$stage/"
     printf '%s\n' "$version" > "$stage/VERSION"
     printf '%s\n' "$arch" > "$stage/ARCH"
@@ -21,11 +22,14 @@ for arch in amd64 arm64; do
         sha256sum mxioc index.html mxioc-go-release.service VERSION ARCH > SHA256SUMS
     )
     tar -czf "$out/$name.tar.gz" -C "$stage" mxioc index.html mxioc-go-release.service install-go.sh VERSION ARCH SHA256SUMS
+    cp deploy/install-agent.sh "$stage/"
+    (cd "$stage" && sha256sum mxioc-agent install-agent.sh > SHA256SUMS)
+    tar -czf "$out/mxioc-agent-$version-linux-$arch.tar.gz" -C "$stage" mxioc-agent install-agent.sh SHA256SUMS
     rm -rf -- "$stage"
     trap - EXIT
 done
 (
     cd "$out"
-    sha256sum "mxioc-go-$version-linux-amd64.tar.gz" "mxioc-go-$version-linux-arm64.tar.gz" > SHA256SUMS
+    sha256sum "mxioc-go-$version-linux-amd64.tar.gz" "mxioc-go-$version-linux-arm64.tar.gz" "mxioc-agent-$version-linux-amd64.tar.gz" "mxioc-agent-$version-linux-arm64.tar.gz" > SHA256SUMS
 )
 printf '%s\n' "$out"

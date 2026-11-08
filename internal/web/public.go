@@ -65,6 +65,13 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		body = result.Body
 		extension = "-" + parts[2] + ".txt"
 		contentType = "text/plain; charset=utf-8"
+		if parts[2] == "stash" || parts[2] == "egern" {
+			extension = "-" + parts[2] + ".yaml"
+			contentType = "text/yaml; charset=utf-8"
+		}
+		if parts[2] == "quantumult-x" || parts[2] == "surfboard" {
+			extension = "-" + parts[2] + ".conf"
+		}
 		if parts[2] == "loon" {
 			extension = "-loon.conf"
 		}

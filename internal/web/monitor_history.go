@@ -150,7 +150,7 @@ func (s *Server) sampleMonitorHistory(ctx context.Context) {
 		go func(id string) {
 			defer wg.Done()
 			defer func() { <-slots }()
-			view, e := manager.Metrics(ctx, id)
+			view, e := s.serverMetrics(ctx, id)
 			if ctx.Err() != nil {
 				return
 			}

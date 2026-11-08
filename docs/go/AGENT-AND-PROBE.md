@@ -1,0 +1,47 @@
+# Agent、公开监控与 DNS 证书
+
+## Agent 接入
+
+硬件监控 → 选择服务器 → Agent 接入。支持 HTTP 上报、WebSocket 上报、自动回退，以及 HTTPS Pull。生成凭据后下载配置，保存到目标服务器 `/etc/mxioc-agent.json`，权限设为 `0600`。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Angasky/Mx-Panel/main/deploy/quick-install-agent.sh -o /tmp/mx-agent-install.sh
+sudo bash /tmp/mx-agent-install.sh
+```
+
+独立 Agent 包提供 amd64 / arm64 二进制，不需要 Python。安装前校验配置，启动失败恢复旧二进制与服务文件。进程启动不代表已连上面板；请回到 Agent 接入查看状态。撤销凭据立即拒绝新上报，并恢复 SSH 采样；需要在远端自行执行 `systemctl disable --now mxioc-agent` 停止 Agent。
+
+自动模式优先 WebSocket，失败后使用 HTTP，每 5 分钟重试 WebSocket；每 15 秒采样，90 秒没有新样本显示过期。重置凭据后需重新下载配置；主控重启后等待下一次上报。Agent 负责资源采样，节点部署、入站、出站与配置操作仍走 SSH。
+
+Pull 要求有效的受信任 HTTPS 证书，地址为已登记主机的 `/metrics`。配置文件中的监听地址、证书及私钥路径需按实际环境调整。主控拒绝重定向、回环及链路本地地址；Pull 凭据在主控加密存储。推送模式凭据仅存摘要。
+
+反向代理必须允许 WebSocket Upgrade，参考 [Nginx 示例](../../deploy/nginx.conf.example)。只开放 HTTP 上报也可运行自动模式。
+
+## 公开监控
+
+硬件监控 → 监控分享与只读 API。默认关闭。选择服务器、填写公开名称，可以生成私密链接，也可以勾选“允许无凭据公开访问”。需另行启用相应服务器的历史采样。
+
+| 接口 | 用途 |
+| --- | --- |
+| `/sub/status-public` | 无凭据公开页面（必须显式启用公开模式） |
+| `/sub/status/<token>` | 凭据控制的页面 |
+| `/sub/status-api` | 当前指标 |
+| `/sub/status-series?server=0&range=24h` | 历史，范围支持 `1h`、`6h`、`24h` |
+| `/sub/status-ws` | WebSocket，每 5 秒推送当前指标 |
+
+非公开模式的 API 和 WebSocket 请求须携带 `Authorization: Bearer <token>`，不接受查询参数令牌。`server` 使用状态接口返回的 `index`，不要自行按数组位置重编号。服务器被删除时对应历史返回 404。
+
+白名单仅包含公开名称、展示索引、状态、采样时间、CPU、内存、收发速率。不会包含服务器内部 ID、IP、SSH 凭据或代理配置。公开页面提供 24 小时 CPU/内存曲线；缺失采样不连线。暂停、撤销或关闭公开访问后，已有 WebSocket 会在下一次推送前重新鉴权。资源采样失败不等同于代理服务离线。
+
+## DNS 证书验证
+
+新增节点 → TLS 模板 → 自动申请证书 → 选择验证方式：
+
+- HTTP：保留原 TCP 80 验证方式。
+- Cloudflare：`CF_Token`，需要目标区域 DNS 编辑和区域读取权限。
+- 阿里云 DNS：`Ali_Key`、`Ali_Secret`。
+- DNSPod：`DP_Id`、`DP_Key`。
+
+DNS 验证不需要开放 80 端口，不要求关闭 CDN。凭据通过已固定主机指纹的 SSH 发送，保存在远端 root 专用 ACME 目录，供自动续期使用。主控不保存这些 DNS 密钥，也不返回可能包含密钥的远端签发日志。ACME 程序与 DNS 插件均固定提交和 SHA256。
+
+已存在且有效的证书会复用，保留原续期方式；不会通过强制签发消耗 ACME 配额。只支持单个明确域名，不支持通配符。无实际 DNS 账户的环境只能验证脚本、权限边界与界面，不能据此宣称公网签发已实测。

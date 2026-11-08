@@ -24,7 +24,23 @@ func (s *Server) certificateRoutes(w http.ResponseWriter, r *http.Request) bool 
 			problem(w, 400, "请求 JSON 必须为对象")
 			return true
 		}
-		job, err = manager.StartCertificate(stringField(payload, "serverId"), stringField(payload, "serverName"))
+		credentials := map[string]string{}
+		if raw, exists := payload["dnsCredentials"]; exists {
+			fields, ok := raw.(map[string]any)
+			if !ok {
+				problem(w, 400, "DNS 凭据必须为对象")
+				return true
+			}
+			for k, v := range fields {
+				value, ok := v.(string)
+				if !ok {
+					problem(w, 400, "DNS 凭据必须为字符串")
+					return true
+				}
+				credentials[k] = value
+			}
+		}
+		job, err = manager.StartDNSCertificate(stringField(payload, "serverId"), stringField(payload, "serverName"), stringField(payload, "dnsProvider"), credentials)
 	}
 	if err != nil {
 		problem(w, 400, err.Error())

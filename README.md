@@ -28,7 +28,7 @@
 
 `VLESS` · `VMess` · `Trojan` · `Shadowsocks` · `Hysteria2` · `TUIC` · `Snell` · `Mieru` · `SOCKS5` · `HTTP(S)`
 
-订阅适配 Mihomo / Clash、V2Ray 系列与 Shadowrocket。不同协议、内核及客户端的能力边界见[客户端适配说明](docs/client-compatibility.md)。
+订阅适配 Mihomo / Clash、V2Ray 系列、Shadowrocket、sing-box、Surge、Loon、Quantumult X、Stash、Surfboard 和 Egern。后六种配置仅导出明确兼容的基础节点和手动选择组，不转换原分流规则或链路。不同协议、内核及客户端的能力边界见[客户端适配说明](docs/client-compatibility.md)。
 
 ## 界面预览
 
@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.10` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.11` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.10-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.11-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -211,3 +211,5 @@ bash install.sh local-build
 配置使用独立手动选择组与 `FINAL,MX-PROXY`，不复制原 Mihomo 分流、DNS、策略组或主备链路。含未适配参数或无法安全表示的凭据的节点会被跳过，可展开“不兼容项目”查看原因。不要把生成成功等同于客户端实机验证。
 
 依据 [Loon 官方节点文档](https://github.com/Loon0x00/LoonManual/blob/master/docs/cn/node.md)实现。已验证协议映射、配置注入防护、下载权限与浏览器入口；当前 Linux 环境没有 Loon iOS 客户端，尚未完成实机导入与连接验收。
+
+Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南](docs/go/AGENT-AND-PROBE.md)。
