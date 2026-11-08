@@ -236,7 +236,7 @@ ln -s -- "$release" "$base/.current-new"
 switched=1
 mv -Tf -- "$base/.current-new" "$base/current"
 systemctl restart "$service"
-wait_healthy "${MXIOC_GO_EXPECT_CURRENT:+$version}" || die "Go service did not pass HTTP checks."
+wait_healthy "$version" || die "Go service did not pass HTTP checks."
 if (( gateway_active )); then
     systemctl restart mx-p-gateway.service
     systemctl is-active --quiet mx-p-gateway.service || die "HTTPS gateway restart failed."
