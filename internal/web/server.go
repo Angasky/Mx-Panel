@@ -47,6 +47,8 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	shareMu           sync.Mutex
+	shareSlots        chan struct{}
 	history           *monitorhistory.Store
 	historyOnce       sync.Once
 	historyDone       chan struct{}
@@ -95,7 +97,7 @@ func New(options Options) (*Server, error) {
 	}
 	repository := &config.Repository{Root: options.Root}
 	ignored, _ := doc["goIgnoredRelease"].(string)
-	return &Server{history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
+	return &Server{shareSlots: make(chan struct{}, 4), history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -213,6 +215,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
+		if s.monitorSharePublic(w, r) {
+			return
+		}
 		if s.publicRoutes(w, r) {
 			return
 		}
@@ -237,6 +242,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.monitorShareAdmin(w, r) {
 		return
 	}
 	if s.monitorHistoryRoute(w, r) {

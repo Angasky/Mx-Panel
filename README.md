@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.7` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.8` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.7-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.8-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -180,3 +180,14 @@ bash install.sh local-build
 - 网卡流量与订阅计费分开，表中显示有效观测时长与缺口次数，不应当作完整账单。
 - 暂停采样保留尚未过期的记录；“清空并停用”删除该服务器历史并停止采样。
 - 数据保存在 `monitor-history/`，文件权限 `0600`；普通用户无法读取或修改。服务器删除后，残留记录在 30 天未更新后清理。
+
+### 监控分享与只读 API
+
+管理员在 **设置 → 监控分享**（或服务器资源概览的“监控分享”）中选择服务器，填写公开名称，然后生成访问链接。默认不分享任何服务器；请先为所选服务器启用历史监控。
+
+- 页面只显示公开名称、CPU、内存、收发速率、采样时间和采样状态，不包含 IP、SSH 信息、订阅或历史流量。
+- 完整链接和 API 令牌只在生成时显示一次；服务器只保存令牌摘要。持有凭据的人无需登录即可读取所选指标，请妥善保存。
+- 暂停后可重新启用原链接；更换或撤销凭据会使旧链接和旧 API 令牌失效。
+- 只读接口为 `GET /sub/status-api`，使用请求头 `Authorization: Bearer <令牌>`；不支持查询参数传令牌。
+- 分享页面每 60 秒刷新；数据超过 120 秒未更新时显示过期。状态表示采样结果，不代表代理连接可用性。
+- 分享配置位于数据目录 `monitor-sharing.json`，权限 `0600`。现有 `/sub/` HTTPS 反向代理即可转发，无需新增监听端口。

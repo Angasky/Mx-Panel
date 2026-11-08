@@ -2166,7 +2166,7 @@ async function memberPortal() {
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
     <p class="muted">首次使用默认科技主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
@@ -2983,6 +2983,29 @@ async function monitoring() {
 }
 
 
+
+async function monitorShareManager() {
+  const [cfg,data]=await Promise.all([api('/servers/sharing'),api('/servers')]);
+  openModal('监控分享与只读 API', `<p class="note">持有分享链接或 API 令牌的人，无需登录即可查看选定服务器的公开名称、CPU、内存、收发速率和采样时间。不会公开 IP、SSH 信息、订阅或历史流量。请为服务器填写适合对外展示的名称。</p><p class="muted">指标来自已启用的历史监控，分享请求不会触发 SSH 连接。请先在服务器“历史记录”中启用后台采样；采样失败不等同于服务器离线。</p><form id="monitorShareForm"><label style="display:flex;align-items:center;gap:8px"><input id="shareEnabled" type="checkbox" ${cfg.enabled?'checked':''} ${cfg.hasLink?'':'disabled'}>启用现有分享链接 / API</label><p class="hint">${cfg.hasLink?'暂停后可重新启用原链接；如需永久作废，请撤销或生成新链接。':'尚未生成访问凭据，请选择服务器后点击“生成并启用”。'}</p><div style="display:grid;gap:12px;max-height:300px;overflow:auto">${data.servers.map((server,i)=>{const selected=(cfg.servers||[]).find(v=>v.id===server.id);return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-share-server="${i}" ${selected?'checked':''}>${esc(server.name)}</label><label for="shareLabel${i}">公开名称</label><input id="shareLabel${i}" maxlength="60" value="${esc(selected?.label||'') }" placeholder="例如：香港节点 A（不自动使用内部名称）"></div>`}).join('')||'<p class="empty">请先添加服务器。</p>'}</div><p id="shareError" class="error" role="alert"></p><div class="toolbar"><button class="btn" type="submit">保存设置</button><button class="btn primary" type="button" id="shareGenerate">${cfg.hasLink?'更换链接与令牌':'生成并启用'}</button><button class="btn danger" type="button" id="shareRevoke" ${cfg.hasLink?'':'disabled'}>撤销访问凭据</button></div></form>`);
+  const payload=()=>({enabled:$('shareEnabled').checked,servers:[...document.querySelectorAll('[data-share-server]:checked')].map(el=>{const i=Number(el.dataset.shareServer);return {id:data.servers[i].id,label:$('shareLabel'+i).value.trim()};})});
+  const save=async(method)=>{
+    const body=method==='DELETE'?{}:payload();
+    if(method!=='DELETE'&&body.servers.some(s=>!s.label)){$('shareError').textContent='请为每台选中的服务器填写公开名称';return;}
+    document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=true);
+    try{const result=await api('/servers/sharing',jsonOpt(method,body));if(result.token)showMonitorShareSecret(result);else{await monitorShareManager();notice(method==='DELETE'?'原链接与令牌已撤销':'监控分享设置已保存');}}
+    catch(e){if($('shareError')){$('shareError').textContent=e.message;document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=false);}}
+  };
+  $('monitorShareForm').onsubmit=e=>{e.preventDefault();void save('PUT');};
+  $('shareGenerate').onclick=()=>{if(!cfg.hasLink||confirm('生成新链接和 API 令牌后，旧凭据立即失效。继续？'))void save('POST');};
+  $('shareRevoke').onclick=()=>{if(confirm('撤销后，现有分享链接和 API 令牌立即失效，无法恢复。继续？'))void save('DELETE');};
+}
+function showMonitorShareSecret(result) {
+  const url=location.origin+result.url, endpoint=location.origin+result.api;
+  openModal('访问凭据已生成',`<p class="note">完整链接和令牌仅显示这一次，请立即保存。任何持有凭据的人均可读取已选指标。关闭窗口后无法找回原令牌，但可以重新生成。</p><label for="shareLink">分享页面</label><input id="shareLink" readonly value="${esc(url)}"><div class="toolbar"><button class="btn primary" id="copyShareLink">复制链接</button><a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">预览分享页</a></div><label for="shareAPI">只读 API（GET）</label><input id="shareAPI" readonly value="${esc(endpoint)}"><label for="shareToken">Bearer 令牌</label><input id="shareToken" readonly type="password" value="${esc(result.token)}"><p class="hint">请求头格式：Authorization: Bearer &lt;令牌&gt;。API 不接受 URL 查询参数中的令牌。</p><div class="toolbar"><button class="btn" id="copyShareToken">复制令牌</button><button class="btn" id="shareDone">我已保存，返回设置</button></div>`);
+  const copy=async(value)=>{try{await navigator.clipboard.writeText(value);notice('已复制');}catch(e){notice('复制失败，请手动选择输入框内容保存');}};
+  $('copyShareLink').onclick=()=>copy(url);$('copyShareToken').onclick=()=>copy(result.token);$('shareDone').onclick=()=>monitorShareManager().catch(e=>notice(e.message));
+}
+
 function historyChart(points, fields, ceiling) {
   const now=Date.now()/1000, recent=points.filter(p=>p.time>=now-86400&&p.time<=now);
   const start=recent.length?Math.max(now-86400,Math.min(now-60,recent[0].time-30)):now-86400;
@@ -3019,7 +3042,7 @@ function renderMonitorOverview() {
   S.monitorCards ||= new Map();
   const query = (S.filters.monitoring || '').toLowerCase();
   const page = tableSlice(S.servers.filter(s => `${s.name} ${s.host} ${s.installType || ''}`.toLowerCase().includes(query)), 'monitoring');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>服务器资源概览</h3><p class="muted">${S.servers.length} 台服务器 · 点击卡片查看详情 · 仅采集当前页，最多 3 个并发</p></div><button class="btn" id="monitorOverviewRefresh">${uiIcon('refresh-cw')}刷新当前页</button></div><input id="search" type="search" aria-label="搜索监控服务器" placeholder="搜索名称、IP 或内核…" value="${esc(S.filters.monitoring || '')}"></section><div class="host-overview-grid">${page.rows.map(s=>`<button type="button" class="host-card" data-host="${esc(s.id)}" aria-label="查看 ${esc(s.name)} 的监控详情"><span class="host-card-heading">${uiIcon('server')}<strong>${esc(s.name)}</strong>${uiIcon('chevron-right')}</span><span class="host-address">${esc(s.host)} · ${esc(s.installType || '3x-ui')}</span><span class="host-summary" data-summary>等待采样</span></button>`).join('') || '<p class="empty">没有匹配的服务器</p>'}</div>${pagination(page)}`;
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>服务器资源概览</h3><p class="muted">${S.servers.length} 台服务器 · 点击卡片查看详情 · 仅采集当前页，最多 3 个并发</p></div><button class="btn primary" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn" id="monitorOverviewRefresh">${uiIcon('refresh-cw')}刷新当前页</button></div><input id="search" type="search" aria-label="搜索监控服务器" placeholder="搜索名称、IP 或内核…" value="${esc(S.filters.monitoring || '')}"></section><div class="host-overview-grid">${page.rows.map(s=>`<button type="button" class="host-card" data-host="${esc(s.id)}" aria-label="查看 ${esc(s.name)} 的监控详情"><span class="host-card-heading">${uiIcon('server')}<strong>${esc(s.name)}</strong>${uiIcon('chevron-right')}</span><span class="host-address">${esc(s.host)} · ${esc(s.installType || '3x-ui')}</span><span class="host-summary" data-summary>等待采样</span></button>`).join('') || '<p class="empty">没有匹配的服务器</p>'}</div>${pagination(page)}`;
   const cards = new Map([...document.querySelectorAll('[data-host]')].map(el=>[el.dataset.host, el]));
   cards.forEach((el,id)=>{ el.onclick=()=>openHostMonitor(encodeURIComponent(id)); renderMonitorCard(el,S.monitorCards.get(id)); });
   bindSearch('monitoring', renderMonitorOverview);
@@ -4789,6 +4812,7 @@ function closeModal() {
   document.body.classList.remove('modal-open');
   if (S.modalFocus?.isConnected) S.modalFocus.focus();
   S.modalFocus = null;
+  if ($('shareLink')) $('modalBody').replaceChildren();
 }
 
 const OPTION_LABELS = {
