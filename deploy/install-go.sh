@@ -168,14 +168,16 @@ wait_healthy() {
     local expected="${1:-}" health attempt
     for ((attempt=0; attempt<20; attempt++)); do
         if systemctl is-active --quiet "$service" &&
-            health=$(curl -fsS --max-time 2 http://127.0.0.1:62578/healthz) &&
+            health=$(curl -fsS --max-time 2 http://127.0.0.1:62578/healthz 2>/dev/null) &&
             grep -Fq '"runtime":"go"' <<< "$health" &&
             { [[ -z "$expected" ]] || grep -Fq "\"version\":\"$expected\"" <<< "$health"; } &&
-            curl -fsS --max-time 2 --head http://127.0.0.1:62578/admin/ >/dev/null; then
+            curl -fsS --max-time 2 --head http://127.0.0.1:62578/admin/ >/dev/null 2>&1; then
             return 0
         fi
+        if (( attempt == 0 )); then printf '正在等待 Go 后台启动并通过健康检查…\n'; fi
         sleep 1
     done
+    printf 'Go 后台未在等待时间内通过健康检查，请检查 mxioc-go.service 日志。\n' >&2
     return 1
 }
 rollback() {
