@@ -1758,8 +1758,8 @@ function showLogin() {
 
 async function showAuthenticatedApp() {
   await loadProfiles();
-  await reload(false);
-  await go('overview');
+  if (S.profiles.length) await reload(false);
+  await go(S.profiles.length ? 'overview' : 'profiles');
   $('boot').classList.add('hidden');
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
@@ -1921,6 +1921,11 @@ async function loadProfiles() {
 }
 
 async function reload(render = true) {
+  if (!S.profiles.length) {
+    S.data = null;
+    if (render) await go('profiles');
+    return;
+  }
   const profile = S.profile;
   const data = await api('/snapshot');
   if (S.profile !== profile) return;
@@ -1959,6 +1964,10 @@ const pageSections = {
 const sectionFor = page => Object.keys(pageSections).find(key => pageSections[key].includes(page)) || 'overview';
 
 async function go(page) {
+  if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring'].includes(page)) {
+    page = 'profiles';
+    notice('请先创建一份订阅，再管理节点和规则');
+  }
   window.cancelNodeDrag?.();
   if (page !== 'monitoring') stopMonitoring();
   if (S.page !== page) $('content').innerHTML = '<div class="empty" role="status">正在加载…</div>';
@@ -4422,7 +4431,7 @@ async function raw() {
 
 async function system() {
   const profile = S.profile;
-  let [d, account] = await Promise.all([api('/backups'), api('/account')]);
+  let [d, account] = await Promise.all([S.profiles.length ? api('/backups') : Promise.resolve({backups: []}), api('/account')]);
   if (S.page !== 'system' || S.profile !== profile) return;
   $('content').innerHTML = `
   <section class="panel">
