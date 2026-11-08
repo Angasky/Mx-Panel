@@ -38,6 +38,9 @@ func managementMenu() error {
 	if os.Geteuid() != 0 {
 		return errors.New("请执行 sudo mx-p")
 	}
+	if err := managementLogo(); err != nil {
+		return err
+	}
 	c := exec.Command("bash", "-c", deploy.Menu, "mx-p")
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
