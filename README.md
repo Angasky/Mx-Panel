@@ -1,34 +1,142 @@
+<div align="center">
+
 # Mx-Panel
 
-原生 Go 后端与中英文管理界面。运行和构建管理器不依赖 Python；旧 Python 后端、旧安装器与开发测试文件已从当前仓库移除。原版独立维护于 [mxioc-vpn-manager](https://github.com/Angasky/mxioc-vpn-manager)。
+**你的节点，你的订阅，一个控制台。**
 
-## 功能
+原生 Go 后端 · 可视化节点管理 · 多订阅与流量控制
 
-- 节点、订阅、策略组、路由规则、DNS 和分享链接管理。
-- 多订阅套餐、流量额度、到期处理、独立用户与服务器管理。
-- Xray / sing-box 配置、中转、主备与失败恢复。
-- 三种主题，统一易读的中文和英文字体；搜索支持中文输入法。
+[![Go](https://img.shields.io/badge/Backend-Go-00ADD8?style=flat-square&logo=go&logoColor=white)](go.mod)
+[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-334155?style=flat-square&logo=linux&logoColor=white)](https://github.com/Angasky/Mx-Panel/releases)
+[![Preview](https://img.shields.io/badge/Release-Preview-F59E0B?style=flat-square)](https://github.com/Angasky/Mx-Panel/releases)
 
-## 构建与安装
+[**下载安装**](https://github.com/Angasky/Mx-Panel/releases) · [界面预览](#界面预览) · [快速开始](#快速开始) · [使用文档](#使用文档)
 
-需要 Linux 和 `go.mod` 声明的 Go 工具链。构建双架构安装包：
+</div>
 
-```sh
-bash install.sh local-build
-```
+---
 
-输出位于 `dist/go-local-build/`。取对应架构压缩包，核验 SHA256 后解压，在解压目录执行：
+## 一个面板，管理日常配置
 
-```sh
+| 节点与订阅 | 服务器与流量 | 分流与维护 |
+| :--- | :--- | :--- |
+| 分享链接导入、节点编辑与排序 | 服务器接入与独立用户管理 | 策略组、路由规则与 DNS |
+| 多订阅、套餐与二维码分享 | 流量额度、倍率与到期处理 | 中转、主备与失败恢复 |
+| 中文搜索、三种界面主题 | Xray / sing-box 配置管理 | 配置校验、备份与版本更新 |
+
+支持的节点协议：
+
+`VLESS` · `VMess` · `Trojan` · `Shadowsocks` · `Hysteria2` · `TUIC` · `Snell` · `Mieru` · `SOCKS5` · `HTTP(S)`
+
+订阅适配 Mihomo / Clash、V2Ray 系列与 Shadowrocket。不同协议、内核及客户端的能力边界见[客户端适配说明](docs/client-compatibility.md)。
+
+## 界面预览
+
+**科技主题** · 深色界面，集中展示节点与常用操作。
+
+![科技主题的节点管理界面](docs/assets/theme-high.png)
+
+<table>
+  <tr>
+    <th width="50%">简洁主题</th>
+    <th width="50%">暖粉主题</th>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/theme-low.png" alt="简洁主题界面"></td>
+    <td><img src="docs/assets/theme-pink.png" alt="暖粉主题界面"></td>
+  </tr>
+</table>
+
+<sub>主题示意截图使用示例数据；实际界面以当前发布版为准。三种主题均支持中文输入法搜索，并使用易读的中英文字体。</sub>
+
+## 快速开始
+
+### 1. 下载对应架构的安装包
+
+**无需安装 Go 或 Python。** 准备一台使用 systemd 的 Linux 服务器，并具备 root / sudo 权限。
+
+| 服务器架构 | 选择安装包 |
+| :--- | :--- |
+| Intel / AMD，`uname -m` 显示 `x86_64` | **linux-amd64.tar.gz** |
+| ARM，`uname -m` 显示 `aarch64` | **linux-arm64.tar.gz** |
+
+前往 [Releases 下载页](https://github.com/Angasky/Mx-Panel/releases)，下载对应压缩包、`SHA256SUMS` 和 `INSTALL-zh-CN.txt`。服务器需要 bash、curl、tar、coreutils 和 util-linux。
+
+### 2. 校验并安装
+
+以下以 `preview-20261108-ca34466` 的 amd64 包为例；其他版本或架构请替换文件名。
+
+```bash
+# 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
+sha256sum --check --ignore-missing SHA256SUMS
+
+mkdir -p mx-panel-install
+tar -xzf mxioc-go-preview-20261108-ca34466-linux-amd64.tar.gz -C mx-panel-install
+cd mx-panel-install
+
 sudo bash install-go.sh fresh
 ```
 
-迁移旧数据使用 `install`，更新使用 `update`。详见 [安装说明](docs/go/DEPLOY.md)。Go 默认监听 `127.0.0.1:62578`，反代模板见 `deploy/nginx.conf.example`。源码构建本身不安装服务。
+按提示设置管理员账号与至少 **12 个字符**的密码，没有默认账号密码。`fresh` 用于首次安装；已有数据请使用下方对应操作。
 
-## 内核兼容与状态
+### 3. 打开管理界面
 
-Reality / Snell 的兼容补丁和原生 Go 构建工具位于 [tools/core-compat](tools/core-compat/README.md)。这些独立内核补丁不会随管理器自动安装；需要对应内核才能生效。
+默认监听 **`127.0.0.1:62578`**。可在自己电脑上建立 SSH 隧道：
 
-主要实现已迁移。真实面板、SSH、systemd、公网和客户端 App 的完整实机验收仍有边界，详见 [当前状态](docs/go/REMAINING.md)。本地测试与性能验证记录保留在文档中，测试源文件按仓库维护要求保留在本地，不发布进仓库。GitHub CI 只执行源码构建和静态检查，不将其冒充全量功能测试。
+```bash
+ssh -L 62578:127.0.0.1:62578 用户@服务器IP
+```
 
-已有 Git 历史中的 Python 文件和测试仍属于历史版本；当前分支源码已清理，未重写历史。GitHub 语言比例在默认分支更新后重新统计。
+保持连接，在浏览器打开 **http://127.0.0.1:62578/admin/**。使用正式域名时，配置 HTTPS 反代到该端口，参考 [Nginx 配置](deploy/nginx.conf.example)。
+
+<details>
+<summary><strong>已有部署：迁移、更新与卸载</strong></summary>
+
+在对应安装包的解压目录执行：
+
+| 操作 | 命令 | 说明 |
+| :--- | :--- | :--- |
+| 迁移旧版数据 | `sudo bash install-go.sh install` | 先备份数据和凭据，停止并禁用旧版服务 |
+| 更新 Go 版本 | `sudo bash install-go.sh update` | 从新版本安装包执行 |
+| 卸载 Go 服务 | `sudo bash install-go.sh uninstall` | 默认保留数据 |
+| 查看服务状态 | `sudo systemctl status mxioc-go --no-pager` | 查看启动状态与近期日志 |
+
+迁移前备份 `/opt/mxioc-rule-manager` 和 `/etc/mxioc-rule-manager.auth.json`。完整流程见[安装与更新说明](docs/go/DEPLOY.md)。
+
+</details>
+
+<details>
+<summary><strong>开发者：从源码构建</strong></summary>
+
+使用 `go.mod` 声明的 Go 工具链，在仓库根目录执行：
+
+```bash
+bash install.sh local-build
+```
+
+双架构安装包及校验文件输出到 `dist/go-local-build/`。此命令只构建，不安装系统服务。
+
+</details>
+
+## 使用文档
+
+| 想了解什么 | 从这里开始 |
+| :--- | :--- |
+| 安装、迁移、更新与卸载 | [部署指南](docs/go/DEPLOY.md) |
+| 协议与客户端适配 | [客户端兼容说明](docs/client-compatibility.md) |
+| Reality / Snell 兼容内核 | [补丁与构建工具](tools/core-compat/README.md) |
+| 迁移进度与尚未完成的实机验收 | [当前状态](docs/go/REMAINING.md) |
+| 性能测试与优化记录 | [索引优化与性能对比](docs/go/INDEX-CACHE-20261108.md) |
+
+> [!NOTE]
+> 当前为 **Go 预览版**。amd64 安装包已验证隔离初始化、数据检查与网页启动；arm64 已交叉构建，尚未实机运行。真实面板、SSH、systemd、公网及客户端 App 的完整验收仍在推进。代理内核需另行配置，兼容补丁不会随管理器自动安装。
+
+---
+
+<div align="center">
+
+基于 [mxioc-vpn-manager](https://github.com/Angasky/mxioc-vpn-manager) 迁移 · 当前管理器后端使用 **Go**
+
+[下载版本](https://github.com/Angasky/Mx-Panel/releases) · [反馈问题](https://github.com/Angasky/Mx-Panel/issues)
+
+</div>
