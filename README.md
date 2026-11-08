@@ -1,4 +1,4 @@
-# Dingzhi Ban · Go 定制版
+# Mx-Panel
 
 原生 Go 后端与中英文管理界面。运行和构建管理器不依赖 Python；旧 Python 后端、旧安装器与开发测试文件已从当前仓库移除。原版独立维护于 [mxioc-vpn-manager](https://github.com/Angasky/mxioc-vpn-manager)。
 
