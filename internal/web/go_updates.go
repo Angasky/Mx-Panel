@@ -29,18 +29,19 @@ type goRelease struct {
 }
 
 type goUpdateStatus struct {
-	Manual         bool               `json:"manual"`
-	Version        string             `json:"version"`
-	Latest         string             `json:"latestVersion,omitempty"`
-	ReleaseURL     string             `json:"releaseUrl,omitempty"`
-	Available      bool               `json:"available"`
-	Dismissed      bool               `json:"dismissed"`
-	Checking       bool               `json:"checking"`
-	Checked        bool               `json:"checked"`
-	CheckedAt      int64              `json:"checkedAt,omitempty"`
-	CheckError     string             `json:"checkError,omitempty"`
-	ApplySupported bool               `json:"applySupported"`
-	Job            *releaseupdate.Job `json:"job,omitempty"`
+	UninstallSupported bool               `json:"uninstallSupported"`
+	Manual             bool               `json:"manual"`
+	Version            string             `json:"version"`
+	Latest             string             `json:"latestVersion,omitempty"`
+	ReleaseURL         string             `json:"releaseUrl,omitempty"`
+	Available          bool               `json:"available"`
+	Dismissed          bool               `json:"dismissed"`
+	Checking           bool               `json:"checking"`
+	Checked            bool               `json:"checked"`
+	CheckedAt          int64              `json:"checkedAt,omitempty"`
+	CheckError         string             `json:"checkError,omitempty"`
+	ApplySupported     bool               `json:"applySupported"`
+	Job                *releaseupdate.Job `json:"job,omitempty"`
 }
 
 type goUpdates struct {
@@ -218,6 +219,7 @@ func (s *Server) goUpdateRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	status := s.updates.status(s.options.Version)
+	status.UninstallSupported = s.options.ServiceUninstaller != nil
 	if updater := s.options.ReleaseUpdater; updater != nil {
 		job, err := updater.Status()
 		if err == nil {

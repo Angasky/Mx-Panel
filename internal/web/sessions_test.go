@@ -173,3 +173,19 @@ func TestSessionCapAndCookieLogout(t *testing.T) {
 		t.Fatal("cookie logout failed with unrelated authorization header")
 	}
 }
+
+func TestPythonBearerWhitespaceAndExplicitHeaderPrecedence(t *testing.T) {
+	for _, tc := range []struct{ header, want string }{
+		{"Bearer   token-with-padding  ", "token-with-padding"},
+		{"Bearer ", ""},
+		{"Bearer bad-token", "bad-token"},
+		{"Basic ignored", "cookie-token"},
+	} {
+		r := httptest.NewRequest("GET", "https://panel.test/admin/api/account", nil)
+		r.Header.Set("Authorization", tc.header)
+		r.AddCookie(&http.Cookie{Name: "mxioc_session", Value: "cookie-token"})
+		if got := requestSessionToken(r); got != tc.want {
+			t.Fatalf("header precedence: got %q want %q", got, tc.want)
+		}
+	}
+}

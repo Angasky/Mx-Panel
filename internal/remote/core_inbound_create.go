@@ -27,6 +27,13 @@ func (m *Manager) createStandaloneInbound(ctx context.Context, server, key, requ
 }
 
 func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requestHash string, record, payload, outbound Record, run coreRunner) (Record, error) {
+	entry, err := m.loadCreate(key)
+	if err != nil {
+		return nil, err
+	}
+	if entry != nil && (entry["status"] == "canceled" || entry["cancelRequested"] == true) {
+		return nil, errors.New("此创建请求已取消或正在取消")
+	}
 	template := templateName(payload)
 	protocol := standaloneTemplateProtocol(kind, template)
 	if protocol == "" || payload["inbound"] != nil || (payload["landingLink"] != nil && outbound == nil) ||
@@ -230,7 +237,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	}
 	after := coreConfigHash(data)
 	if journal == nil {
-		journal = Record{"key": key, "operation": coreInboundCreate, "before": before, "after": after, "row": row}
+		journal = Record{"key": key, "operation": coreInboundCreate, "before": before, "after": after, "row": row, "cancelFence": true}
 		pending, err = m.SealUser(journal)
 		if err != nil {
 			return nil, err
@@ -241,7 +248,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	} else if journal["after"] != after {
 		return nil, errors.New("独立内核创建计划与保存记录不一致")
 	}
-	if _, err := applyCore(ctx, kind, raw, next, tag, run); err != nil {
+	if _, err := applyCoreVerified(ctx, kind, raw, next, tag, "", run, key); err != nil {
 		if (errors.Is(err, errCoreRolledBack) || errors.Is(err, errCoreValidation)) && journal["before"] == before {
 			err = errors.Join(err, m.updateCoreUserState(server, stateToken, pending, stateToken, ""))
 		}
@@ -256,7 +263,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 func standaloneTemplateProtocol(kind, template string) string {
 	switch template {
 	case "ss-aes-128-gcm", "ss-aes-256-gcm", "ss-chacha20-poly1305":
-		if kind == "xray" {
+		if kind == "xray" || kind == "sing-box" {
 			return "shadowsocks"
 		}
 	case "ss2022-aes-128", "ss2022-aes-256":

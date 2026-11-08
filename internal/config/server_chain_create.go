@@ -34,6 +34,16 @@ func (r *Repository) ServerChainSources(id string, chain *ServerChainImport) (Do
 	if err != nil {
 		return nil, nil, err
 	}
+	for _, raw := range rows(record, "failoverDrafts") {
+		draft := raw.(Document)
+		if draft["cancelRequested"] == true {
+			for _, request := range rows(draft, "pathRequests") {
+				if request == chain.Request {
+					return nil, nil, errors.New("此主备路径正在取消，不能继续创建")
+				}
+			}
+		}
+	}
 	p, err := profileFrom(record)
 	if err != nil {
 		return nil, nil, err

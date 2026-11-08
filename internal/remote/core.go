@@ -78,8 +78,8 @@ func applyCore(ctx context.Context, kind string, raw []byte, next Record, manage
 	return applyCoreVerified(ctx, kind, raw, next, managedTag, "", run)
 }
 
-func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record, managedTag, verify string, run coreRunner) (Record, error) {
-	script, err := coreWriteScript(kind, raw, next, managedTag, verify)
+func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record, managedTag, verify string, run coreRunner, cancelKey ...string) (Record, error) {
+	script, err := coreWriteScript(kind, raw, next, managedTag, verify, cancelKey...)
 	if err != nil {
 		return nil, err
 	}

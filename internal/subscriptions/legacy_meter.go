@@ -74,6 +74,30 @@ func (c *Controller) ClearLegacyMeter(ctx context.Context, profile string, posit
 			}
 		}
 	}
+	finish := func(reconciled bool) (Record, error) {
+		if err := c.updateBinding(profile, binding, func(_, current Record) error {
+			delete(current, "legacyMeterRetained")
+			return nil
+		}); err != nil {
+			return nil, errors.New("远端规则已清理，订阅记录保存待重试")
+		}
+		info, err := c.Info(profile)
+		return Record{"cleared": true, "reconciled": reconciled, "traffic": info}, err
+	}
+	// Only a persisted receipt for this exact inbound and port proves cleanup.
+	// Absence from a registry alone can also mean incomplete legacy metadata.
+	record, err := c.Backend.Record(server)
+	if err != nil {
+		return nil, err
+	}
+	meters, metersOK := record["meters"].(Record)
+	cleared, clearedOK := record["goMeterCleared"].(Record)
+	if metersOK && clearedOK && binding["legacyMeterRetained"] == true {
+		_, exists := meters[text(binding["inboundId"])]
+		if !exists && text(cleared[text(binding["inboundId"])]) == text(binding["port"]) {
+			return finish(true)
+		}
+	}
 	sample, err := c.Backend.SubscriptionUser(ctx, server, binding, "read", nil)
 	if err != nil {
 		return nil, err
@@ -87,12 +111,5 @@ func (c *Controller) ClearLegacyMeter(ctx context.Context, profile string, posit
 	if err := cleaner.ClearLegacyMeter(ctx, server, int(id), int(port)); err != nil {
 		return nil, err
 	}
-	if err := c.updateBinding(profile, binding, func(_, current Record) error {
-		delete(current, "legacyMeterRetained")
-		return nil
-	}); err != nil {
-		return nil, errors.New("远端规则已清理，订阅记录保存待重试")
-	}
-	info, err := c.Info(profile)
-	return Record{"cleared": true, "traffic": info}, err
+	return finish(false)
 }

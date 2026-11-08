@@ -1,0 +1,383 @@
+{
+  "sourceRepository": "Angasky/mxioc-vpn-manager",
+  "sourceSHA256": "723c10daf72b2862a993cafac0a721bca214255d37b2f6ad465e40b598cdbb06",
+  "scope": "Explicit path comparisons; dynamic public routes and response semantics require separate tests",
+  "routes": [
+    {
+      "method": "DELETE",
+      "path": "/admin/api/dns"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/failovers"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/groups"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/nodes"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/nodes/bulk"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/policy-templates"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/profiles"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/rules"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/server-chains"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/servers"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/api/servers/inbounds"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/admin"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/account"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/backups"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/conversions"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/failovers"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/nodes/group-options"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/nodes/qrcode"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/nodes/share"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/policy-templates"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/profiles"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/qrcode"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/raw"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/server-chains"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/servers"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/servers/certificates"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/servers/inbounds"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/servers/jobs"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/servers/metrics"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/snapshot"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/traffic"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/api/updates"
+    },
+    {
+      "method": "GET",
+      "path": "/clash"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/account"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/backups/restore"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/chains"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/dns"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/failovers"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/groups"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/import-node"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/import-subscription"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/import-subscription/preview"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/login"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/logout"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/nodes"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/nodes/flags"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/nodes/groups"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/nodes/move"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/nodes/validate"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/password"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/policy-templates"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/profiles"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/rules"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/rules/move"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/attach"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/bind"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/certificates"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/diagnose"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/import"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/inbounds"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/install"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/probe"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/relay"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/sni"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/test"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/users"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/users/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/servers/users/targets"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/traffic/sync"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/uninstall"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/updates/apply"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/updates/check"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/api/updates/dismiss"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/chains"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/dns"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/groups"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/nodes"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/policy-templates"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/profiles"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/raw"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/rules"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/servers"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/servers/bandwidth"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/servers/inbounds"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/servers/multiplier"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic/bindings/cleanup"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic/bindings/remove"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic/plan"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic/plans"
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/api/traffic/plans/delete"
+    }
+  ]
+}

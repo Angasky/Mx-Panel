@@ -203,3 +203,66 @@ func TestMetricsCacheCoalescingFailuresAndIsolation(t *testing.T) {
 		t.Fatal("unbounded monitor cache")
 	}
 }
+
+func TestMetricsHotplugAndIntervalBoundary(t *testing.T) {
+	before := parseMetricFixture(t, metricFixture)
+	after := parseMetricFixture(t, metricFixture)
+	after.uptime = before.uptime + 60
+	after.cpus["cpu1"] = cpuTicks{100, 80}
+	after.view["interfaces"] = append(after.view["interfaces"].([]Record), Record{"name": "eth1", "rxBytes": uint64(50), "txBytes": uint64(80)})
+	after.view["summaryInterfaces"] = []string{"eth0", "eth1"}
+	view := deriveHostMetrics(after, before)
+	if view["warmingUp"] != false {
+		t.Fatal("60 second boundary must remain valid")
+	}
+	cpus := view["perCpu"].([]Record)
+	if len(cpus) != 2 || cpus[1]["name"] != "cpu1" || cpus[1]["percent"] != nil {
+		t.Fatal("hotplug CPU invented delta", cpus)
+	}
+	nics := view["interfaces"].([]Record)
+	if nics[len(nics)-1]["rxBytesPerSecond"] != nil || view["network"].(Record)["rxBytesPerSecond"] != nil {
+		t.Fatal("new NIC invented rate")
+	}
+	if view["network"].(Record)["rxBytes"] != uint64(9007199254741043) {
+		t.Fatal("hotplug lost counters")
+	}
+	after.uptime += .001
+	if deriveHostMetrics(after, before)["warmingUp"] != true {
+		t.Fatal("expired interval accepted")
+	}
+	after.uptime = before.uptime
+	if deriveHostMetrics(after, before)["warmingUp"] != true {
+		t.Fatal("zero interval accepted")
+	}
+}
+
+func TestMetricsOverflowIsUnknownAndFailureRecovers(t *testing.T) {
+	raw := parseMetricFixture(t, metricFixture)
+	raw.view["interfaces"] = []Record{
+		{"name": "eth0", "rxBytes": uint64(^uint64(0)), "txBytes": uint64(10)},
+		{"name": "eth1", "rxBytes": uint64(1), "txBytes": uint64(20)},
+	}
+	raw.view["summaryInterfaces"] = []string{"eth0", "eth1"}
+	net := deriveHostMetrics(raw, nil)["network"].(Record)
+	if net["rxBytes"] != nil || net["txBytes"] != uint64(30) {
+		t.Fatal("overflow wrapped", net)
+	}
+	h := &hostMonitor{entries: map[[32]byte]*metricEntry{}}
+	key := [32]byte{1}
+	calls := 0
+	fail := func(context.Context) (*hostSample, error) { calls++; return nil, errors.New("offline") }
+	if _, err := h.sample(context.Background(), key, fail); err == nil {
+		t.Fatal("first failure hidden")
+	}
+	if _, err := h.sample(context.Background(), key, fail); err == nil || calls != 1 {
+		t.Fatal("failure was not cached")
+	}
+	h.entries[key].failed = time.Now().Add(-6 * time.Second)
+	view, err := h.sample(context.Background(), key, func(context.Context) (*hostSample, error) { return parseMetricFixture(t, metricFixture), nil })
+	if err != nil || view["stale"] != false || view["warmingUp"] != true || view["error"] != "" {
+		t.Fatal("recovery", view, err)
+	}
+	if !h.entries[key].failed.IsZero() || h.entries[key].failure != "" {
+		t.Fatal("failure not cleared")
+	}
+}

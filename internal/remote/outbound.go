@@ -2,6 +2,9 @@ package remote
 
 import (
 	"errors"
+	"maps"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/Angasky/dingzhi-ban/internal/links"
@@ -10,6 +13,10 @@ import (
 // NodeOutbound is shared by complete client configurations and remote relays.
 // Unknown options are rejected rather than silently weakening the transport.
 func NodeOutbound(node Record, tag string) (Record, error) {
+	return nodeOutbound(node, tag, true)
+}
+
+func nodeOutbound(node Record, tag string, xrayPolicy bool) (Record, error) {
 	for _, key := range []string{"tls", "udp", "skip-cert-verify"} {
 		if raw, ok := node[key]; ok {
 			if _, ok := raw.(bool); !ok {
@@ -17,8 +24,23 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 			}
 		}
 	}
+	sni := ""
+	for _, key := range []string{"servername", "sni"} {
+		if raw, exists := node[key]; exists {
+			name, ok := raw.(string)
+			if !ok || strings.ContainsAny(name, "\r\n\x00") {
+				return nil, errors.New("TLS 服务器名称必须为有效字符串")
+			}
+			if name != "" {
+				if sni != "" && sni != name {
+					return nil, errors.New("TLS 服务器名称参数冲突")
+				}
+				sni = name
+			}
+		}
+	}
 	allowed := map[string]bool{}
-	for _, k := range []string{"name", "type", "server", "port", "uuid", "password", "username", "cipher", "alterId", "alter-id", "encryption", "flow", "network", "tls", "servername", "sni", "client-fingerprint", "skip-cert-verify", "alpn", "reality-opts", "ws-opts", "grpc-opts", "xhttp-opts", "udp", "tfo"} {
+	for _, k := range []string{"name", "type", "server", "port", "uuid", "password", "username", "cipher", "alterId", "alter-id", "encryption", "flow", "network", "tls", "servername", "sni", "client-fingerprint", "skip-cert-verify", "alpn", "reality-opts", "ws-opts", "grpc-opts", "xhttp-opts", "udp", "tfo", "headers"} {
 		allowed[k] = true
 	}
 	for k := range node {
@@ -26,10 +48,43 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 			return nil, errors.New("节点扩展参数尚未适配完整 Xray 配置")
 		}
 	}
-	if node["skip-cert-verify"] == true || node["udp"] == false {
+	kind := value(node["type"])
+	// Legacy Python/Mihomo Trojan nodes omit tls: TLS is implicit for this
+	// protocol. Use a copy so export never rewrites the stored source node.
+	if _, explicit := node["tls"]; kind == "trojan" && !explicit {
+		node = maps.Clone(node)
+		node["tls"] = true
+	}
+	// HTTP CONNECT is TCP-only. Its importer explicitly records udp=false;
+	// that describes the protocol rather than an unsupported UDP restriction.
+	if kind == "http" && node["udp"] == true {
+		return nil, errors.New("HTTP CONNECT 出站不支持 UDP")
+	}
+	if node["skip-cert-verify"] == true {
+		return nil, errors.New("当前 Xray 已移除 allowInsecure，无法转换跳过证书校验的节点")
+	}
+	if node["udp"] == false && kind != "http" {
 		return nil, errors.New("此证书或 UDP 限制不能无损转换为当前 Xray 配置")
 	}
-	kind := value(node["type"])
+	var headers Record
+	if raw, exists := node["headers"]; exists {
+		if kind != "http" {
+			return nil, errors.New("HTTP 请求头仅适用于 HTTP 出站")
+		}
+		var err error
+		headers, err = singHTTPHeaders(raw)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := headers["Host"]; exists {
+			return nil, errors.New("当前 Xray CONNECT 不支持自定义 Host，请使用 sing-box")
+		}
+		// Xray evaluates header values as Go templates. Quote literals so imported
+		// braces cannot change meaning or interpolate connection metadata.
+		for key, header := range headers {
+			headers[key] = "{{" + strconv.Quote(header.(string)) + "}}"
+		}
+	}
 	port, err := parsedPort(node["port"], 0)
 	host := value(node["server"])
 	if err != nil || port < 1 || !validHost(host) || tag == "" {
@@ -99,6 +154,9 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 	default:
 		return nil, errors.New("Xray 出站不支持该协议")
 	}
+	if headers != nil {
+		settings["headers"] = headers
+	}
 	network := value(node["network"])
 	if network == "" {
 		network = "tcp"
@@ -152,22 +210,16 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 			}
 		}
 		stream["security"] = "reality"
-		stream["realitySettings"] = Record{"serverName": value(node["servername"]), "fingerprint": fp, "publicKey": opts["public-key"], "shortId": value(opts["short-id"]), "spiderX": "/"}
+		stream["realitySettings"] = Record{"serverName": sni, "fingerprint": fp, "publicKey": opts["public-key"], "shortId": value(opts["short-id"]), "spiderX": "/"}
 	} else if node["tls"] == true {
-		sni := value(node["servername"])
-		if sni == "" {
-			sni = value(node["sni"])
-		}
 		tls := Record{"serverName": sni}
-		if node["alpn"] != nil {
-			values, ok := node["alpn"].([]any)
-			if !ok {
-				return nil, errors.New("ALPN 必须为字符串数组")
-			}
-			for _, v := range values {
-				if _, ok := v.(string); !ok {
-					return nil, errors.New("ALPN 必须为字符串数组")
-				}
+		if insecure, exists := node["skip-cert-verify"]; exists {
+			tls["allowInsecure"] = insecure
+		}
+		if raw, exists := node["alpn"]; exists {
+			values, err := links.ALPNValues(raw, false)
+			if err != nil {
+				return nil, errors.New("ALPN 必须为有效协议字符串数组")
 			}
 			tls["alpn"] = values
 		}
@@ -178,6 +230,9 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 		stream["tlsSettings"] = tls
 	} else if node["alpn"] != nil || node["client-fingerprint"] != nil || value(node["sni"]) != "" || value(node["servername"]) != "" {
 		return nil, errors.New("TLS 参数要求启用 TLS")
+	}
+	if xrayPolicy && (kind == "vless" || kind == "trojan") && stream["security"] == "none" && !xrayPrivateAddress(host) {
+		return nil, errors.New("当前 Xray 禁止公网明文 VLESS/Trojan，请启用 TLS/Reality 或使用支持此配置的内核")
 	}
 	if network == "ws" {
 		opts, e := inboundObject(node["ws-opts"])
@@ -222,4 +277,31 @@ func NodeOutbound(node Record, tag string) (Record, error) {
 		stream["sockopt"] = Record{"tcpFastOpen": v}
 	}
 	return Record{"tag": tag, "protocol": protocol, "settings": settings, "streamSettings": stream}, nil
+}
+
+// Matches Xray 26.10.31 transport-security exceptions. Do not resolve DNS:
+// Xray applies this policy to the configured address, not its resolved IP.
+func xrayPrivateAddress(host string) bool {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+	}
+	domain := strings.TrimSuffix(strings.ToLower(host), ".")
+	for _, suffix := range []string{"lan", "localdomain", "example", "invalid", "localhost", "test", "local", "home.arpa", "internal"} {
+		if domain == suffix || strings.HasSuffix(domain, "."+suffix) {
+			return true
+		}
+	}
+	if len(domain) < 1 || len(domain) > 63 || domain[0] < 'a' || domain[0] > 'z' {
+		return false
+	}
+	for i, c := range domain {
+		if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+			continue
+		}
+		if c == '-' && i != len(domain)-1 {
+			continue
+		}
+		return false
+	}
+	return true
 }

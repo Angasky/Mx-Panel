@@ -21,10 +21,89 @@ flock -n 9 || die "A Go release operation is already running."
 
 if [[ "$action" == uninstall ]]; then
     [[ -L "$base/current" && -f "$unit" ]] || die "No managed Go installation found."
+    current=$(readlink -f -- "$base/current")
+    [[ $(dirname -- "$current") == "$base/releases" ]] || die "Unexpected release path."
+    if [[ -n ${MXIOC_GO_EXPECT_CURRENT:-} ]]; then
+        [[ "$current" == "$MXIOC_GO_EXPECT_CURRENT" ]] || die "Installed version changed before removal."
+        cmp -s "$current/mxioc-go-release.service" "$unit" || die "Installed systemd unit differs from this release."
+    fi
+    purge=${MXIOC_GO_PURGE_DATA:-0}
+    [[ "$purge" == 0 || "$purge" == 1 ]] || die "Invalid data removal option."
+    if [[ "$purge" == 1 ]]; then
+        [[ -n ${MXIOC_GO_EXPECT_CURRENT:-} ]] || die "Data removal requires a version-bound uninstall job."
+        if systemctl is-active --quiet "$legacy" || systemctl is-enabled --quiet "$legacy"; then
+            die "Python service still uses the shared data; data removal refused."
+        fi
+        [[ -d "$data" && ! -L "$data" && $(readlink -f -- "$data") == "$data" ]] || die "Unexpected data directory."
+        [[ -f "$auth" && ! -L "$auth" && $(readlink -f -- "$auth") == "$auth" ]] || die "Unexpected credential path."
+        command -v findmnt >/dev/null || die "findmnt is required for data removal."
+        # Do not traverse mounted filesystems inside the data directory.
+        mount_table=$(findmnt -rn -o TARGET) || die "Mount inventory unavailable."
+        while IFS= read -r mount_path; do
+            [[ "$mount_path" != "$data" && "$mount_path" != "$data/"* ]] || die "Mounted data cannot be purged."
+        done <<< "$mount_table"
+    fi
+    # Keep enough local state to undo a partial removal. The release lock
+    # remains held throughout rollback, including service restoration.
+    was_active=0
+    was_enabled=0
+    systemctl is-active --quiet "$service" && was_active=1
+    systemctl is-enabled --quiet "$service" && was_enabled=1
+    original_link=$(readlink -- "$base/current")
+    removal_stage=$(mktemp -d "$base/.remove.XXXXXXXX")
+    if ! cp -p -- "$unit" "$removal_stage/unit"; then
+        rmdir -- "$removal_stage"
+        die "Could not preserve the installed unit before removal."
+    fi
+    rollback_removal() {
+        local status=$? restored=1
+        trap - EXIT HUP INT TERM
+        if (( status != 0 )); then
+            cp -p -- "$removal_stage/unit" "$unit" || restored=0
+            if [[ ! -e "$base/current" && ! -L "$base/current" ]]; then
+                ln -s -- "$original_link" "$base/current" || restored=0
+            elif [[ ! -L "$base/current" || $(readlink -- "$base/current") != "$original_link" ]]; then
+                restored=0
+            fi
+            systemctl daemon-reload || restored=0
+            if (( restored )); then
+                if (( was_enabled )); then
+                    systemctl enable "$service" || restored=0
+                fi
+                if (( was_active )); then
+                    systemctl start "$service" || restored=0
+                fi
+            fi
+            if (( restored )); then
+                printf 'Removal failed; previous installation and service state restored.\n' >&2
+            else
+                printf 'Removal failed; restoration is incomplete. Recovery unit retained at %s/unit.\n' "$removal_stage" >&2
+            fi
+        fi
+        if (( restored )); then
+            rm -rf -- "$removal_stage"
+        fi
+        exit "$status"
+    }
+    trap rollback_removal EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     systemctl disable --now "$service"
     rm -- "$unit" "$base/current"
     systemctl daemon-reload
-    printf 'Go service removed. Subscription data, credentials and cached releases are preserved.\n'
+    if [[ "$purge" == 1 ]]; then
+        # Deletion is irreversible: never restart the service against partially
+        # removed data. Leave a recovery unit for diagnosis on deletion failure.
+        trap - EXIT HUP INT TERM
+        if ! rm -rf --one-file-system -- "$data" || ! rm -f -- "$auth"; then
+            die "Service removed; data removal incomplete. Check data paths before reinstalling."
+        fi
+        rm -rf -- "$removal_stage"
+        printf 'Go service and local subscription data, backups and credentials removed. Remote nodes and cached releases are preserved.\n'
+    else
+        printf 'Go service removed. Subscription data, credentials and cached releases are preserved.\n'
+    fi
     exit 0
 fi
 

@@ -26,11 +26,21 @@ func main() {
 	adminHTML := flag.String("admin-html", "", "optional release-specific administrator HTML path")
 	bootstrapUser := flag.String("bootstrap-user", "", "initialize a fresh data directory and account using a password read from stdin")
 	applyRelease := flag.String("apply-release", "", "run the queued systemd release update")
+	removeService := flag.Bool("remove-service", false, "run the queued service removal with persisted data policy")
 	updateJob := flag.String("update-job", "", "queued release update identifier")
 	flag.Parse()
 	var updater *releaseupdate.Manager
 	if !*local && *root == "/opt/mxioc-rule-manager" && *auth == "/etc/mxioc-rule-manager.auth.json" && releaseupdate.ValidVersion(releaseVersion) {
 		updater = releaseupdate.Managed()
+	}
+	if *removeService {
+		if updater == nil || *check || *bootstrapUser != "" || *applyRelease != "" {
+			log.Fatal("service removal requires the packaged Linux installation")
+		}
+		if err := updater.RunUninstall(releaseVersion, *updateJob); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 	if *applyRelease != "" || *updateJob != "" {
 		if updater == nil || *check || *bootstrapUser != "" {
@@ -50,7 +60,11 @@ func main() {
 		}
 		return
 	}
-	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local, ReleaseUpdater: updater})
+	var uninstaller web.ServiceUninstaller
+	if updater != nil {
+		uninstaller = updater
+	}
+	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local, ReleaseUpdater: updater, ServiceUninstaller: uninstaller})
 	if err != nil {
 		log.Fatal("startup validation failed: ", err)
 	}
@@ -67,14 +81,22 @@ func main() {
 	if err = handler.RunBackground(ctx); err != nil {
 		log.Fatal("background accounting startup failed: ", err)
 	}
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = server.Shutdown(shutdown)
+		if err := server.Shutdown(shutdown); err != nil {
+			log.Print("HTTP shutdown: ", err)
+		}
+		if err := handler.WaitAccountingStopped(shutdown); err != nil {
+			log.Print("accounting shutdown: ", err)
+		}
 	}()
 	log.Print("Go migration service listening on ", *listen)
 	if err = server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+	<-shutdownDone
 }

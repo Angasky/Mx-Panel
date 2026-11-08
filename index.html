@@ -2170,7 +2170,7 @@ function serverForm(encoded = '', existing = false) {
     $('rsCoreBox').classList.toggle('hidden', !core || existing);
     $('rsInstallNote').textContent = core ? (existing
       ? '通过 SSH 读取已有内核配置，并验证内核与 systemd 服务，不安装、不重启、不修改远端配置。默认位置：Xray /usr/local/bin/xray、/usr/local/etc/xray/config.json；sing-box /usr/bin/sing-box、/etc/sing-box/config.json。验证成功后可创建总控受管节点，原有未受管节点不会自动导入。'
-      : '将使用官方安装器安装独立内核，不提供 Web 面板。安装会重启服务，请检查配置中的端口是否与已有软件冲突。可在服务器节点页面创建模板节点和中转。') : panelNote;
+      : '安装固定版本的独立内核：Xray 26.10.31 或 sing-box 1.14.4，不提供 Web 面板。先验证配置再替换，失败尝试恢复旧程序、配置及服务状态。安装会重启服务，请检查端口冲突。当前 sing-box 客户端连接此 Xray 版本的 Reality 不兼容，请使用已验证的客户端与协议组合。') : panelNote;
     ['rsPanelUser', 'rsPanelPassword', 'rsMode'].forEach(id => {
       $(id).parentElement.classList.toggle('hidden', core);
       $(id).disabled = core;
@@ -2519,11 +2519,11 @@ function renderRemoteNodes() {
   const canImport=row=>readOnly ? row.provisionable === true : remoteSupportsIndependentUser(row)&&row.enable!==false;
   const q = S.filters.remoteNodes || '', s = S.remoteServer;
   const page = tableSlice(S.remoteRows.filter(x => `${x.remark} ${x.protocol} ${x.port}`.toLowerCase().includes(q.toLowerCase())), 'serverNodes');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${['xray','sing-box'].includes(s.installType) ? '<button class="btn primary" onclick="remoteNodeForm(true)">添加中转</button>' : ''}${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。独立内核仅展示总控创建的入站。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${['xray','sing-box'].includes(s.installType) ? '<button class="btn primary" onclick="remoteNodeForm(true)">添加中转</button>' : ''}${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn" onclick="rawPanelInboundForm(true)">创建单密码 SS</button><button class="btn" onclick="rawPanelInboundForm()">原始入站新增</button><button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
     <div class="toolbar"><button id="remoteBatchImport" class="btn" onclick="remoteNodeBatchLinks()">批量导入订阅</button><button id="remoteSelectionClear" class="btn small">取消节点选择</button><input id="search" aria-label="搜索远端节点" placeholder="搜索节点名称、协议、端口…" value="${esc(q)}"></div>
     <div class="tablewrap"><table><thead><tr><th><input id="remoteNodesAll" type="checkbox" aria-label="全选本页可导入节点"></th><th>ID</th><th>名称</th><th>协议 / 端口</th><th>状态</th><th>上传 / 下载</th><th>订阅联动</th><th>操作</th></tr></thead><tbody>
     ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}${x.coreRelay ? ' <span class="pill">中转</span>' : ''}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : x.editPending ? '编辑待核对' : coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
-      ${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${remoteSupportsIndependentUser(x) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
+      ${x.legacyRelayNeedsProof ? `<button class="btn small" onclick="adoptLegacyRelay(${x.id})">核对旧中转归属</button>` : ''}<button class="btn small" onclick="bindDedicatedRemoteNode(${x.id})">绑定专属入站</button>${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${remoteSupportsIndependentUser(x) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
     </tbody></table></div>${pagination(page)}</section>`;
   const updateSelection=()=>{const selected=S.remoteNodeSelection.size,available=page.rows.filter(canImport);$('remoteBatchImport').disabled=!selected;$('remoteBatchImport').textContent=`将所选 ${selected} 个节点导入订阅`;$('remoteSelectionClear').disabled=!selected;$('remoteNodesAll').checked=!!available.length&&available.every(row=>S.remoteNodeSelection.has(row.id));$('remoteNodesAll').indeterminate=available.some(row=>S.remoteNodeSelection.has(row.id))&&!$('remoteNodesAll').checked;};
   document.querySelectorAll('.remoteNodeChoice').forEach(input=>input.onchange=()=>{const id=Number(input.value);if(input.checked&&S.remoteNodeSelection.size>=50){input.checked=false;return notice('一次最多选择 50 个节点');}input.checked?S.remoteNodeSelection.add(id):S.remoteNodeSelection.delete(id);updateSelection();});
@@ -2558,6 +2558,47 @@ async function prepareNodeCertificate(serverId,domain,form) {
   return null;
 }
 
+function rawPanelInboundForm(shadowsocks = false) {
+  if (['xray','sing-box'].includes(S.remoteServer?.installType)) return;
+  const serverId=S.serverId, profile=S.profile, operationId=crypto.randomUUID().replaceAll('-','');
+  openModal(shadowsocks ? '创建单密码 Shadowsocks 入站' : '原始面板入站新增', `<form id="rawPanelForm">${shadowsocks ? '<p class="hint">使用 AES-128-GCM 和服务器生成的随机密码，支持 TCP / UDP。创建后可查看链接，不自动绑定订阅，也不启用按订阅计量或到期限制。</p><label for="panelSSName">节点名称</label><input id="panelSSName" maxlength="100" value="Shadowsocks"><label for="panelSSPort">端口</label><input id="panelSSPort" type="number" min="1" max="65535" placeholder="留空自动分配">' : `<p class="hint">填写面板入站 JSON。保留其中的用户凭据，不自动导入或绑定订阅。端口、协议、证书路径及其他配置按原文下发。</p><label for="rawPanelJSON">入站 JSON</label><textarea id="rawPanelJSON" rows="16" required spellcheck="false">{
+  "port": 24001,
+  "protocol": "vmess",
+  "enable": true,
+  "settings": {"clients": []},
+  "streamSettings": {"network": "tcp", "security": "none"}
+}</textarea>`}<p class="error" id="rawPanelError" role="alert"></p><button id="rawPanelSave" class="btn primary">创建入站</button></form>`);
+  const form=$('rawPanelForm'), input=$('rawPanelJSON'), button=$('rawPanelSave'), errorBox=$('rawPanelError');
+  let submitted=null;
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    if(button.disabled)return;
+    let created=false;
+    try {
+      if(!submitted){
+        if(shadowsocks){
+          const port=$('panelSSPort').value;
+          if(port && (!/^\d+$/.test(port) || Number(port)<1 || Number(port)>65535))throw Error('监听端口必须为 1–65535');
+          submitted={serverId,operationId,template:'shadowsocks',remark:$('panelSSName').value,port};
+        } else {
+          const inbound=JSON.parse(input.value);
+          if(!inbound || Array.isArray(inbound) || typeof inbound!=='object')throw Error('入站配置必须为 JSON 对象');
+          submitted={serverId,operationId,inbound};
+        }
+      }
+      form.querySelectorAll('input,textarea').forEach(control=>control.disabled=true);button.disabled=true;errorBox.textContent='';
+      const options=jsonOpt('POST',submitted);options.headers={...(options.headers||{}),'X-Profile':profile};
+      await api('/servers/inbounds',options);created=true;S.remoteLoaded=false;
+      if(form.isConnected)closeModal();
+      if(S.page==='serverNodes' && S.serverId===serverId)await serverNodes();
+      notice('入站已创建，未自动绑定订阅；可从服务器列表查看链接');
+    } catch(error) {
+      if(created)alert('入站已创建，但列表刷新失败，请刷新核对，勿重复创建。');
+      else if(form.isConnected){errorBox.textContent=error.message;button.disabled=false;button.textContent=submitted?'重试核对':'创建入站';}
+    }
+  };
+}
+
 function remoteNodeForm(relay) {
   const standalone = ['xray','sing-box'].includes(S.remoteServer?.installType);
   const singRelay = relay && S.remoteServer?.installType === 'sing-box';
@@ -2573,7 +2614,7 @@ function remoteNodeForm(relay) {
     <div><label for="rnPort">监听端口</label><input id="rnPort" type="number" min="1" max="65535" ${standalone ? 'placeholder="留空自动分配"' : `required value="${randomPort}"`}><p class="hint">默认随机使用 20001–65535，可手动修改；创建时检查冲突。</p></div>
     ${relay ? '' : '<div class="span2"><label for="rnTemplate">节点模板</label><select id="rnTemplate"><option value="vless-reality">VLESS + Reality / Vision（免证书）</option><option value="vmess-tcp">VMess + TCP</option><option value="trojan-tls">Trojan + TLS（自动证书）</option><option value="vless-ws-tls">VLESS + WebSocket + TLS（自动证书）</option></select><p class="hint">模板按所选服务器内核提供。同一入站可供多个订阅使用；每个订阅拥有独立用户、用量和有效期。共用入站暂不支持单用户带宽限制。</p></div>'}
     <div class="span2 ${singRelay ? 'hidden' : ''}" id="rnSniFields"><label id="rnSniLabel" for="rnSni">Reality 伪装域名</label><div class="sni-field"><input id="rnSni" value="raw.githubusercontent.com" ${singRelay ? '' : 'required'}><datalist id="rnTlsDomains">${remoteTlsDomains().map(domain=>`<option value="${esc(domain)}"></option>`).join('')}</datalist><button id="rnSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button></div><p class="hint" id="rnSniHint">Reality 可扫描并选择内置候选域名。</p></div>
-    ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label id="rnPathLabel" for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"></div><div id="rnXhttpField" class="hidden"><label for="rnXhttpMode">XHTTP 模式</label><select id="rnXhttpMode"><option value="stream-up">stream-up</option><option value="packet-up">packet-up</option><option value="stream-one">stream-one</option><option value="auto">auto</option></select></div><div id="rnGrpcField" class="hidden"><label for="rnGrpcService">gRPC 服务名</label><input id="rnGrpcService" value="vpn" maxlength="128" pattern="[A-Za-z0-9._\\-]+"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
+    ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label id="rnPathLabel" for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"><label for="rnTransportHost">Host（可选）</label><input id="rnTransportHost" maxlength="256" placeholder="留空使用服务器地址"></div><div id="rnXhttpField" class="hidden"><label for="rnXhttpMode">XHTTP 模式</label><select id="rnXhttpMode"><option value="stream-up">stream-up</option><option value="packet-up">packet-up</option><option value="stream-one">stream-one</option><option value="auto">auto</option></select></div><div id="rnAlpnField" class="hidden"><label for="rnAlpn">ALPN（高级）</label><input id="rnAlpn" maxlength="32" placeholder="h2,http/1.1"><p class="hint">按优先顺序以逗号分隔。gRPC 仅允许 h2；XHTTP 必须包含 h2。</p></div><div id="rnGrpcField" class="hidden"><label for="rnGrpcService">gRPC 服务名</label><input id="rnGrpcService" value="vpn" maxlength="128" pattern="[A-Za-z0-9._\\-]+"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
     ${relay ? `<div class="span2"><label for="rnLanding">落地节点分享链接</label><textarea id="rnLanding" required placeholder="${singRelay ? '支持 HY2、TUIC、VLESS、VMess、Trojan、SS、SOCKS5、HTTP' : 'vless://、vmess://、trojan://、ss://、socks5:// 或 http://'}"></textarea><div class="note">将创建 ${singRelay ? 'VMess TCP' : 'Reality'} 入口、落地出站和专属路由。</div></div>` : ''}
   </div>${standalone ? '<p class="note">创建会重启内核。统计接口验证通过后，后台才会为当前订阅创建独立用户。</p>' : ''}<label class="inlinecheck"><input id="rnImport" type="checkbox" checked disabled>创建后添加到当前订阅</label><div id="remoteError" class="error" role="alert"></div><button id="rnSave" class="btn primary">创建${relay ? '中转' : '节点'}</button></form>`);
   if ($('rnTemplate')) {
@@ -2581,7 +2622,7 @@ function remoteNodeForm(relay) {
     if (standalone) {
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-128', 'ss2022-aes-128'));
       $('rnTemplate').add(new Option('Shadowsocks 2022 AES-256', 'ss2022-aes-256'));
-      if (S.remoteServer.installType === 'xray') {
+      if (standalone) {
         $('rnTemplate').add(new Option('Shadowsocks AES-128-GCM', 'ss-aes-128-gcm'));
         $('rnTemplate').add(new Option('Shadowsocks AES-256-GCM', 'ss-aes-256-gcm'));
         $('rnTemplate').add(new Option('Shadowsocks ChaCha20-Poly1305', 'ss-chacha20-poly1305'));
@@ -2613,6 +2654,9 @@ function remoteNodeForm(relay) {
       $('rnWsField').classList.toggle('hidden', !xhttp && !wsTemplates.includes(val('rnTemplate')));
       $('rnPathLabel').textContent = xhttp ? 'XHTTP 路径' : 'WebSocket 路径';
       $('rnXhttpField').classList.toggle('hidden', !xhttp);
+      const customAlpn=tls && !['hysteria2','tuic'].includes(val('rnTemplate'));
+      $('rnAlpnField').classList.toggle('hidden',!customAlpn);$('rnAlpn').disabled=!customAlpn;
+      $('rnAlpn').value=xhttp || grpcTemplates.includes(val('rnTemplate')) ? 'h2' : 'h2,http/1.1';
       const grpc = grpcTemplates.includes(val('rnTemplate'));
       $('rnGrpcField').classList.toggle('hidden', !grpc);
       $('rnGrpcService').required = grpc;
@@ -2642,7 +2686,7 @@ function remoteNodeForm(relay) {
     if(S.profile!==profile || S.serverId!==serverId){$('remoteError').textContent='服务器或订阅已切换，请重新打开创建窗口';return;}
     let created = false;
     $('rnSave').disabled = true;
-    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, xhttpMode:val('rnTemplate') === 'vless-xhttp-tls' ? val('rnXhttpMode') : undefined, grpcService:grpcTemplates.includes(val('rnTemplate')) ? val('rnGrpcService') : undefined, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? val('rnRelayTemplate') : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
+    const payload = submittedPayload || {serverId,operationId:creationOperationId, certFile:$('rnCert')?.value, keyFile:$('rnKey')?.value, path:$('rnPath')?.value, alpn:$('rnAlpn') && !$('rnAlpn').disabled ? val('rnAlpn') : undefined, wsHost:wsTemplates.includes(val('rnTemplate')) ? val('rnTransportHost') : undefined, xhttpHost:val('rnTemplate') === 'vless-xhttp-tls' ? val('rnTransportHost') : undefined, xhttpMode:val('rnTemplate') === 'vless-xhttp-tls' ? val('rnXhttpMode') : undefined, grpcService:grpcTemplates.includes(val('rnTemplate')) ? val('rnGrpcService') : undefined, remark:val('rnName'),port:val('rnPort'),serverName:val('rnSni'),sniVerified:$('rnSni')?.dataset.sniVerified === val('rnSni'),sniAddress:$('rnSni')?.dataset.sniVerified === val('rnSni') ? $('rnSni')?.dataset.sniAddress : undefined,template:relay ? (singRelay ? val('rnRelayTemplate') : 'vless-reality') : val('rnTemplate'),landingLink:relay ? val('rnLanding') : undefined};
     try {
       if(!submittedPayload && !relay && tlsTemplates.includes(payload.template) && val('rnCertMode')==='auto') {
         const job=await prepareNodeCertificate(serverId,payload.serverName,form);
@@ -2992,9 +3036,12 @@ function remoteNodeEditManaged(id) {
     <p class="muted">${row.editPending ? '继续核对并保存上次提交的配置。' : '修改端口或传输参数前需解除订阅绑定。应用连接配置时会重启内核。'}</p>
     <label>入站名称<input name="remark" required maxlength="100"></label>
     <label>监听端口<input name="port" required type="number" min="1" max="65535"></label>
+    ${Object.hasOwn(fields,'alpn') ? `<label>ALPN<input name="alpn" maxlength="32" placeholder="h2,http/1.1"></label><p class="hint">按顺序以逗号分隔。gRPC 仅允许 h2；XHTTP 必须包含 h2。TCP / WS 留空使用内核默认值。</p>` : ''}
     ${fields.protocol ? `<label>节点协议<select name="protocol" ${row.editPending ? 'disabled' : ''}>${options(['vless','vmess','trojan'],fields.protocol)}</select></label><p class="hint">协议切换要求入站没有用户；保存后重新导入订阅会创建新的独立 UUID 或密码。</p>` : ''}
     ${fields.network ? `<label>传输方式<select name="network" ${row.editPending ? 'disabled' : ''}>${options(['tcp','ws','grpc'],fields.network)}</select></label><div id="coreTransportFields"></div>` : ''}
     ${!fields.network && transport ? `<label>${transport[1]}<input name="${transport[0]}" ${transport[0]==='grpcService' ? 'required maxlength="128" pattern="[A-Za-z0-9._\\-]+"' : 'maxlength="256"'}></label>` : ''}
+    ${!fields.network && Object.hasOwn(fields,'wsHost') ? `<label>WebSocket Host<input name="wsHost" maxlength="256" placeholder="留空使用服务器地址"></label>` : ''}
+    ${Object.hasOwn(fields,'xhttpHost') ? `<label>XHTTP Host<input name="xhttpHost" maxlength="256" placeholder="留空使用服务器地址"></label>` : ''}
     ${Object.hasOwn(fields,'xhttpMode') ? `<label>XHTTP 模式<select name="xhttpMode" ${row.editPending ? 'disabled' : ''}>${options(['auto','stream-up','packet-up','stream-one'], fields.xhttpMode)}</select></label>` : ''}
     <div class="error" role="alert"></div><button class="btn primary">保存</button></form>`);
   const form=$('coreInboundEdit'), save=form.querySelector('button'), errorBox=form.querySelector('.error');
@@ -3004,14 +3051,21 @@ function remoteNodeEditManaged(id) {
     input.readOnly=!!row.editPending;
   }
   if(form.elements.network){
-    const drafts={ws:fields.wsPath || '/',grpc:fields.grpcService || 'vpn'};let active=fields.network;
+    const drafts={ws:fields.wsPath || '/',grpc:fields.grpcService || 'vpn',wsHost:fields.wsHost || ''};let active=fields.network;
     const render=()=>{
       if(form.elements.wsPath)drafts.ws=form.elements.wsPath.value;
+      if(form.elements.wsHost)drafts.wsHost=form.elements.wsHost.value;
       if(form.elements.grpcService)drafts.grpc=form.elements.grpcService.value;
-      active=form.elements.network.value;
+      const nextNetwork=form.elements.network.value;
+      if(nextNetwork!==active && form.elements.alpn)form.elements.alpn.value=nextNetwork==='grpc'?'h2':'h2,http/1.1';
+      active=nextNetwork;
       const key=active==='ws'?'wsPath':active==='grpc'?'grpcService':null;
       $('coreTransportFields').innerHTML=key?`<label>${active==='ws'?'WebSocket 路径':'gRPC 服务名'}<input name="${key}" required ${active==='grpc'?'maxlength="128" pattern="[A-Za-z0-9._\\-]+"':'maxlength="256"'}></label>`:'';
       if(key){form.elements[key].value=drafts[active];form.elements[key].readOnly=!!row.editPending;}
+      if(active==='ws'){
+        $('coreTransportFields').insertAdjacentHTML('beforeend','<label>WebSocket Host<input name="wsHost" maxlength="256" placeholder="留空使用服务器地址"></label>');
+        form.elements.wsHost.value=drafts.wsHost;form.elements.wsHost.readOnly=!!row.editPending;
+      }
     };
     form.elements.network.onchange=render;render();
   }
@@ -3041,6 +3095,38 @@ async function remoteNodeDelete(id) {
   if (!confirm(message)) return;
   try { await api('/servers/inbounds',jsonOpt('DELETE',{serverId,inboundId:id,expectedIdentity})); if(S.serverId===serverId && S.page===page)await serverNodes(true); notice('远端入站已删除'); }
   catch (error) { alert(error.message); }
+}
+
+function adoptLegacyRelay(id) {
+ const row=S.remoteRows.find(r=>r.id===id);if(!row?.legacyRelayNeedsProof)return;
+ const serverId=S.serverId,expectedIdentity=row.editToken;
+ openModal('核对旧中转归属',`<form id="relayAdoptForm"><p>从原始备份中填写此中转的出站对象和对应路由对象。后端会逐项核对远端配置及独占引用，只保存归属摘要；随后才能使用原有删除流程清理资源。</p><label>原出站 JSON<textarea id="relayAdoptOutbound" required spellcheck="false"></textarea></label><label>原路由 JSON<textarea id="relayAdoptRoute" required spellcheck="false"></textarea></label><label><input id="relayAdoptConfirmed" type="checkbox" required>我确认这些资源属于此旧中转</label><div id="relayAdoptError" class="error"></div><button class="btn primary">核对并保存归属</button></form>`);
+ const form=$('relayAdoptForm'),button=form.querySelector('button');
+ form.onsubmit=async event=>{
+  event.preventDefault();if(button.disabled)return;
+  try{
+   if(!$('relayAdoptConfirmed').checked)throw Error('请确认资源归属');
+   const outbound=JSON.parse($('relayAdoptOutbound').value),route=JSON.parse($('relayAdoptRoute').value);
+   if(!outbound || !route || Array.isArray(outbound) || Array.isArray(route) || typeof outbound!=='object' || typeof route!=='object')throw Error('出站和路由必须是 JSON 对象');
+   button.disabled=true;
+   await api('/servers/relay/adopt',jsonOpt('POST',{serverId,inboundId:id,expectedIdentity,confirmed:true,outbound,route}));
+   if(form.isConnected)closeModal();
+   if(S.serverId===serverId && S.page==='serverNodes')await serverNodes(true);
+   notice('旧中转归属已核对，远端配置未改动');
+  }catch(error){if(form.isConnected)$('relayAdoptError').textContent=error.message;}
+  finally{if(button.isConnected)button.disabled=false;}
+ };
+}
+
+async function bindDedicatedRemoteNode(id) {
+  const serverId=S.serverId,profile=S.profile;
+  if(!confirm('将此入站专属绑定到当前订阅？保留原凭据，从当前流量开始计费。有认证用户时到期撤销该用户；单密码 Shadowsocks / 单连接 HTTP、SOCKS 到期删除整个入站、月额度用尽停用整个入站；独立内核会初始化并核对专属端口计量。其他订阅不得共用；多用户或归属冲突会拒绝。'))return;
+  try {
+    const opt=jsonOpt('POST',{serverId,inboundId:id,confirmed:true});opt.headers['X-Profile']=profile;
+    await api('/servers/bind',opt);
+    if(S.profile===profile)await reload(false);
+    notice('专属入站已绑定，计量和到期限制已启用');
+  } catch(error){alert(error.message+'；结果待核对时请在同一入站重试。');}
 }
 
 async function importRemoteLinks(links, source) {
@@ -3249,7 +3335,7 @@ async function removeTrafficBinding(index, button, migrate = false) {
   if (bindingRemovalPending) return notice('正在删除绑定记录，请稍候');
   const profile = S.profile, binding = S.data.profile?.traffic?.bindings?.[index];
   if (!binding) return notice('记录已变更，请刷新列表');
-  if (!confirm(migrate ? `把这条旧绑定迁移为独立用户计量？节点连接、订阅地址和已计费用量会保留。切换计数来源时，从新的用户计数基线开始计费。` : `删除「${binding.name || '未命名'} : ${binding.port}」这条绑定记录？\n只删除本地记录，保留已计费用量、订阅链接和远端节点；服务器已有的限速或暂停状态不会改变。\n如果节点仍存在，移除后总控不再通过这条绑定计量或执行到期限制。`)) return;
+  if (!confirm(migrate ? `核对并迁移这条旧绑定？保留原连接、订阅地址和已计费用量。有认证用户时迁移到用户计量；专属单连接代理保留整入站计量及到期删除。缺少身份摘要时必须与当前订阅中唯一保存的连接一致。` : `删除「${binding.name || '未命名'} : ${binding.port}」这条绑定记录？\n只删除本地记录，保留已计费用量、订阅链接和远端节点；服务器已有的限速或暂停状态不会改变。\n如果节点仍存在，移除后总控不再通过这条绑定计量或执行到期限制。`)) return;
   if (button?.disabled) return;
   bindingRemovalPending = true;
   if (button) button.disabled = true;
@@ -3261,7 +3347,7 @@ async function removeTrafficBinding(index, button, migrate = false) {
     if (S.profile !== profile) return;
     S.data.profile.traffic = result.traffic;
     if (S.page === 'traffic') traffic();
-    notice(migrate ? (result.legacyMeterRetained ? '已切换到独立用户计量，可清理旧端口计量规则' : '旧绑定已迁移为独立用户') : '绑定记录已删除，已计费用量保留');
+    notice(migrate ? (result.legacyMeterRetained ? '已切换到独立用户计量，可清理旧端口计量规则' : result.scope==='inbound' ? '旧专属入站已核对并迁移' : '旧绑定已迁移为独立用户') : '绑定记录已删除，已计费用量保留');
   } catch (error) {
     if (S.profile === profile && $('trafficError')) $('trafficError').textContent = error.message;
   } finally { bindingRemovalPending = false; if (button?.isConnected) button.disabled = false; }
@@ -3290,11 +3376,11 @@ function trafficBindings(t) {
   const history = (t.bindings || []).filter(b => b.status !== 'active');
   const positions = new Map((t.bindings || []).map((binding, index) => [binding, index]));
   const removeButton = b => `<button type="button" class="btn small danger" data-remove-binding="${positions.get(b)}" onclick="removeTrafficBinding(${positions.get(b)},this)">删除记录</button>`;
-  const migrateButton = b => b.scope !== 'user' && !b.monthlyPaused &&
+  const migrateButton = b => b.scope !== 'user' && !b.dedicated && !b.monthlyPaused &&
     (b.counterSource === 'authenticated-client' || (S.idempotentCreate && ['inbound',''].includes(b.counterSource ?? '')))
-    ? `<button type="button" class="btn small" onclick="removeTrafficBinding(${positions.get(b)},this,true)">迁移到独立用户</button>` : '';
+    ? `<button type="button" class="btn small" onclick="removeTrafficBinding(${positions.get(b)},this,true)">核对迁移旧绑定</button>` : '';
   const labels = {active:'有效',detached:'已解绑',revoked:'已撤销',missing:'远端已不存在',identity_changed:'身份已变化（停止管理）',provisioning:'用户创建待核对（重试添加可恢复）'};
-  return `<h3>有效绑定节点（${active.length}）</h3><div class="tablewrap"><table><thead><tr><th>订阅用户 / 入站</th><th>服务器 / ID</th><th>状态 / 限速</th><th>操作 / 错误</th></tr></thead><tbody>${active.map(b => `<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${b.scope === 'user' ? '独立用户 · '+esc(b.userEmail) : '旧版专属绑定（可迁移）'}</div></td><td>${esc(b.serverId)} / ${b.inboundId}</td><td>${b.monthlyPaused ? '月额度暂停' : '有效'} · ${esc((b.multiplierUnits ?? ((t.multiplier ?? 1) * 1000)) / 1000)} 倍<div class="hint">${bandwidthLabel(b.bandwidth)}</div><div class="hint">${b.counterSource === 'authenticated-client' ? '认证用户流量' : b.counterSource === 'pending' ? '等待首次采集' : '入站/端口流量（含连接开销）'} · 本次采集 ${formatBytes(b.lastRawDelta || 0)}${b.lastSampleAt ? ' · '+esc(new Date(b.lastSampleAt * 1000).toLocaleTimeString('zh-CN')) : ''}</div></td><td><button type="button" class="btn small" ${b.scope === 'user' ? 'disabled title="共用入站暂不支持单用户带宽限制"' : ''} onclick="nodeBandwidthModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点带宽限制</button><button type="button" class="btn small" onclick="nodeMultiplierModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点流量倍率</button>${migrateButton(b)}${b.legacyMeterRetained === true ? `<button type="button" class="btn small" onclick="clearTrafficLegacyMeter(${positions.get(b)},this)">清理旧端口计量</button>` : ''}${removeButton(b)}<div class="error">${esc(b.error || '')}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">暂无有效绑定，请选择服务器入站添加独立订阅用户</td></tr>'}</tbody></table></div>
+  return `<h3>有效绑定节点（${active.length}）</h3><div class="tablewrap"><table><thead><tr><th>订阅用户 / 入站</th><th>服务器 / ID</th><th>状态 / 限速</th><th>操作 / 错误</th></tr></thead><tbody>${active.map(b => `<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${b.scope === 'user' ? (b.dedicated ? '专属用户' : '独立用户') : b.dedicated ? '专属整入站' : '旧版专属绑定（可迁移）'}</div></td><td>${esc(b.serverId)} / ${b.inboundId}</td><td>${b.monthlyPaused ? '月额度暂停' : '有效'} · ${esc((b.multiplierUnits ?? ((t.multiplier ?? 1) * 1000)) / 1000)} 倍<div class="hint">${bandwidthLabel(b.bandwidth)}</div><div class="hint">${b.counterSource === 'authenticated-client' ? '认证用户流量' : b.counterSource === 'pending' ? '等待首次采集' : '入站/端口流量（含连接开销）'} · 本次采集 ${formatBytes(b.lastRawDelta || 0)}${b.lastSampleAt ? ' · '+esc(new Date(b.lastSampleAt * 1000).toLocaleTimeString('zh-CN')) : ''}</div></td><td><button type="button" class="btn small" ${b.scope === 'user' ? 'disabled title="共用入站暂不支持单用户带宽限制"' : ''} onclick="nodeBandwidthModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点带宽限制</button><button type="button" class="btn small" onclick="nodeMultiplierModal('${encodeURIComponent(b.serverId).replace(/'/g,'%27')}',${b.inboundId})">节点流量倍率</button>${migrateButton(b)}${b.legacyMeterRetained === true ? `<button type="button" class="btn small" onclick="clearTrafficLegacyMeter(${positions.get(b)},this)">清理旧端口计量</button>` : ''}${removeButton(b)}<div class="error">${esc(b.error || '')}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">暂无有效绑定，请选择服务器入站添加独立订阅用户</td></tr>'}</tbody></table></div>
   ${history.length ? `<details id="trafficHistory"><summary>失效历史绑定（${history.length}）</summary><p class="hint">这些不是当前有效绑定，已停止计量；历史计费用量仍保留。身份变化表示旧绑定已失效，同一 ID 可能已被新节点使用。清理仅移除本地历史绑定，不会连接服务器、删除远端节点或订阅中的节点链接。</p><div class="tablewrap"><table><thead><tr><th>历史节点</th><th>状态</th><th>历史错误</th></tr></thead><tbody>${history.map(b=>`<tr><td>${esc(b.name || '')} : ${b.port}<div class="hint">${esc(b.serverId)} / ${b.inboundId}</div></td><td>${esc(labels[b.status] || b.status)}</td><td>${esc(b.error || '—')}${removeButton(b)}</td></tr>`).join('')}</tbody></table></div><button id="trafficCleanup" class="btn small danger" type="button">清理失效历史绑定</button></details>` : ''}`;
 }
 
@@ -3313,7 +3399,7 @@ function traffic() {
     <div id="trafficPlanError" class="error" role="alert"></div>
     </section><section class="panel">
     <div class="panel-head"><h3>流量额度与有效期</h3><div class="client-badges"><span>Clash / Mihomo</span><span>V2Ray</span><span>Shadowrocket</span></div></div>
-    <p class="muted">当前订阅：${esc(S.data.profile?.name || '')}。启用服务器强制限制后，后台每 30 秒巡检并累计独立用户用量；月额度用尽暂停该用户，下个周期恢复；一次性额度用尽或到期删除该用户授权，保留共用入站和其他用户，订阅链接返回 403。旧版专属绑定仍按旧规则处理，可在服务器节点中迁移。未绑定节点、外部节点和 Mihomo 客户端用量不能由总控强制控制。</p>
+    <p class="muted">当前订阅：${esc(S.data.profile?.name || '')}。启用服务器强制限制后，后台每 15 秒巡检并累计绑定用量；月额度用尽暂停该用户，下个周期恢复；一次性额度用尽或到期删除该用户授权，保留共用入站和其他用户，订阅链接返回 403。专属单连接代理按整入站计量，月额度用尽停用整个入站，到期删除整个入站；未迁移的旧绑定请先核对迁移。未绑定节点、外部节点和 Mihomo 客户端用量不能由总控强制控制。</p>
     <form id="trafficForm"><div class="grid">
       <div><label for="trafficUnit">流量单位</label><select id="trafficUnit"><option value="1073741824">GiB（1 GiB = 1024 MiB）</option><option value="1048576">MiB</option><option value="1099511627776">TiB</option></select></div>
       <div><label for="trafficTotal">${t.resetPeriod === 'monthly' ? '每月流量额度' : '总流量额度'}</label><input id="trafficTotal" type="number" min="0" step="any" placeholder="留空表示不限" value="${t.total != null ? t.total / unit : ''}"></div>
@@ -3354,14 +3440,14 @@ function traffic() {
     }
   };
   if ($('trafficCleanup')) $('trafficCleanup').onclick = async () => {
-    if (!confirm('只清理当前订阅已解绑、已撤销和远端缺失的历史绑定？已计费用量保留，不删除任何远端节点。')) return;
+    if (!confirm('只清理当前订阅已解绑、已撤销和远端缺失的历史绑定？已计费用量保留，不删除任何远端节点；待完成的删除或本地清理记录会保留。')) return;
     const profile = S.profile, button=$('trafficCleanup');button.disabled=true;
     try {
       const result=await api('/traffic/bindings/cleanup',jsonOpt('PUT',{confirmed:true}));
       if(S.profile!==profile)return;
       S.data.profile.traffic=result.traffic;
       if(S.page==='traffic')traffic();
-      notice(`已清理 ${result.removed} 条失效历史绑定，计费用量保留`);
+      notice(`已清理 ${result.removed} 条失效历史绑定，计费用量保留${result.retainedPending ? `；另有 ${result.retainedPending} 条待完成记录已保留，请先刷新服务器或同步重试` : ''}`);
     }catch(error){if($('trafficError'))$('trafficError').textContent=error.message;}
     finally{button.disabled=false;}
   };
@@ -3761,7 +3847,7 @@ async function chains() {
   </div>
   <section class="panel"><div class="panel-head"><h3>多入口负载均衡 · 主备切换</h3><button class="btn primary" onclick="failoverModal()">新增多入口主备</button></div>
   <p class="hint">多个入口 → 同一个出口。Mihomo 定期检测完整链路，按优先顺序选择可用入口，主入口恢复后自动切回。Mihomo 使用完整订阅；电脑 v2rayN、安卓 v2rayNG 使用 Xray 主备配置；小火箭需导入配套节点和策略配置。请在客户端订阅窗口选择。单节点分享链接不包含自动切换功能。全部入口失效时连接失败，不切换到直连。已有连接可能需要重连。出口 IP 取决于固定出口服务器的网络配置。</p>
-  <div class="tablewrap"><table><thead><tr><th>名称</th><th>入口优先顺序</th><th>固定出口</th><th>检测间隔 / 状态</th><th>操作</th></tr></thead><tbody>${S.failovers.map(f => `<tr><td>${esc(f.name)}</td><td>${f.entries.map(esc).join(' → ')}</td><td>${esc(f.exit)}</td><td>${esc(f.interval)} 秒 / ${esc(f.status === 'active' ? '已配置，客户端检测' : f.status)}${f.error ? `<div class="error">${esc(f.error)}</div>` : ''}</td><td><button class="btn small" onclick="profileClientLinks(encodeURIComponent(S.profile))">客户端导入</button>${f.status === 'creating' && f.operationId ? `<button class="btn small" onclick="resumeFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',this)">继续创建</button> <button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',true)">取消草稿</button>` : `<button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}')">${f.status === 'deleting' ? '继续清理' : '删除主备组'}</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">暂无多入口主备组</td></tr>'}</tbody></table></div></section>
+  <div class="tablewrap"><table><thead><tr><th>名称</th><th>入口优先顺序</th><th>固定出口</th><th>检测间隔 / 状态</th><th>操作</th></tr></thead><tbody>${S.failovers.map(f => `<tr><td>${esc(f.name)}</td><td>${f.entries.map(esc).join(' → ')}</td><td>${esc(f.exit)}</td><td>${esc(f.interval)} 秒 / ${esc(f.cancelRequested ? '取消中，等待远端核对' : f.status === 'active' ? '已配置，客户端检测' : f.status)}${f.error ? `<div class="error">${esc(f.error)}</div>` : ''}</td><td><button class="btn small" onclick="profileClientLinks(encodeURIComponent(S.profile))">客户端导入</button>${f.status === 'creating' && f.operationId ? `${!f.cancelRequested ? `<button class="btn small" onclick="resumeFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',this)">继续创建</button>` : ''} <button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',true)">${f.cancelRequested ? '继续取消' : '取消草稿'}</button>` : `<button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}')">${f.status === 'deleting' ? '继续清理' : '删除主备组'}</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">暂无多入口主备组</td></tr>'}</tbody></table></div></section>
   <section class="panel"><div class="panel-head"><h3>服务器内部转发</h3></div><p class="hint">客户端只连接新生成的入口节点，可导出单节点链接。入口和出口服务器都须在总控登记。</p><div class="tablewrap"><table><thead><tr><th>名称</th><th>入口 → 出口</th><th>操作</th></tr></thead><tbody>${S.serverChains.filter(c => !(S.failovers || []).some(f => f.paths.includes(c.name))).map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.entry)} → ${esc(c.exit)}</td><td><button class="btn small danger" onclick="deleteServerChain('${encodeURIComponent(c.name).replace(/'/g, '%27')}')">删除服务器链路</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">暂无服务器链路</td></tr>'}</tbody></table></div></section>
   <section class="panel">
     <div class="note">Mihomo 客户端专用模式：链式两跳代理（Chained Relay Proxy）：客户端流量首先建立隧道至入口中转节点，再经由中转节点握手连接出口落地服务器。Clash/Mihomo 格式将完整保留此链路；转换为单节点分享链接时将自动跳过两跳节点。</div>
@@ -4344,15 +4430,16 @@ async function maintenance() {
   if (S.page !== 'maintenance' || S.profile !== profile) return;
   if (update.manual) {
     const job = update.job, busy = ['queued','running'].includes(job?.status);
-    const phases = {queued:'等待后台启动',download:'下载发布包',verify:'校验发布包',install:'检查数据、切换版本和验证服务',complete:'已完成'};
-    const jobStatus = {queued:'排队中',running:'更新中',succeeded:'更新成功',rolledBack:'已恢复旧版本',failed:'更新失败',interrupted:'结果待核对'};
+    const phases = {uninstall:'停止并移除 Go 服务，保留数据',queued:'等待后台启动',download:'下载发布包',verify:'校验发布包',install:'检查数据、切换版本和验证服务',complete:'已完成'};
+    const jobStatus = {queued:'排队中',running:job?.operation==='uninstall'?'卸载中':'更新中',succeeded:job?.operation==='uninstall'?'卸载完成':'更新成功',rolledBack:'已恢复旧版本',failed:job?.operation==='uninstall'?'卸载失败':'更新失败',interrupted:'结果待核对'};
     $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>Go 版本维护</h3><span class="pill">${esc(update.version)}</span></div>
       <p id="goUpdateStatus" aria-live="polite">${esc(update.checkError || (update.checking ? '正在检查…' : update.latestVersion ? '最新发布：' + update.latestVersion + (update.dismissed ? '（已忽略）' : update.available ? '（可更新）' : '') : update.checked ? '暂无可下载的 Go 发布包' : '尚未检查发布版本'))}</p>
       ${update.checkedAt ? `<p class="hint">上次成功检查：${esc(new Date(update.checkedAt * 1000).toLocaleString())}</p>` : ''}
       <div class="toolbar"><button id="goUpdateCheck" class="btn">检查更新</button>${update.available && !busy ? '<button id="goUpdateDismiss" class="btn">忽略此版本</button>' : ''}${update.applySupported && update.available && !busy ? '<button id="goUpdateApply" class="btn primary">应用更新</button>' : ''}</div>
-      ${job ? `<p role="status">${esc(job.version)} · ${esc(jobStatus[job.status] || job.status)} · ${esc(phases[job.stage] || job.stage)}</p>${job.error ? `<p class="error">${esc(job.error)}</p>` : ''}` : ''}
+      ${job ? `<p role="status">${job.operation==='uninstall' ? '卸载服务' : esc(job.version)} · ${esc(jobStatus[job.status] || job.status)} · ${esc(phases[job.stage] || job.stage)}</p>${job.error ? `<p class="error">${esc(job.error)}</p>` : ''}` : ''}
       <p>${update.applySupported ? '更新会先校验发布包，再短暂重启后台。页面将自动查询任务结果。' : '下载对应架构的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。'}</p>
       <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>
+      ${update.uninstallSupported && !busy ? `<form id="goUninstallForm"><h4>卸载 Go 服务</h4><p>停止并移除 Go 后台服务，默认保留本地数据；勾选清空后会删除本地订阅、账号和备份。远端节点保留。后台停止后本页面将无法继续访问。</p><label>当前用户名<input id="goUninstallUser" required autocomplete="username" value="${esc(account.username)}"></label><label>当前密码<input id="goUninstallPassword" required type="password" autocomplete="current-password"></label><label>确认文字<input id="goUninstallConfirmation" required placeholder="UNINSTALL"></label><label><input id="goUninstallPurge" type="checkbox">同时清空本地订阅、账号和备份（不可恢复）</label><p class="hint">数据可能与旧 Python 后台共用，旧服务运行或启用时会拒绝清空。远端节点不会被删除。</p><label>清空数据确认（仅勾选时填写）<input id="goUninstallPurgeConfirmation" autocomplete="off" placeholder="DELETE ALL DATA"></label><button class="btn danger">卸载服务</button></form>` : ''}
       <a class="btn" href="${esc(update.releaseUrl || 'https://github.com/Angasky/dingzhi-ban/releases')}" target="_blank" rel="noopener noreferrer">查看发布包</a>
     </section>`;
     const check = $('goUpdateCheck'), dismiss = $('goUpdateDismiss'), apply = $('goUpdateApply'), status = $('goUpdateStatus');
@@ -4379,6 +4466,19 @@ async function maintenance() {
     if (dismiss) dismiss.onclick = () => run(dismiss, '/updates/dismiss', {version:update.latestVersion});
     if (apply) apply.onclick = () => {
       if (confirm(`应用 ${update.latestVersion} 并重启 Go 管理后台？`)) run(apply, '/updates/apply', {version:update.latestVersion, confirmed:true});
+    };
+    if($('goUninstallForm'))$('goUninstallForm').onsubmit=async event=>{
+      event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');
+      if($('goUninstallConfirmation').value!=='UNINSTALL'){status.textContent='请输入大写 UNINSTALL';return;}
+      const purgeData=$('goUninstallPurge').checked,purgeConfirmation=$('goUninstallPurgeConfirmation').value;
+      if(purgeData&&purgeConfirmation!=='DELETE ALL DATA'){status.textContent='清空数据需输入 DELETE ALL DATA';return;}
+      if(!confirm(purgeData?'卸载并永久清空本地订阅、账号和备份？远端节点会保留，但本地管理记录将丢失。':'停止并卸载 Go 后台服务？订阅、账号及远端节点数据将保留。'))return;
+      button.disabled=true;
+      try{
+        const result=await api('/uninstall',jsonOpt('POST',{username:$('goUninstallUser').value,password:$('goUninstallPassword').value,confirmation:'UNINSTALL',purgeData,purgeConfirmation}));
+        clearTimeout(S.goUpdatePoll);$('goUninstallPassword').value='';status.textContent=result.message;
+        form.querySelectorAll('input,button').forEach(control=>control.disabled=true);
+      }catch(error){status.textContent=error.message;button.disabled=false;}
     };
     if (busy) poll();
     return;

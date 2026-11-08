@@ -14,14 +14,28 @@ import (
 // Start is explicit: constructing a web handler or test fixture does not launch
 // background network activity. The caller owns shutdown through ctx.
 func (c *Controller) Start(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if !c.started.CompareAndSwap(false, true) {
 		return errors.New("订阅计量已经启动")
 	}
+	done := make(chan struct{})
+	c.stopped = done
+	// The initial sweep covers changes queued before startup.
+	select {
+	case <-c.wake:
+	default:
+	}
 	go func() {
-		defer c.started.Store(false)
+		defer func() {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			c.started.Store(false)
+			close(done)
+		}()
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -30,10 +44,28 @@ func (c *Controller) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+			case <-c.wake:
 			}
 		}
 	}()
 	return nil
+}
+
+// WaitStopped waits for the currently started worker and its in-flight sweep.
+// The owner must cancel the context passed to Start before waiting for shutdown.
+func (c *Controller) WaitStopped(ctx context.Context) error {
+	c.mu.Lock()
+	done := c.stopped
+	c.mu.Unlock()
+	if done == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 func (c *Controller) sweep(ctx context.Context) {
 	profiles, err := c.Repository.Profiles()
@@ -126,13 +158,6 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 	if err != nil {
 		return nil, err
 	}
-	u, err := usage(p)
-	if err != nil {
-		return nil, err
-	}
-	if !u.Enabled || !u.Enforce {
-		return c.finishSync(profile, failures)
-	}
 	if err = c.Repository.UpdateState(profile, func(p Record) error { return resetCycle(p, c.Now().UTC()) }); err != nil {
 		return nil, err
 	}
@@ -140,11 +165,18 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 	if err != nil {
 		return nil, err
 	}
+	u, err := usage(p)
+	if err != nil {
+		return nil, err
+	}
+	if !u.Enabled || !u.Enforce {
+		return c.finishSync(profile, failures)
+	}
 	for _, b := range objects(p["remoteNodes"]) {
 		if b["status"] != "active" && b["status"] != "provisioning" {
 			continue
 		}
-		if b["scope"] != "user" {
+		if !managedBinding(b) {
 			failures = append(failures, "旧版入站计量尚未迁移，未执行远端操作")
 			continue
 		}
@@ -165,7 +197,7 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 		if enforce && state.Blocked(c.Now()) && !(traffic(current)["resetPeriod"] == "monthly" && !expired(state, c.Now())) {
 			continue
 		}
-		response, e := c.Backend.SubscriptionUser(ctx, text(b["serverId"]), b, "read", nil)
+		response, e := c.subscriptionUser(ctx, text(b["serverId"]), b, "read", nil)
 		if e != nil {
 			failures = append(failures, "用户采集或身份核验失败，保留归属等待重试")
 			continue
@@ -210,7 +242,7 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 		return nil, err
 	}
 	for _, b := range objects(p["remoteNodes"]) {
-		if b["scope"] != "user" || b["status"] != "active" && b["status"] != "provisioning" {
+		if !managedBinding(b) || b["status"] != "active" && b["status"] != "provisioning" {
 			continue
 		}
 		op := ""
@@ -235,7 +267,7 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 			continue
 		}
 		if op == "pause" && b["monthlyPaused"] != true {
-			response, e := c.Backend.SubscriptionUser(ctx, text(b["serverId"]), b, "read", nil)
+			response, e := c.subscriptionUser(ctx, text(b["serverId"]), b, "read", nil)
 			if e != nil {
 				failures = append(failures, "月额度已用尽，用户暂停待重试")
 				continue
@@ -262,7 +294,7 @@ func (c *Controller) syncLocked(ctx context.Context, profile string, enforce boo
 				return nil, err
 			}
 		}
-		if _, e := c.Backend.SubscriptionUser(ctx, text(b["serverId"]), b, op, nil); e != nil {
+		if _, e := c.subscriptionUser(ctx, text(b["serverId"]), b, op, nil); e != nil {
 			failures = append(failures, "用户暂停、恢复或撤销待重试，未操作其他用户")
 			continue
 		}
@@ -313,7 +345,8 @@ func (c *Controller) applyReadingToBinding(p, current, reading Record) error {
 	if err != nil || down < 0 {
 		return errors.New("认证用户下载计数无效")
 	}
-	if reading["source"] != "authenticated-client" {
+	expectedSource := bindingCounterSource(current)
+	if reading["source"] != expectedSource {
 		return errors.New("计数来源不属于独立用户，停止计费")
 	}
 
@@ -350,11 +383,11 @@ func (c *Controller) applyReadingToBinding(p, current, reading Record) error {
 	if current["monthlyBaselinePending"] == true {
 		previous.Up = up
 		previous.Down = down
-		previous.Source = "authenticated-client"
+		previous.Source = expectedSource
 		previous.UpRemainder = 0
 		previous.DownRemainder = 0
 	}
-	delta, e := billing.Compute(previous, billing.Counter{Up: up, Down: down, Source: "authenticated-client"})
+	delta, e := billing.Compute(previous, billing.Counter{Up: up, Down: down, Source: expectedSource})
 	if e != nil {
 		return e
 	}
@@ -376,7 +409,7 @@ func (c *Controller) applyReadingToBinding(p, current, reading Record) error {
 	current["down"] = down
 	current["uploadRemainder"] = delta.Next.UpRemainder
 	current["downloadRemainder"] = delta.Next.DownRemainder
-	current["counterSource"] = "authenticated-client"
+	current["counterSource"] = expectedSource
 	if reading["legacyMeterRetained"] == true {
 		current["legacyMeterRetained"] = true
 	}
@@ -413,7 +446,7 @@ func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, 
 	}
 	var binding Record
 	for _, b := range objects(p["remoteNodes"]) {
-		if text(b["serverId"]) == server && text(b["inboundId"]) == fmt.Sprint(inbound) && b["scope"] == "user" && b["status"] == "active" {
+		if text(b["serverId"]) == server && text(b["inboundId"]) == fmt.Sprint(inbound) && managedBinding(b) && b["status"] == "active" {
 			if binding != nil {
 				return nil, errors.New("存在重复节点归属，请先核对")
 			}
@@ -423,7 +456,7 @@ func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, 
 	if binding == nil {
 		return nil, errors.New("有效节点绑定不存在")
 	}
-	response, err := c.Backend.SubscriptionUser(ctx, server, binding, "read", nil)
+	response, err := c.subscriptionUser(ctx, server, binding, "read", nil)
 	if err != nil {
 		return nil, errors.New("目标节点原倍率结算失败")
 	}
@@ -449,4 +482,12 @@ func (c *Controller) SetMultiplier(ctx context.Context, profile, server string, 
 		return nil, err
 	}
 	return Record{"serverId": server, "inboundId": inbound, "multiplier": float64(units) / 1000}, nil
+}
+
+// Changes coalesce while a sweep is busy. The HTTP writer never waits for SSH.
+func (c *Controller) wakeEnforcement() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
 }

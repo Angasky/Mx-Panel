@@ -41,6 +41,12 @@ func bindingErrors(record Document) {
 	record["enforcementError"] = string(message)
 }
 
+// Preserve durable recovery evidence during bulk history cleanup. Explicit
+// individual removal remains a separate, confirmed abandonment operation.
+func BindingCleanupPending(binding Document) bool {
+	return binding["inboundDeletePending"] != nil || binding["localCleanupPending"] == true
+}
+
 func (r *Repository) CleanupBindings(id string, confirmed bool) (int, error) {
 	if !confirmed {
 		return 0, errors.New("请确认仅清理本地绑定记录，远端节点将保留")
@@ -50,6 +56,10 @@ func (r *Repository) CleanupBindings(id string, confirmed bool) (int, error) {
 		keep := []any{}
 		for _, v := range rows(p, "remoteNodes") {
 			b := v.(map[string]any)
+			if BindingCleanupPending(b) {
+				keep = append(keep, v)
+				continue
+			}
 			switch b["status"] {
 			case "detached", "revoked", "missing", "identity_changed":
 				removed++

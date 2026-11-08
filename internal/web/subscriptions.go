@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +35,9 @@ func (s *Server) subscriptionController() (*subscriptions.Controller, error) {
 	return controller, nil
 }
 func (s *Server) RunBackground(ctx context.Context) error {
+	if err := s.repository.MigrateLegacyProfiles(); err != nil {
+		return err
+	}
 	c, err := s.subscriptionController()
 	if err != nil {
 		return err
@@ -57,7 +59,43 @@ func (s *Server) RunBackground(ctx context.Context) error {
 	return nil
 }
 
+// WaitAccountingStopped joins an existing worker without initializing services.
+func (s *Server) WaitAccountingStopped(ctx context.Context) error {
+	if v, ok := subscriptionControllers.Load(s.repository); ok {
+		return v.(*subscriptions.Controller).WaitStopped(ctx)
+	}
+	return nil
+}
+
 func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/admin/api/servers/relay/adopt" && r.Method == "POST" {
+		var input struct {
+			ServerID         string
+			InboundID        int
+			ExpectedIdentity string
+			Confirmed        bool
+			Outbound, Route  map[string]any
+		}
+		if err := readJSON(w, r, &input); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		c, err := s.subscriptionController()
+		if err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		result, err := c.AdoptLegacyRelay(ctx, input.ServerID, input.InboundID, input.ExpectedIdentity, map[string]any{"confirmed": input.Confirmed, "outbound": input.Outbound, "route": input.Route})
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
+
 	if r.URL.Path == "/admin/api/servers/inbounds" && (r.Method == "PUT" || r.Method == "DELETE") {
 		var input struct {
 			ServerID  string         `json:"serverId"`
@@ -98,6 +136,42 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 			problem(w, 400, err.Error())
 		} else {
 			respond(w, 200, map[string]any{"profiles": profiles})
+		}
+		return true
+	}
+
+	if r.Method == "POST" && (r.URL.Path == "/admin/api/servers/import" || r.URL.Path == "/admin/api/servers/bind") {
+		var payload map[string]any
+		if readJSON(w, r, &payload) != nil || payload == nil {
+			problem(w, 400, "请求 JSON 必须为对象")
+			return true
+		}
+		if r.URL.Path == "/admin/api/servers/bind" {
+			if payload["confirmed"] != true {
+				problem(w, 409, "请显式确认接管已有专属用户")
+				return true
+			}
+			payload["bind"] = true
+		}
+		raw, ok := payload["inboundId"].(json.Number)
+		id, e := strconv.Atoi(string(raw))
+		if !ok || e != nil || id < 1 {
+			problem(w, 400, "入站 ID 无效")
+			return true
+		}
+		c, e := s.subscriptionController()
+		if e != nil {
+			problem(w, 400, e.Error())
+			return true
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		result, e := c.ImportServerInbound(ctx, r.Header.Get("X-Profile"), stringField(payload, "serverId"), id, payload)
+		if e != nil {
+			problem(w, 400, e.Error())
+		} else {
+			result["ok"] = true
+			respond(w, 200, result)
 		}
 		return true
 	}
@@ -219,6 +293,10 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 		} else {
 			ids := []int{}
 			if path == "/admin/api/servers/users" {
+				if _, raw := payload["inbound"]; raw || payload["template"] == "shadowsocks" {
+					problem(w, 400, "单密码模板或原始配置请使用入站新增入口，不会自动创建订阅用户")
+					return true
+				}
 				if payload["inboundId"] == nil {
 					result, err = c.CreateInbound(ctx, profile, server, payload)
 					if err != nil {
@@ -281,23 +359,5 @@ func (s *Server) subscriptionRoutes(w http.ResponseWriter, r *http.Request) bool
 }
 
 func bandwidthRate(raw any) (int, error) {
-	if raw == nil {
-		return 0, nil
-	}
-	value, ok := raw.(json.Number)
-	if !ok {
-		return 0, errors.New("带宽格式无效")
-	}
-	whole, fraction, _ := strings.Cut(string(value), ".")
-	if len(whole) < 1 || len(whole) > 5 || len(fraction) > 3 ||
-		strings.Trim(whole+fraction, "0123456789") != "" {
-		return 0, errors.New("带宽格式无效")
-	}
-	mbps, _ := strconv.Atoi(whole)
-	thousandths, _ := strconv.Atoi(fraction + strings.Repeat("0", 3-len(fraction)))
-	rate := mbps*1000 + thousandths
-	if rate > 10_000_000 || (rate != 0 && rate < 100) {
-		return 0, errors.New("带宽超出范围")
-	}
-	return rate, nil
+	return billing.BandwidthKbps(raw)
 }

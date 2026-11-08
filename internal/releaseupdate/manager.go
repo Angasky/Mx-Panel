@@ -34,12 +34,14 @@ func Newer(target, current string) bool {
 }
 
 type Job struct {
-	ID      string `json:"id"`
-	Version string `json:"version"`
-	Status  string `json:"status"`
-	Stage   string `json:"stage"`
-	Started int64  `json:"startedAt"`
-	Error   string `json:"error,omitempty"`
+	PurgeData bool   `json:"purgeData,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	ID        string `json:"id"`
+	Version   string `json:"version"`
+	Status    string `json:"status"`
+	Stage     string `json:"stage"`
+	Started   int64  `json:"startedAt"`
+	Error     string `json:"error,omitempty"`
 }
 
 type Manager struct {
@@ -66,9 +68,13 @@ func Managed() *Manager {
 		return nil
 	}
 	return &Manager{path: base + "/update-status.json", launch: func(ctx context.Context, job Job) error {
+		action, target := "--apply-release", job.Version
+		if job.Operation == "uninstall" {
+			action, target = "--remove-service", "true"
+		}
 		return exec.CommandContext(ctx, systemd, "--quiet", "--collect", "--unit=mxioc-go-update.service",
 			"--property=Type=exec", "--property=RuntimeMaxSec=10min", "--property=TimeoutStopSec=45s",
-			executable, "--apply-release", job.Version, "--update-job", job.ID).Run()
+			executable, action+"="+target, "--update-job", job.ID).Run()
 	}}
 }
 
@@ -117,7 +123,12 @@ func (m *Manager) Start(ctx context.Context, current, target string) (*Job, erro
 	return job, nil
 }
 
-func (m *Manager) queue(target string) (*Job, error) {
+func (m *Manager) queue(target string) (*Job, error) { return m.queueOperation(target, "") }
+
+func (m *Manager) queueOperation(target, operation string) (*Job, error) {
+	return m.queueRemovalOption(target, operation, false)
+}
+func (m *Manager) queueRemovalOption(target, operation string, purge bool) (*Job, error) {
 	unlock, err := lockStatus(m.path)
 	if err != nil {
 		return nil, errors.New("更新任务状态锁定失败")
@@ -134,7 +145,7 @@ func (m *Manager) queue(target string) (*Job, error) {
 	if _, err := rand.Read(id); err != nil {
 		return nil, errors.New("更新任务标识生成失败")
 	}
-	job := Job{ID: hex.EncodeToString(id), Version: target, Status: "queued", Stage: "queued", Started: time.Now().Unix()}
+	job := Job{PurgeData: purge, Operation: operation, ID: hex.EncodeToString(id), Version: target, Status: "queued", Stage: "queued", Started: time.Now().Unix()}
 	if err := m.save(job); err != nil {
 		return nil, errors.New("更新任务保存失败")
 	}

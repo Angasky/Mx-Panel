@@ -7,23 +7,11 @@ import (
 	"math"
 	"math/big"
 	"strconv"
-	"strings"
 	"time"
 )
 
 func MultiplierUnits(value string) (int64, error) {
-	if strings.TrimSpace(value) != value || value == "" {
-		return 0, errors.New("流量倍率无效")
-	}
-	ratio, ok := new(big.Rat).SetString(value)
-	if !ok || ratio.Sign() < 0 || ratio.Cmp(big.NewRat(100, 1)) > 0 {
-		return 0, errors.New("流量倍率范围为 0–100")
-	}
-	ratio.Mul(ratio, big.NewRat(1000, 1))
-	if !ratio.IsInt() || !ratio.Num().IsInt64() {
-		return 0, errors.New("流量倍率最多支持三位小数")
-	}
-	return ratio.Num().Int64(), nil
+	return ScaledDecimal(value, 1000, 100)
 }
 
 type Counter struct {

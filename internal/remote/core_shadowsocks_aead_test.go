@@ -20,7 +20,7 @@ func TestManagedSSAEADCredentialsAndOwnership(t *testing.T) {
 	for _, template := range []string{"ss-aes-128-gcm", "ss-aes-256-gcm", "ss-chacha20-poly1305"} {
 		t.Run(template, func(t *testing.T) {
 			row := managedSSAEADFixture(t, template)
-			if !coreProvisionInbound("xray", row) || coreProvisionInbound("sing-box", row) || standaloneTemplateProtocol("sing-box", template) != "" {
+			if !coreProvisionInbound("xray", row) || !coreProvisionInbound("sing-box", row) || standaloneTemplateProtocol("sing-box", template) != "shadowsocks" {
 				t.Fatal("template adapter eligibility incorrect")
 			}
 			if _, err := buildInboundTemplate(Record{"template": template}, ""); err == nil {
@@ -106,8 +106,8 @@ func TestManagedSSAEADCredentialsAndOwnership(t *testing.T) {
 					}
 				})
 			}
-			if _, err := legacyNativeInbound("sing-box", row); err == nil {
-				t.Fatal("classic multi-user silently converted to sing-box")
+			if native, err := legacyNativeInbound("sing-box", row); err != nil || len(anyRecords(native["users"])) != 1 || native["password"] != nil {
+				t.Fatal("managed AEAD users not converted to sing-box", err)
 			}
 			nodes, err := InboundNodes(row, Record{"host": "node.example.com"})
 			if err != nil || len(nodes) != 1 {

@@ -70,7 +70,11 @@ func TestManagedSSAEADUsersWithRealCore(t *testing.T) {
 	testShadowsocksUsersWithRealCores(t, []string{"managed:aes-128-gcm", "managed:aes-256-gcm", "managed:chacha20-ietf-poly1305"})
 }
 
-func testShadowsocksUsersWithRealCores(t *testing.T, methods []string) {
+func TestManagedSingSSAEADUDPWithRealCore(t *testing.T) {
+	testShadowsocksUsersWithRealCores(t, []string{"managed:aes-128-gcm", "managed:aes-256-gcm", "managed:chacha20-ietf-poly1305"}, true)
+}
+func testShadowsocksUsersWithRealCores(t *testing.T, methods []string, udpOption ...bool) {
+	udpMode := len(udpOption) > 0 && udpOption[0]
 	xray := os.Getenv("MXIOC_TEST_XRAY")
 	if xray == "" {
 		t.Skip("set MXIOC_TEST_XRAY for real SS2022 export verification")
@@ -88,8 +92,11 @@ func testShadowsocksUsersWithRealCores(t *testing.T, methods []string) {
 		managedAEAD := strings.HasPrefix(method, "managed:")
 		method = strings.TrimPrefix(method, "managed:")
 		for _, kind := range []string{"xray", "sing-box"} {
-			if kind == "sing-box" && !strings.HasPrefix(method, "2022-") {
-				continue // sing-box classic AEAD is not a multi-user inbound.
+			if udpMode && kind != "sing-box" {
+				continue
+			}
+			if kind == "sing-box" && !strings.HasPrefix(method, "2022-") && !managedAEAD {
+				continue // Unmanaged legacy mixed-method users are not adopted.
 			}
 			t.Run(caseName+"/"+kind, func(t *testing.T) {
 				binary := xray
@@ -103,6 +110,27 @@ func testShadowsocksUsersWithRealCores(t *testing.T, methods []string) {
 				defer cancel()
 				target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ss2022-user-proof") }))
 				defer target.Close()
+				var udpTarget *net.UDPConn
+				if udpMode {
+					var err error
+					udpTarget, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+					if err != nil {
+						t.Fatal(err)
+					}
+					done := make(chan struct{})
+					go func() {
+						defer close(done)
+						b := make([]byte, 4096)
+						for {
+							n, p, e := udpTarget.ReadFromUDP(b)
+							if e != nil {
+								return
+							}
+							udpTarget.WriteToUDP(b[:n], p)
+						}
+					}()
+					defer func() { udpTarget.Close(); <-done }()
+				}
 				row := ss2022Fixture(method)
 				if !strings.HasPrefix(method, "2022-") {
 					for _, client := range anyRecords(row["settings"].(Record)["clients"]) {
@@ -190,14 +218,23 @@ func testShadowsocksUsersWithRealCores(t *testing.T, methods []string) {
 					}
 					outbound["settings"].(Record)["servers"].([]any)[0].(Record)["address"] = "127.0.0.1"
 					socks := port()
-					stopClient, clientLog := startSSFixtureCore(t, ctx, xray, "xray", Record{"inbounds": []any{Record{"listen": "127.0.0.1", "port": socks, "protocol": "socks", "settings": Record{"auth": "noauth"}}}, "outbounds": []any{outbound}}, socks)
+					stopClient, clientLog := startSSFixtureCore(t, ctx, xray, "xray", Record{"inbounds": []any{Record{"listen": "127.0.0.1", "port": socks, "protocol": "socks", "settings": Record{"auth": "noauth", "udp": true}}}, "outbounds": []any{outbound}}, socks)
 					proxy, _ := url.Parse("socks5://127.0.0.1:" + value(socks))
 					transport := &http.Transport{Proxy: http.ProxyURL(proxy)}
-					response, requestErr := (&http.Client{Transport: transport, Timeout: 1200 * time.Millisecond}).Get(target.URL)
 					var body []byte
-					if response != nil {
-						body, _ = io.ReadAll(response.Body)
-						response.Body.Close()
+					var requestErr error
+					if udpMode {
+						requestErr = socksUDPProbe("127.0.0.1:"+value(socks), udpTarget.LocalAddr().String(), []byte("ss2022-user-proof"))
+						if requestErr == nil {
+							body = []byte("ss2022-user-proof")
+						}
+					} else {
+						response, e := (&http.Client{Transport: transport, Timeout: 1200 * time.Millisecond}).Get(target.URL)
+						requestErr = e
+						if response != nil {
+							body, _ = io.ReadAll(response.Body)
+							response.Body.Close()
+						}
 					}
 					transport.CloseIdleConnections()
 					stopClient()

@@ -48,6 +48,9 @@ func parseVMess(body string) (map[string]any, error) {
 			node[target] = value
 		}
 	}
+	if text(v["sni"]) == "" && text(v["host"]) != "" {
+		node["servername"] = text(v["host"])
+	}
 	if value := text(v["alpn"]); value != "" {
 		list := []any{}
 		for _, protocol := range strings.Split(value, ",") {
@@ -79,13 +82,13 @@ func parseVMess(body string) (map[string]any, error) {
 		if host := text(v["host"]); host != "" {
 			headers["Host"] = host
 		}
-		node["network"], node["ws-opts"] = network, map[string]any{"path": text(v["path"]), "headers": headers}
+		node["network"], node["ws-opts"] = network, map[string]any{"path": transportDefault(text(v["path"]), "/"), "headers": headers}
 	case "grpc":
 		service := text(v["path"])
 		if service == "" {
 			service = text(v["serviceName"])
 		}
-		node["network"], node["grpc-opts"] = network, map[string]any{"grpc-service-name": service}
+		node["network"], node["grpc-opts"] = network, map[string]any{"grpc-service-name": transportDefault(service, "grpc")}
 	default:
 		return nil, ErrURI
 	}

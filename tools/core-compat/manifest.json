@@ -1,0 +1,16 @@
+{
+  "sing-box": {
+    "module": "github.com/sagernet/sing-box",
+    "version": "v1.14.4",
+    "file": "common/tls/reality_client.go",
+    "originalSHA256": "38a5d553fffd108afca51bde0b0888512d2f4633daa608e03767838b8fdcdbc0",
+    "patchedSHA256": "858a8040c01616da7b82857b13b69a71ed1d151e9a557eac61fa19bdd34bb383"
+  },
+  "mihomo": {
+    "module": "github.com/metacubex/mihomo",
+    "version": "v1.19.33",
+    "file": "listener/snell/server.go",
+    "originalSHA256": "b93fd0c26d87e6477d4f06d8eaba58e3d007aba2a990e627daf1bb8b035cf660",
+    "patchedSHA256": "7977edce3112149424e61c5822e659f5b0a2c3ee3c0e69daa901bb9607ec144b"
+  }
+}

@@ -52,6 +52,10 @@ cleanup() {
     fi
     if [ "$rollback_failed" = 1 ]; then echo 'MXIOC_ROLLBACK_FAILED'; else echo 'MXIOC_ROLLBACK_RESTORED'; fi
   fi
+  if [ "${rollback_failed:-0}" = 1 ]; then
+    echo "Recovery copies retained in $workdir and $backup"
+    return
+  fi
   rm -rf -- "$workdir"
   rm -f "$backup"
   [ -z "$candidate" ] || rm -f "$candidate"
@@ -59,6 +63,8 @@ cleanup() {
   [ -z "$unit_candidate" ] || rm -f "$unit_candidate"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [ -f /usr/bin/sing-box ]; then cp --preserve=all /usr/bin/sing-box "$workdir/previous-sing-box"; had_binary=1; fi
 if systemctl is-active --quiet sing-box; then was_active=1; fi
 if systemctl is-enabled --quiet sing-box; then was_enabled=1; fi

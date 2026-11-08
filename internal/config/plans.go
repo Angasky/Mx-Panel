@@ -74,14 +74,7 @@ func PlanBytes(value any) (int64, error) {
 	return q.Int64(), nil
 }
 func PlanUnits(value any) (int64, error) {
-	text, err := decimalText(value)
-	if err != nil {
-		return 0, err
-	}
-	if _, err = planDecimal(value, 0, 100); err != nil {
-		return 0, err
-	}
-	return billing.MultiplierUnits(text)
+	return billing.ScaledDecimal(value, 1000, 100)
 }
 func normalizedPlan(payload Document) (Document, error) {
 	name := strings.TrimSpace(stringValue(payload["name"]))
@@ -111,18 +104,11 @@ func normalizedPlan(payload Document) (Document, error) {
 	if period != "monthly" && period != "none" {
 		return nil, errors.New("流量重置周期无效")
 	}
-	speed := payload["speedMbps"]
-	if speed == nil || speed == "" {
-		speed = 0
-	}
-	rate, err := planDecimal(speed, 0, 10000)
+	kbps, err := billing.BandwidthKbps(payload["speedMbps"])
 	if err != nil {
 		return nil, err
 	}
-	rate.Mul(rate, big.NewRat(1000, 1))
-	if !rate.IsInt() || rate.Num().Sign() > 0 && rate.Cmp(big.NewRat(100, 1)) < 0 {
-		return nil, errors.New("限速须为 0 或 0.1–10000 Mbps，最多三位小数")
-	}
+	speed := json.Number(strconv.FormatFloat(float64(kbps)/1000, 'f', -1, 64))
 	multiplier := payload["multiplier"]
 	if multiplier == nil {
 		multiplier = 1

@@ -153,18 +153,11 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 			}
 			return true
 		}
-		if id != "" {
-			previous, err := manager.Record(id)
-			if err != nil {
-				problem(w, 400, err.Error())
-				return true
-			}
-			if err = s.repository.GuardServerUpdate(id, payload, previous); err != nil {
-				problem(w, 400, err.Error())
-				return true
-			}
+		controller, err := s.subscriptionController()
+		var server map[string]any
+		if err == nil {
+			server, err = controller.SaveServer(r.Context(), payload)
 		}
-		server, err := manager.Save(payload)
 		if err != nil {
 			problem(w, 400, err.Error())
 		} else {
@@ -214,7 +207,7 @@ true
 		if err != nil {
 			output += "\n" + err.Error()
 		}
-		respond(w, 200, map[string]any{"log": output})
+		respond(w, 200, map[string]any{"log": remote.CleanDiagnosticLog(output)})
 		return true
 	}
 	if err != nil {

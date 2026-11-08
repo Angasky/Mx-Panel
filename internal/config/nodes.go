@@ -1,15 +1,60 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/Angasky/dingzhi-ban/internal/links"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+// EditNode avoids cloning the complete configuration for an identical PUT.
+// It still validates the submitted node and verifies every mirror before
+// skipping the transaction; a damaged mirror goes through normal repair.
+func (r *Repository) EditNode(id, method string, payload Document) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if method == "PUT" {
+		p, err := r.profile(id)
+		if err != nil {
+			return err
+		}
+		doc, raw, err := r.cachedRead(p)
+		if err != nil {
+			return err
+		}
+		if submitted, ok := payload["config"].(map[string]any); ok {
+			next := cloneConfig(submitted).(Document)
+			if err := ValidateNode(next); err != nil {
+				return err
+			}
+			for _, item := range rows(doc, "proxies") {
+				old := item.(Document)
+				if old["name"] != payload["oldName"] || !equalConfig(old, next) {
+					continue
+				}
+				healthy := true
+				for _, path := range p.Files {
+					mirror, err := os.ReadFile(path)
+					if err != nil || !bytes.Equal(raw, mirror) {
+						healthy = false
+						break
+					}
+				}
+				if healthy {
+					return nil
+				}
+				break
+			}
+		}
+	}
+	return r.mutateLocked(id, func(doc Document) error { return EditNode(doc, method, payload) })
+}
 
 var uuid = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 var domain = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$`)
@@ -75,6 +120,15 @@ func ValidateNode(node map[string]any) error {
 			return errors.New("节点密码不能为空")
 		}
 	}
+	if kind == "hysteria2" || kind == "tuic" {
+		if raw, exists := node["alpn"]; exists {
+			list, err := links.ALPNValues(raw, true)
+			if err != nil {
+				return errors.New("QUIC ALPN 必须为有效协议字符串或字符串数组")
+			}
+			node["alpn"] = list
+		}
+	}
 	if kind == "ss" {
 		cipher := stringValue(node["cipher"])
 		if cipher == "" {
@@ -87,24 +141,26 @@ func ValidateNode(node map[string]any) error {
 		}
 	}
 	if kind == "snell" {
-		psk := stringValue(node["psk"])
-		if psk == "" || len(psk) > 1024 || strings.ContainsAny(psk, "\r\n\x00") {
-			return errors.New("Snell PSK 无效")
+		normalized, err := links.NormalizeSnell(node)
+		if err != nil {
+			return err
 		}
-		version := 1
-		if value := node["version"]; value != nil {
-			var err error
-			version, err = integer(value)
-			if err != nil || version < 1 || version > 5 {
-				return errors.New("Snell 版本必须为 1–5")
-			}
+		for key := range node {
+			delete(node, key)
 		}
-		if version < 3 && node["udp"] == true {
-			return errors.New("Snell UDP 需要 v3 或以上")
+		for key, v := range normalized {
+			node[key] = v
 		}
-		if version < 4 && node["reuse"] == true {
-			return errors.New("Snell reuse 需要 v4 或以上")
+	}
+	if raw, exists := node["reality-opts"]; exists {
+		if kind != "vless" || node["tls"] != true {
+			return errors.New("Reality 要求 VLESS 和 TLS")
 		}
+		opts, err := links.NormalizeReality(raw)
+		if err != nil {
+			return errors.New("Reality 公钥、short ID 或混合握手参数无效")
+		}
+		node["reality-opts"] = opts
 	}
 	if node["dialer-proxy"] == name {
 		return errors.New("节点不能以前置中转引用自身")
@@ -217,7 +273,7 @@ func EditNode(doc Document, method string, payload map[string]any) error {
 		if payload["addToGroups"] == true {
 			for _, v := range rows(doc, "proxy-groups") {
 				group := v.(map[string]any)
-				if group["name"] == "🛑 广告拦截" || group["name"] == "🛡️ 基础广告拦截" || group["name"] == "🔥 强力广告拦截" {
+				if group["type"] != "select" || excludedNodeGroups[stringValue(group["name"])] {
 					continue
 				}
 				refs, _ := group["proxies"].([]any)
@@ -276,7 +332,25 @@ func replaceReferences(doc Document, old, name string) {
 	doc["rules"] = updated
 }
 
+func (r *Repository) MoveNode(id string, payload map[string]any) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	profile, err := r.profile(id)
+	if err != nil {
+		return err
+	}
+	excluded := map[string]bool{}
+	for _, group := range profile.Failovers {
+		excluded[stringValue(group["name"])] = true
+	}
+	return r.mutateLocked(id, func(doc Document) error { return moveNode(doc, payload, excluded) })
+}
+
 func MoveNode(doc Document, payload map[string]any) error {
+	return moveNode(doc, payload, nil)
+}
+
+func moveNode(doc Document, payload map[string]any, excluded map[string]bool) error {
 	nodes := rows(doc, "proxies")
 	name := stringValue(payload["name"])
 	from := -1
@@ -304,7 +378,10 @@ func MoveNode(doc Document, payload map[string]any) error {
 		if to < 0 {
 			return errors.New("目标节点不存在")
 		}
-		position := stringValue(payload["position"])
+		position := "before"
+		if _, exists := payload["position"]; exists {
+			position = stringValue(payload["position"])
+		}
 		if position != "before" && position != "after" {
 			return errors.New("排序位置无效")
 		}
@@ -336,7 +413,13 @@ func MoveNode(doc Document, payload map[string]any) error {
 	}
 	for _, v := range rows(doc, "proxy-groups") {
 		group := v.(map[string]any)
-		refs, _ := group["proxies"].([]any)
+		if excluded[stringValue(group["name"])] {
+			continue
+		}
+		refs, ok := group["proxies"].([]any)
+		if !ok {
+			continue
+		}
 		slots := []int{}
 		members := []string{}
 		for i, v := range refs {

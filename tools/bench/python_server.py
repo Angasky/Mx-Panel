@@ -1,9 +1,11 @@
 """Production Python handler, isolated data and no periodic/network workers."""
 import json
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+repo = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(os.environ.get("MXIOC_BENCH_PYTHON_REPO", repo.parent / "python-original")).resolve()))
 import server
 
 root = Path(sys.argv[1]).resolve()

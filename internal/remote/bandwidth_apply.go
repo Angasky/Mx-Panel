@@ -49,7 +49,9 @@ func (m *Manager) SetLegacyBandwidth(ctx context.Context, server string, id, por
 		}
 		clients, ok := settings["clients"].([]any)
 		if !ok || len(clients) != 1 {
-			return errors.New("只有独占单用户入站支持端口限速")
+			if _, err := DedicatedPasswordBinding(row, Record{}); err != nil {
+				return errors.New("只有独占单用户或专属单连接入站支持端口限速")
+			}
 		}
 		protocols, err := bandwidthProtocols(row)
 		if err != nil {

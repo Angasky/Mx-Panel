@@ -53,19 +53,9 @@ func NewPinnedPanel(connection *ssh.Client, record Record, password, token strin
 	if address == "" {
 		address = value(record["panelUrl"])
 	}
-	u, err := url.Parse(address)
-	if err != nil || u.Hostname() == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return nil, errors.New("请先配置面板完整地址，包含端口和访问路径")
-	}
-	port := 443
-	if u.Scheme == "http" {
-		port = 80
-	}
-	if u.Port() != "" {
-		port, err = strconv.Atoi(u.Port())
-		if err != nil || port < 1 || port > 65535 {
-			return nil, errors.New("面板端口无效")
-		}
+	u, port, err := parsePanelAddress(address)
+	if err != nil {
+		return nil, err
 	}
 	u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(port))
 	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: 20 * time.Second, TLSHandshakeTimeout: 10 * time.Second, DisableKeepAlives: true,
@@ -177,7 +167,7 @@ func (p *Panel) raw(ctx context.Context, path string, payload Record, method str
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(raw)))
 	decoder.UseNumber()
-	if decoder.Decode(&result) != nil {
+	if decoder.Decode(&result) != nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("面板返回非 JSON 内容，请核对版本与路径")
 	}
 	if !result.Success {
@@ -260,6 +250,11 @@ func (p *Panel) request(ctx context.Context, path string, payload Record, method
 			return p.request(ctx, path, payload, method, false, jsonBody...)
 		}
 		return nil, fmt.Errorf("%w，请核对面板状态、端口、路径和 API 权限", status)
+	}
+	if err == nil && path == "panel/api/inbounds/list" {
+		if _, ok := result.([]any); !ok {
+			return nil, errors.New("面板入站接口未返回列表，未完成验证")
+		}
 	}
 	return result, err
 }

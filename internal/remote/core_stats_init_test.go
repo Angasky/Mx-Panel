@@ -17,8 +17,13 @@ func TestFirstImportEnablesStatsBeforeGrantingUser(t *testing.T) {
 	testCoreStatsRecovery(t, true)
 }
 
-func testCoreStatsRecovery(t *testing.T, importing bool) {
+func TestLegacyEnrollmentEnablesStatsAndRecoversAfterRestart(t *testing.T) {
+	testCoreStatsRecovery(t, true, true)
+}
+
+func testCoreStatsRecovery(t *testing.T, importing bool, existingUser ...bool) {
 	t.Helper()
+	existing := len(existingUser) > 0 && existingUser[0]
 	for _, kind := range []string{"xray", "sing-box"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
@@ -46,6 +51,16 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 			client, err := NewUser(row)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if existing {
+				row["settings"].(Record)["clients"] = []any{client}
+				next, err := m.SealUser(Record{"inbounds": []any{row}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := m.updateCoreUserState(id, state, "", next, ""); err != nil {
+					t.Fatal(err)
+				}
 			}
 			binding := bindingFor(t, row, client)
 			binding["inboundId"] = 17
@@ -95,7 +110,9 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 				if err != nil {
 					return err
 				}
-				if importing {
+				if existing {
+					_, err = m.changeCoreUser(ctx, id, kind, "add", record, binding, run, nil)
+				} else if importing {
 					_, err = m.changeCoreUser(ctx, id, kind, "add", record, binding, run, client)
 				} else {
 					_, err = m.enableCoreStats(ctx, id, kind, record, run)
@@ -105,7 +122,7 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 			if err := enable(); err == nil || writes != 1 {
 				t.Fatal("unexpected first result", err)
 			}
-			if strings.Contains(string(raw), value(client["id"])) {
+			if !existing && strings.Contains(string(raw), value(client["id"])) {
 				t.Fatal("user granted before verifying stats")
 			}
 			m, err = Open(root)
@@ -127,7 +144,7 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 					t.Fatal(err)
 				}
 				state, err := parseLegacyCoreState(saved)
-				if err != nil || len(state.UserStats) != 0 || strings.Contains(string(raw), value(client["id"])) {
+				if err != nil || len(state.UserStats) != 0 || (!existing && strings.Contains(string(raw), value(client["id"]))) {
 					t.Fatal("stats or user committed before gRPC verification", err)
 				}
 				m, err = Open(root)
@@ -138,7 +155,7 @@ func testCoreStatsRecovery(t *testing.T, importing bool) {
 				baseWrites = 3
 			}
 			expectedWrites := baseWrites
-			if importing {
+			if importing && (!existing || kind == "sing-box") {
 				expectedWrites++
 			}
 			if err := enable(); err != nil || writes != expectedWrites {

@@ -57,6 +57,9 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 		return nil, errors.New("原始入站新增尚未适配，请使用节点模板")
 	}
 	name := templateName(payload)
+	if _, exists := payload["alpn"]; exists && !tlsTemplate(name) {
+		return nil, errors.New("该模板不支持 TLS ALPN")
+	}
 	if name != "vless-reality" && name != "vmess-tcp" && !tlsTemplate(name) {
 		return nil, errors.New("此模板尚未适配已有面板的独立用户创建")
 	}
@@ -138,7 +141,7 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			alpn = nil // Use the core's TUIC ALPN default.
 		} else if name == "vless-xhttp-tls" {
 			options := Record{"path": "/vpn", "mode": "stream-up"}
-			for field, key := range map[string]string{"path": "path", "xhttpMode": "mode"} {
+			for field, key := range map[string]string{"path": "path", "xhttpMode": "mode", "xhttpHost": "host"} {
 				if v, exists := payload[field]; exists {
 					options[key] = v
 				}
@@ -179,15 +182,30 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			} else {
 				settings["decryption"] = "none"
 			}
-			ws := value(payload["path"])
-			if ws == "" {
-				ws = "/"
-			}
-			if len(ws) > 256 || !strings.HasPrefix(ws, "/") || strings.ContainsAny(ws, "\x00\r\n") {
-				return nil, errors.New("WebSocket 路径必须以 / 开头且不超过 256 字节")
+			ws := "/"
+			if raw, exists := payload["path"]; exists {
+				var ok bool
+				ws, ok = raw.(string)
+				if !ok {
+					return nil, errors.New("WebSocket 路径必须为字符串")
+				}
+				if ws == "" {
+					ws = "/"
+				}
 			}
 			stream["network"] = "ws"
-			stream["wsSettings"] = Record{"path": ws}
+			stream["wsSettings"] = Record{"path": "/"}
+			// Reuse the editor's validation so newly created paths and Host
+			// can be edited and shared without silently changing their meaning.
+			patch := Record{"wsPath": ws}
+			if host, exists := payload["wsHost"]; exists {
+				patch["wsHost"] = host
+			}
+			candidate, err := prepareManagedCoreEdit(Record{"streamSettings": stream}, patch)
+			if err != nil {
+				return nil, err
+			}
+			stream = candidate["streamSettings"].(Record)
 		}
 		stream["security"] = "tls"
 		tls := Record{"serverName": domain, "certificates": []any{Record{"certificateFile": cert, "keyFile": key}}}
@@ -195,6 +213,24 @@ func buildInboundTemplate(payload Record, address string) (Record, error) {
 			tls["alpn"] = alpn
 		}
 		stream["tlsSettings"] = tls
+		if raw, exists := payload["alpn"]; exists {
+			if !tcpTLSTemplate(name) && !wsTemplate(name) && !grpcTemplate(name) && name != "vless-xhttp-tls" {
+				return nil, errors.New("该模板暂不支持自定义 ALPN")
+			}
+			text, ok := raw.(string)
+			if !ok {
+				return nil, errors.New("ALPN 必须为逗号分隔的字符串")
+			}
+			alpn, err := parseManagedALPN(text, value(stream["network"]))
+			if err != nil {
+				return nil, err
+			}
+			if alpn == nil {
+				delete(tls, "alpn")
+			} else {
+				tls["alpn"] = alpn
+			}
+		}
 	}
 	return Record{"remark": remark, "port": port, "protocol": protocol, "enable": true, "listen": "", "up": 0, "down": 0, "total": 0, "expiryTime": 0, "settings": settings, "streamSettings": stream, "sniffing": Record{"enabled": true, "destOverride": []any{"http", "tls", "quic"}}}, nil
 }

@@ -1,0 +1,64 @@
+--- a/listener/snell/server.go
++++ b/listener/snell/server.go
+@@ -162,7 +162,10 @@
+ 	default:
+ 		return
+ 	}
+-	stream := snell.ServerStreamConn(conn, []byte(l.config.Psk), l.config.Version)
++	encrypted := snell.ServerStreamConn(conn, []byte(l.config.Psk), l.config.Version)
++	// Tunnel peeking changes read deadlines. Apply those above decryption so
++	// an interrupted ciphertext read cannot discard a partial authenticated frame.
++	stream := &snellDeadlineConn{Conn: N.NewDeadlineConn(encrypted), stream: encrypted}
+ 	for {
+ 		reuse, err := l.handleRequest(stream, tunnel, additions...)
+ 		if err != nil || !reuse {
+@@ -171,7 +174,7 @@
+ 	}
+ }
+ 
+-func (l *Listener) handleRequest(stream *snell.Snell, tunnel C.Tunnel, additions ...inbound.Addition) (bool, error) {
++func (l *Listener) handleRequest(stream net.Conn, tunnel C.Tunnel, additions ...inbound.Addition) (bool, error) {
+ 	br := bufio.NewReader(stream)
+ 	version, err := br.ReadByte()
+ 	if err != nil {
+@@ -223,7 +226,7 @@
+ 	return string(id), nil
+ }
+ 
+-func (l *Listener) handleTCP(stream *snell.Snell, br *bufio.Reader, reuse bool, clientID string, tunnel C.Tunnel, additions ...inbound.Addition) (bool, error) {
++func (l *Listener) handleTCP(stream net.Conn, br *bufio.Reader, reuse bool, clientID string, tunnel C.Tunnel, additions ...inbound.Addition) (bool, error) {
+ 	hostLen, err := br.ReadByte()
+ 	if err != nil {
+ 		return false, err
+@@ -254,7 +257,7 @@
+ 	return true, nil
+ }
+ 
+-func (l *Listener) handleUDP(stream *snell.Snell, clientID string, tunnel C.Tunnel, additions ...inbound.Addition) error {
++func (l *Listener) handleUDP(stream net.Conn, clientID string, tunnel C.Tunnel, additions ...inbound.Addition) error {
+ 	if _, err := stream.Write([]byte{snell.CommandTunnel}); err != nil {
+ 		return err
+ 	}
+@@ -386,7 +389,7 @@
+ 
+ type udpPacket struct {
+ 	data      []byte
+-	conn      *snell.Snell
++	conn      net.Conn
+ 	writeMu   *sync.Mutex
+ 	localAddr net.Addr
+ 	dstAddr   net.Addr
+@@ -415,3 +418,13 @@
+ 
+ var _ C.MultiAddrListener = (*Listener)(nil)
+ var _ C.UDPPacket = (*udpPacket)(nil)
++
++// Keep UDP packet boundaries while buffering plaintext reads for deadlines.
++type snellDeadlineConn struct {
++	net.Conn
++	stream *snell.Snell
++}
++
++func (c *snellDeadlineConn) WritePacketFrame(b []byte) (int, error) {
++	return c.stream.WritePacketFrame(b)
++}

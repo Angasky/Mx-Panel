@@ -22,7 +22,8 @@ import psutil
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO))
+PYTHON_REPO = Path(os.environ.get("MXIOC_BENCH_PYTHON_REPO", REPO.parent / "python-original")).resolve()
+sys.path.insert(0, str(PYTHON_REPO))
 import server as reference
 
 PASSWORD = 'isolated-performance-password'
@@ -140,7 +141,7 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--go-bin',type=Path,required=True);parser.add_argument('--nodes',default='100,1000');parser.add_argument('--rounds',type=int,default=3);parser.add_argument('--requests',type=int,default=60);parser.add_argument('--write-requests',type=int,default=12);parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();binary=args.go_bin.resolve()
     salt,digest=reference.password_hash(PASSWORD,iterations=600000);auth={'username':'benchmark','salt':salt,'hash':digest,'iterations':600000}
-    result={'timeUTC':datetime.now(timezone.utc).isoformat(),'sourceRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),'environment':{'os':platform.platform(),'cpu':platform.processor(),'logicalCPUs':psutil.cpu_count(),'physicalCPUs':psutil.cpu_count(logical=False),'memoryGiB':psutil.virtual_memory().total/1073741824,'python':sys.version.split()[0],'pyyaml':yaml.__version__,'yamlLoader':reference.YamlLoader.__name__},'methodology':{'profiles':30,'warmupPerCase':5,'rounds':args.rounds,'connection':'new loopback HTTP connection per request; trusted HTTPS forwarding header; no TLS encryption','backgroundWorkers':False,'externalNetwork':False,'backupsAndMirrors':True,'readConcurrency':[1,4],'writeConcurrency':[1],'throughputIncludesClientValidation':False,'latencyExcludesClientValidation':True,'scope':'Production HTTP handlers; local data and storage. Not proxy throughput or SSH latency.'},'runs':[]}
+    result={'timeUTC':datetime.now(timezone.utc).isoformat(),'pythonRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=PYTHON_REPO,text=True).strip(),'pythonSourcePath':str(PYTHON_REPO),'sourceRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),'environment':{'os':platform.platform(),'cpu':platform.processor(),'logicalCPUs':psutil.cpu_count(),'physicalCPUs':psutil.cpu_count(logical=False),'memoryGiB':psutil.virtual_memory().total/1073741824,'python':sys.version.split()[0],'pyyaml':yaml.__version__,'yamlLoader':reference.YamlLoader.__name__},'methodology':{'profiles':30,'warmupPerCase':5,'rounds':args.rounds,'connection':'new loopback HTTP connection per request; trusted HTTPS forwarding header; no TLS encryption','backgroundWorkers':False,'externalNetwork':False,'backupsAndMirrors':True,'readConcurrency':[1,4],'writeConcurrency':[1],'throughputIncludesClientValidation':False,'latencyExcludesClientValidation':True,'scope':'Production HTTP handlers; local data and storage. Not proxy throughput or SSH latency.'},'runs':[]}
     with tempfile.TemporaryDirectory(prefix='mxioc-performance-') as temporary:
         for count in map(int,args.nodes.split(',')):
             for round_index in range(args.rounds):

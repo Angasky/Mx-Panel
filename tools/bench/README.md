@@ -28,3 +28,9 @@ python tools/bench/report.py docs/performance/2026-11-03-optimized/results.json 
 ```
 
 报告分别标明本轮请求与优化前 Go 参考请求。基线和本轮的运行环境、测试方法、配置 SHA-256 必须一致；两轮独立运行，不把系统负载变化视为必然优化效果。可选 `--canvas` 输出嵌入真实数据的交互画布。
+
+### 在迁移工作区测试原 Python 与最新 Go
+
+默认从同级 `../python-original` 加载 Python 原仓库；可通过环境变量 `MXIOC_BENCH_PYTHON_REPO` 指定其他基线。避免把 Go 仓库中保留的旧 Python 副本误当原仓库。Go 二进制必须从当前工作树重新构建。结果保存 Python 基线提交与路径；未提交的 Go 代码还应保存源文件和二进制 SHA256 清单。
+
+`plot_current.py results.json --font /path/to/NotoSansCJKsc-Regular.otf` 使用 matplotlib 从实际样本生成三张中文 PNG（平均耗时、并发 P95、千节点明细），同时输出 CSV 和 summary.json。需要 matplotlib 和中文字体，不调用图像生成模型。2026-11-07 本机结果保存在工作区 artifacts/performance-20261107；100/1000 节点、三轮、每轮读 100 次/写 30 次。测试未覆盖 SSH、真实面板、公网或代理转发速度。

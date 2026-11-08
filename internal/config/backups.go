@@ -66,6 +66,10 @@ func (r *Repository) Restore(id, name string) error {
 		return errors.New("备份目录读取失败")
 	}
 	defer root.Close()
+	info, err := root.Lstat(name)
+	if err != nil || !info.Mode().IsRegular() {
+		return errors.New("备份必须是普通文件，不能使用链接或目录")
+	}
 	file, err := root.Open(name)
 	if err != nil {
 		return errors.New("备份不存在或不允许读取")
@@ -76,4 +80,44 @@ func (r *Repository) Restore(id, name string) error {
 		return errors.New("备份读取失败或超过大小限制")
 	}
 	return r.Mutate(id, func(doc Document) error { return ReplaceRaw(doc, map[string]any{"yaml": string(data)}) })
+}
+
+// Best-effort retention follows Python's global 100-backup limit. Only regular
+// YAML files inside the backup directory are eligible; directories and symlinks
+// are never followed. Caller holds Repository.mu after a successful commit.
+func (r *Repository) pruneBackups() {
+	directory := filepath.Join(r.Root, "backups")
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return
+	}
+	type backup struct {
+		name string
+		info os.FileInfo
+	}
+	backups := []backup{}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".yaml") || entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return
+		}
+		if info.Mode().IsRegular() {
+			backups = append(backups, backup{entry.Name(), info})
+		}
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[i].info.ModTime().Equal(backups[j].info.ModTime()) {
+			return backups[i].name > backups[j].name
+		}
+		return backups[i].info.ModTime().After(backups[j].info.ModTime())
+	})
+	if len(backups) <= 100 {
+		return
+	}
+	for _, item := range backups[100:] {
+		_ = os.Remove(filepath.Join(directory, item.name))
+	}
 }

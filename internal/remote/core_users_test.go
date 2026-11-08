@@ -199,3 +199,35 @@ func TestCoreAddUsersKeepSeparateCredentialsAndStats(t *testing.T) {
 		})
 	}
 }
+
+func TestLegacyEnrollmentCannotReplaceMissingOrChangedCredential(t *testing.T) {
+	user := Record{"id": "3c5827c6-2f92-4861-a1f8-562d5388bca7", "email": "legacy"}
+	row := Record{"id": 17, "tag": "mxioc-inbound-17", "port": 443, "protocol": "vless", "settings": Record{"clients": []any{user}}}
+	binding := bindingFor(t, row, user)
+	binding["inboundId"] = 17
+	for _, kind := range []string{"xray", "sing-box"} {
+		for _, mode := range []string{"missing", "changed", "disabled"} {
+			t.Run(kind+"/"+mode, func(t *testing.T) {
+				candidate := Record{"id": row["id"], "tag": row["tag"], "port": row["port"], "protocol": row["protocol"], "settings": Record{"clients": []any{}}}
+				if mode != "missing" {
+					altered := Record{"id": user["id"], "email": user["email"]}
+					if mode == "changed" {
+						altered["id"] = "30403cc4-583b-426a-8424-ec98489977b2"
+					} else {
+						altered["enable"] = false
+					}
+					candidate["settings"].(Record)["clients"] = []any{altered}
+				}
+				native, err := legacyNativeInbound(kind, candidate)
+				if err != nil {
+					t.Fatal(err)
+				}
+				state := legacyCoreState{Inbounds: []Record{candidate}}
+				// Enrollment passes nil rather than a new credential, even on journal retry.
+				if _, _, err := planCoreUserChange(kind, "add", state, Record{"inbounds": []any{native}}, binding, true, nil); err == nil {
+					t.Fatal("enrollment recreated or accepted altered user")
+				}
+			})
+		}
+	}
+}

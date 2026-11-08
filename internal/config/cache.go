@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 const configCacheEntries = 32
@@ -17,14 +18,47 @@ type configEntry struct {
 	digest       [32]byte
 	doc          Document
 	snapshotJSON []byte
+	rawJSON      []byte
 	weight       int
 	used         uint64
+}
+
+// RawJSON caches only serialized configuration, never permissions or traffic.
+// cachedEntry still reads and hashes the file on every request.
+func (r *Repository) RawJSON(id string) ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, err := r.profile(id)
+	if err != nil {
+		return nil, err
+	}
+	entry, raw, err := r.cachedEntry(p)
+	if err != nil {
+		return nil, err
+	}
+	encoded := entry.rawJSON
+	if encoded == nil {
+		encoded, err = json.Marshal(Document{"yaml": string(raw)})
+		if err != nil {
+			return nil, err
+		}
+		encoded = append(encoded, '\n')
+		if r.cache[filepath.Clean(p.Files[0])] == entry && r.cacheBytes+len(encoded) <= configCacheBudget {
+			entry.rawJSON = encoded
+			entry.weight += len(encoded)
+			r.cacheBytes += len(encoded)
+		}
+	}
+	return append([]byte(nil), encoded...), nil
 }
 
 // All cache access is under Repository.mu. Values are immutable: callers that
 // expose or edit a document must clone it. Always hash the file contents, rather
 // than trusting size/mtime (external tools can preserve both).
 func (r *Repository) cachedEntry(p Profile) (*configEntry, []byte, error) {
+	if len(p.Files) == 0 || strings.TrimSpace(p.Files[0]) == "" {
+		return nil, nil, errors.New("订阅未配置有效的 YAML 文件")
+	}
 	path := filepath.Clean(p.Files[0])
 	f, err := os.Open(path)
 	if err != nil {

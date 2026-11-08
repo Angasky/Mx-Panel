@@ -11,6 +11,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 )
 
 //go:embed scripts/certificate.sh
@@ -22,9 +24,14 @@ type certificateTask struct {
 }
 
 func certificateDomain(domain string) (string, error) {
-	domain = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
+	domain = strings.ToLower(strings.TrimRight(strings.TrimSpace(domain), "."))
+	var err error
+	domain, err = idna.Lookup.ToASCII(domain)
+	if err != nil {
+		return "", errors.New("证书域名格式无效")
+	}
 	if len(domain) > 253 || net.ParseIP(domain) != nil || !strings.Contains(domain, ".") {
-		return "", errors.New("请填写自己的证书域名；国际域名请使用 Punycode")
+		return "", errors.New("请填写自己的有效证书域名")
 	}
 	for _, label := range strings.Split(domain, ".") {
 		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
@@ -248,16 +255,18 @@ func (m *Manager) runCertificate(parent context.Context, task *certificateTask, 
 	if err != nil {
 		message := err.Error()
 		if output != "" {
-			tail := []rune(output)
-			if len(tail) > 1600 {
-				tail = tail[len(tail)-1600:]
-			}
-			message += "：" + string(tail)
+			message += "：" + output
 		}
 		for _, key := range []string{"sshPassword", "panelPassword"} {
 			if secret, e := m.Secret(record, key); e == nil && secret != "" {
 				message = strings.ReplaceAll(message, secret, "[REDACTED]")
 			}
+		}
+		// Sanitize before truncation so a long credential line cannot lose its
+		// identifying key while leaving the credential value in the returned tail.
+		message = CleanDiagnosticLog(message)
+		if tail := []rune(message); len(tail) > 2000 {
+			message = string(tail[len(tail)-2000:])
 		}
 		task.status, task.message = "failed", message
 	} else {

@@ -50,12 +50,19 @@ func (r *Resolver) Lookup(ctx context.Context, host string) (Country, error) {
 	if len(addresses) == 0 {
 		return Country{}, errors.New("节点没有解析到公网 IP")
 	}
-	for _, address := range addresses {
-		if !netguard.PublicAddress(address) {
-			return Country{}, errors.New("节点地址包含非公网 IP")
+	// Match Python: use the first public answer, ignoring private DNS
+	// answers. The node itself is never contacted; only the public literal
+	// is sent to the fixed country provider URL.
+	address := ""
+	for _, candidate := range addresses {
+		if netguard.PublicAddress(candidate) {
+			address = candidate.Unmap().String()
+			break
 		}
 	}
-	address := addresses[0].Unmap().String()
+	if address == "" {
+		return Country{}, errors.New("节点没有解析到公网 IP")
+	}
 	now := time.Now()
 	r.mu.Lock()
 	if entry, ok := r.cache[address]; ok && now.Sub(entry.at) >= 0 && now.Sub(entry.at) < 7*24*time.Hour {

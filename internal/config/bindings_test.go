@@ -109,3 +109,52 @@ func TestDetachServerRollbackAndAllProfiles(t *testing.T) {
 		t.Fatal("remote detachment edited node export")
 	}
 }
+
+func TestBulkHistoryCleanupPreservesRecoveryRecords(t *testing.T) {
+	r, primary, _ := fixture(t)
+	before, err := os.ReadFile(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.UpdateState("clash", func(p Document) error {
+		p["traffic"] = Document{"upload": 123}
+		p["remoteNodes"] = []any{
+			Document{"status": "missing", "localCleanupPending": true, "operationId": "local", "importedNodes": []any{Document{"name": "owned", "identity": "proof"}}},
+			Document{"status": "revoked", "inboundDeletePending": Document{"expected": "remote-proof"}, "operationId": "remote"},
+			Document{"status": "missing", "operationId": "done"},
+			Document{"status": "active", "operationId": "active"},
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := r.CleanupBindings("clash", true); err != nil || removed != 1 {
+		t.Fatal(removed, err)
+	}
+	reopened := &Repository{Root: r.Root}
+	p, err := reopened.State("clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindings := rows(p, "remoteNodes")
+	if len(bindings) != 3 || bindings[0].(Document)["localCleanupPending"] != true || bindings[1].(Document)["inboundDeletePending"] == nil {
+		t.Fatal("recovery evidence removed")
+	}
+	if fmt.Sprint(p["traffic"].(Document)["upload"]) != "123" {
+		t.Fatal("history cleanup changed billing")
+	}
+	after, _ := os.ReadFile(primary)
+	if string(before) != string(after) {
+		t.Fatal("history cleanup rewrote subscription")
+	}
+	if err := reopened.UpdateState("clash", func(p Document) error {
+		delete(rows(p, "remoteNodes")[0].(Document), "localCleanupPending")
+		delete(rows(p, "remoteNodes")[1].(Document), "inboundDeletePending")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := reopened.CleanupBindings("clash", true); err != nil || removed != 2 {
+		t.Fatal("completed recovery records not cleanable", removed, err)
+	}
+}

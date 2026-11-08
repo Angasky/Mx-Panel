@@ -24,7 +24,7 @@ func (r *Repository) BeginFailover(profile string, plan Document) error {
 					return errors.New("主备记录无效")
 				}
 				if row["name"] == plan["name"] {
-					if row["status"] == "deleting" {
+					if row["status"] == "deleting" || row["cancelRequested"] == true {
 						return errors.New("主备组正在清理，不能继续创建")
 					}
 					if row["requestId"] == plan["requestId"] && row["requestHash"] == plan["requestHash"] {
@@ -81,7 +81,7 @@ func (r *Repository) ActivateFailover(profile string, plan Document) (Document, 
 	found := false
 	for _, item := range rows(record, "failoverDrafts") {
 		row, ok := item.(Document)
-		if ok && row["name"] == plan["name"] && row["requestId"] == plan["requestId"] && row["requestHash"] == plan["requestHash"] {
+		if ok && row["name"] == plan["name"] && row["requestId"] == plan["requestId"] && row["requestHash"] == plan["requestHash"] && row["cancelRequested"] != true {
 			found = true
 		} else {
 			drafts = append(drafts, item)

@@ -42,6 +42,7 @@ func Parse(value string) (map[string]any, error) {
 	if len(value) > 65536 {
 		return nil, ErrURI
 	}
+	value = normalizePastedURI(value)
 	if name, body, ok := strings.Cut(value, "="); ok && !strings.Contains(name, "://") {
 		if kind, _, ok := strings.Cut(body, ","); ok && strings.EqualFold(strings.TrimSpace(kind), "snell") {
 			return parseSnellPolicy(value)
@@ -71,12 +72,13 @@ func Parse(value string) (map[string]any, error) {
 	}
 	var snellPassword string
 	if scheme == "snell" {
-		authority, rest, hasQuery := strings.Cut(body, "?")
-		fragment := ""
-		if !hasQuery {
-			authority, fragment, _ = strings.Cut(authority, "#")
+		envelope, fragment, hasFragment := strings.Cut(body, "#")
+		authority, rest, hasQuery := strings.Cut(envelope, "?")
+		query, queryErr := url.ParseQuery(rest)
+		if queryErr != nil {
+			return nil, ErrURI
 		}
-		if !strings.Contains(authority, "@") && !strings.Contains(rest, "psk=") {
+		if !strings.Contains(authority, "@") && !query.Has("psk") {
 			decoded, err := decode64(authority)
 			if err != nil {
 				return nil, ErrURI
@@ -89,14 +91,28 @@ func Parse(value string) (map[string]any, error) {
 			value = "snell://" + decoded[at+1:]
 			if hasQuery {
 				value += "?" + rest
-			} else if fragment != "" {
+			}
+			if hasFragment {
 				value += "#" + fragment
 			}
 		}
 	}
-	u, err := url.Parse(value)
+	normalized, err := normalizeIPv6Authority(value)
+	if err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(normalized)
 	if err != nil || u.Hostname() == "" || u.Path != "" && u.Path != "/" {
 		return nil, ErrURI
+	}
+	if scheme == "http" || scheme == "https" {
+		return parseHTTP(u, scheme)
+	}
+	if scheme == "socks" || scheme == "socks5" {
+		if strings.HasSuffix(u.Host, ":") {
+			return nil, ErrURI
+		}
+		return parseSOCKS(u)
 	}
 	port, err := strconv.Atoi(u.Port())
 	if err != nil || port < 1 || port > 65535 {
@@ -106,9 +122,19 @@ func Parse(value string) (map[string]any, error) {
 	if err != nil {
 		return nil, ErrURI
 	}
+	if err := normalizeQueryAliases(q, scheme); err != nil {
+		return nil, err
+	}
+	pin, err := parseCertificatePin(q, scheme)
+	if err != nil {
+		return nil, err
+	}
 	allowed := map[string]bool{}
-	for _, key := range []string{"encryption", "security", "sni", "alpn", "fp", "flow", "pbk", "sid", "type", "path", "host", "serviceName", "insecure", "allowInsecure", "udp", "reuse", "tfo", "version", "psk", "obfs", "obfs-host", "obfs-password", "upmbps", "downmbps"} {
+	for _, key := range []string{"tls_certificate", "tls-certificate", "pinSHA256", "pinned_certchain_sha256", "support-x25519mlkem768", "encryption", "security", "sni", "alpn", "fp", "flow", "pbk", "sid", "type", "path", "host", "serviceName", "insecure", "allowInsecure", "udp", "reuse", "tfo", "version", "psk", "obfs", "obfs-host", "obfs-password", "upmbps", "downmbps"} {
 		allowed[key] = true
+	}
+	if scheme == "tuic" {
+		allowed["password"] = true
 	}
 	for key, values := range q {
 		if (!allowed[key] && key != "congestion_control" && key != "udp_relay_mode" && key != "tls" && key != "mode") || len(values) != 1 {
@@ -119,6 +145,9 @@ func Parse(value string) (map[string]any, error) {
 		return nil, ErrURI
 	}
 	node := map[string]any{"name": u.Fragment, "type": scheme, "server": u.Hostname(), "port": port}
+	if pin != "" {
+		node["fingerprint"] = pin
+	}
 	if u.Fragment == "" {
 		node["name"] = u.Hostname() + ":" + u.Port()
 	}
@@ -132,39 +161,93 @@ func Parse(value string) (map[string]any, error) {
 	switch scheme {
 	case "vless":
 		node["uuid"] = credential
-	case "trojan", "hysteria2":
+	case "trojan":
 		node["password"] = credential
+	case "hysteria2":
+		if u.User == nil {
+			return nil, ErrURI
+		}
+		password, _ := u.User.Password()
+		if password == "" {
+			password = u.User.Username()
+		}
+		if password == "" {
+			return nil, ErrURI
+		}
+		node["password"] = password
 	case "tuic":
-		id, password, ok := strings.Cut(credential, ":")
-		if !ok {
+		if u.User == nil {
+			return nil, ErrURI
+		}
+		id := u.User.Username()
+		password, _ := u.User.Password()
+		if q.Has("password") {
+			if password != "" && password != q.Get("password") {
+				return nil, ErrURI
+			}
+			password = q.Get("password")
+		}
+		if id == "" || password == "" {
 			return nil, ErrURI
 		}
 		node["uuid"] = id
 		node["password"] = password
 	case "snell":
-		if snellPassword == "" {
-			snellPassword = q.Get("psk")
-			if snellPassword == "" {
-				snellPassword = credential
+		allowed := map[string]bool{"psk": true, "version": true, "udp": true, "reuse": true, "tfo": true, "obfs": true, "obfs-host": true}
+		for key := range q {
+			if !allowed[key] {
+				return nil, ErrURI
+			}
+		}
+		if u.User != nil {
+			if _, hasPassword := u.User.Password(); hasPassword || q.Has("psk") {
+				return nil, ErrURI
 			}
 		}
 		if snellPassword == "" {
+			if u.User != nil {
+				snellPassword = u.User.Username()
+			} else {
+				snellPassword = q.Get("psk")
+			}
+		}
+		if snellPassword == "" || len(snellPassword) > 1024 || strings.ContainsAny(snellPassword, "\r\n\x00") {
 			return nil, ErrURI
 		}
 		node["psk"] = snellPassword
 		version := 1
-		if q.Get("version") != "" {
-			version, err = strconv.Atoi(q.Get("version"))
-			if err != nil || version < 1 || version > 5 {
+		if q.Has("version") {
+			v := q.Get("version")
+			if len(v) != 1 || v[0] < '1' || v[0] > '5' {
 				return nil, ErrURI
 			}
+			version = int(v[0] - '0')
 		}
 		node["version"] = version
-		if q.Get("obfs") != "" {
+		for _, key := range []string{"udp", "reuse", "tfo"} {
+			if q.Has(key) {
+				q.Set(key, strings.ToLower(q.Get(key)))
+			}
+		}
+		if (version < 3 && (q.Get("udp") == "true" || q.Get("udp") == "1")) ||
+			(version < 4 && (q.Get("reuse") == "true" || q.Get("reuse") == "1")) {
+			return nil, ErrURI
+		}
+		if q.Has("obfs-host") && !q.Has("obfs") {
+			return nil, ErrURI
+		}
+		if q.Has("obfs") {
 			if q.Get("obfs") != "http" && q.Get("obfs") != "tls" {
 				return nil, ErrURI
 			}
-			node["obfs-opts"] = map[string]any{"mode": q.Get("obfs"), "host": q.Get("obfs-host")}
+			obfs := map[string]any{"mode": q.Get("obfs")}
+			if q.Has("obfs-host") {
+				if q.Get("obfs-host") == "" {
+					return nil, ErrURI
+				}
+				obfs["host"] = q.Get("obfs-host")
+			}
+			node["obfs-opts"] = obfs
 		}
 	case "ss":
 		decoded, err := decode64(credential)
@@ -206,7 +289,12 @@ func Parse(value string) (map[string]any, error) {
 		}
 		node["tls"] = q.Get("tls") == "true" || q.Get("tls") == "1"
 	}
+	if pin != "" && node["tls"] != true {
+		return nil, ErrURI
+	}
 	if scheme == "tuic" {
+		node["congestion-controller"] = "bbr"
+		node["udp-relay-mode"] = "native"
 		if q.Get("congestion_control") != "" {
 			node["congestion-controller"] = q.Get("congestion_control")
 		}
@@ -221,12 +309,19 @@ func Parse(value string) (map[string]any, error) {
 			node["servername"] = sni
 		}
 	}
+	if scheme == "hysteria2" {
+		node["alpn"] = []any{"h3"}
+	}
 	if q.Get("alpn") != "" {
 		values := []any{}
 		for _, v := range strings.Split(q.Get("alpn"), ",") {
 			values = append(values, v)
 		}
-		node["alpn"] = values
+		checked, err := ALPNValues(values, false)
+		if err != nil {
+			return nil, err
+		}
+		node["alpn"] = checked
 	}
 	if q.Get("fp") != "" {
 		node["client-fingerprint"] = q.Get("fp")
@@ -238,7 +333,22 @@ func Parse(value string) (map[string]any, error) {
 		if q.Get("pbk") == "" {
 			return nil, ErrURI
 		}
-		node["reality-opts"] = map[string]any{"public-key": q.Get("pbk"), "short-id": q.Get("sid")}
+		opts := map[string]any{"public-key": q.Get("pbk"), "short-id": q.Get("sid")}
+		if q.Has("support-x25519mlkem768") {
+			v := q.Get("support-x25519mlkem768")
+			if v != "true" && v != "false" && v != "1" && v != "0" {
+				return nil, ErrURI
+			}
+			opts["support-x25519mlkem768"] = v == "true" || v == "1"
+		}
+		normalized, err := NormalizeReality(opts)
+		if err != nil {
+			return nil, err
+		}
+		node["reality-opts"] = normalized
+	}
+	if q.Has("support-x25519mlkem768") && (scheme != "vless" || q.Get("security") != "reality" || node["tls"] != true) {
+		return nil, ErrURI
 	}
 	if q.Has("mode") && q.Get("type") != "xhttp" {
 		return nil, ErrURI
@@ -251,9 +361,9 @@ func Parse(value string) (map[string]any, error) {
 			if host := q.Get("host"); host != "" {
 				headers["Host"] = host
 			}
-			node["ws-opts"] = map[string]any{"path": q.Get("path"), "headers": headers}
+			node["ws-opts"] = map[string]any{"path": transportDefault(q.Get("path"), "/"), "headers": headers}
 		case "grpc":
-			node["grpc-opts"] = map[string]any{"grpc-service-name": q.Get("serviceName")}
+			node["grpc-opts"] = map[string]any{"grpc-service-name": transportDefault(q.Get("serviceName"), "grpc")}
 		case "xhttp":
 			if scheme != "vless" || q.Get("security") != "tls" || node["tls"] != true || q.Has("flow") || q.Has("serviceName") {
 				return nil, ErrURI
@@ -297,6 +407,9 @@ func Parse(value string) (map[string]any, error) {
 			node["down"] = q.Get("downmbps")
 		}
 	}
+	if scheme == "snell" {
+		return NormalizeSnell(node)
+	}
 	return node, nil
 }
 
@@ -326,8 +439,34 @@ func parseSnellPolicy(value string) (map[string]any, error) {
 }
 func Export(n map[string]any) (string, error) {
 	kind := text(n["type"])
+	if kind == "socks5" {
+		return exportSOCKS(n)
+	}
+	if kind == "http" {
+		return exportHTTP(n)
+	}
 	if kind == "mieru" {
 		return exportMieru(n)
+	}
+	if kind == "snell" {
+		normalized, err := NormalizeSnell(n)
+		if err != nil {
+			return "", err
+		}
+		n = normalized
+		allowed := map[string]bool{"name": true, "type": true, "server": true, "port": true, "psk": true, "version": true, "udp": true, "reuse": true, "tfo": true, "obfs-opts": true}
+		for key := range n {
+			if !allowed[key] {
+				return "", errors.New("Snell 扩展参数请使用完整 Mihomo 订阅")
+			}
+		}
+		if obfs, ok := n["obfs-opts"].(map[string]any); ok {
+			for key := range obfs {
+				if key != "mode" && key != "host" {
+					return "", errors.New("Snell 高级混淆请使用完整 Mihomo 订阅")
+				}
+			}
+		}
 	}
 	port := text(n["port"])
 	if port == "" || text(n["server"]) == "" {
@@ -342,6 +481,21 @@ func Export(n map[string]any) (string, error) {
 		}
 	}
 	q := url.Values{}
+	if raw, exists := n["fingerprint"]; exists {
+		value, ok := raw.(string)
+		if !ok || (kind != "hysteria2" && kind != "tuic") || n["tls"] == false {
+			return "", ErrURI
+		}
+		pin, err := normalizePin(value)
+		if err != nil {
+			return "", err
+		}
+		key := "pinSHA256"
+		if kind == "tuic" {
+			key = "pinned_certchain_sha256"
+		}
+		q.Set(key, strings.ReplaceAll(pin, ":", ""))
+	}
 	u := url.URL{Scheme: kind, Host: net.JoinHostPort(text(n["server"]), port), Fragment: text(n["name"])}
 	switch kind {
 	case "vless":
@@ -418,18 +572,34 @@ func Export(n map[string]any) (string, error) {
 	if flow := text(n["flow"]); flow != "" {
 		q.Set("flow", flow)
 	}
-	if reality, ok := n["reality-opts"].(map[string]any); ok {
+	if raw, exists := n["reality-opts"]; exists {
+		if kind != "vless" || n["tls"] != true {
+			return "", ErrURI
+		}
+		reality, err := NormalizeReality(raw)
+		if err != nil {
+			return "", err
+		}
 		q.Set("security", "reality")
 		q.Set("pbk", text(reality["public-key"]))
-		q.Set("sid", text(reality["short-id"]))
+		if sid, exists := reality["short-id"]; exists {
+			q.Set("sid", text(sid))
+		}
+		if flag, exists := reality["support-x25519mlkem768"]; exists {
+			q.Set("support-x25519mlkem768", strconv.FormatBool(flag.(bool)))
+		}
 	}
 	if n["skip-cert-verify"] == true {
 		q.Set("insecure", "1")
 	}
-	if list, ok := n["alpn"].([]any); ok {
+	if raw, exists := n["alpn"]; exists {
+		list, err := ALPNValues(raw, kind == "hysteria2" || kind == "tuic")
+		if err != nil {
+			return "", err
+		}
 		values := []string{}
 		for _, v := range list {
-			values = append(values, text(v))
+			values = append(values, v.(string))
 		}
 		q.Set("alpn", strings.Join(values, ","))
 	}

@@ -80,6 +80,10 @@ func (r *Repository) ImportSubscription(id string, nodes []map[string]any, confl
 				return err
 			}
 			name := stringValue(node["name"])
+			switch name {
+			case "DIRECT", "REJECT", "REJECT-DROP", "PASS":
+				return errors.New("节点名称不能与内置动作冲突")
+			}
 			index, exists := positions[name]
 			if exists && conflict == "skip" {
 				skipped++

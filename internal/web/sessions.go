@@ -110,3 +110,46 @@ func addSession(entries map[[32]byte]session, key [32]byte, now time.Time) {
 	}
 	entries[key] = session{Created: now, Expires: now.Add(sessionTTL)}
 }
+
+// Caller holds s.mu. Credential upgrades, failure cleanup and the new session
+// share one durable transaction. Existing sessions survive a hash-only upgrade.
+func (s *Server) completeLogin(auth, upgraded account, keys []string, token [32]byte) error {
+	var sessions map[[32]byte]session
+	var failures map[string]failure
+	err := storage.New(s.options.AuthFile).Update(func(doc map[string]any) error {
+		raw, err := json.Marshal(doc)
+		if err != nil {
+			return err
+		}
+		var disk account
+		if err = json.Unmarshal(raw, &disk); err != nil {
+			return err
+		}
+		if disk.Iterations == 0 {
+			disk.Iterations = 240000
+		}
+		if disk != auth {
+			return errors.New("账号文件已变化，请重新登录")
+		}
+		sessions, err = readSessions(doc, auth, s.now())
+		if err != nil {
+			return err
+		}
+		failures, err = readLoginFailures(doc, auth, s.now())
+		if err != nil {
+			return err
+		}
+		for _, key := range keys {
+			delete(failures, key)
+		}
+		addSession(sessions, token, s.now())
+		doc["username"], doc["salt"], doc["hash"], doc["iterations"] = upgraded.Username, upgraded.Salt, upgraded.Hash, upgraded.Iterations
+		doc["goSessions"] = encodeSessions(upgraded, sessions)
+		doc["goLoginFailures"] = savedLoginFailures{Version: 1, Credential: credentialID(upgraded), Entries: failures}
+		return nil
+	})
+	if err == nil {
+		s.account, s.sessions, s.failures = upgraded, sessions, failures
+	}
+	return err
+}

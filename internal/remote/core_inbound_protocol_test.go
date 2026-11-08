@@ -88,3 +88,67 @@ func TestManagedTLSProtocolConversionsKeepAuthenticationSeparated(t *testing.T) 
 		}
 	}
 }
+
+func TestProtocolSwitchPreservesHostAndALPN(t *testing.T) {
+	for _, source := range []string{"vless", "vmess", "trojan"} {
+		for _, target := range []string{"vless", "vmess", "trojan"} {
+			row := transportEditFixture(t)
+			row["settings"] = coreProtocolSettings("vless")
+			row, err := prepareManagedCoreEdit(row, Record{"network": "ws", "wsHost": "cdn.example.com", "wsPath": "/owned", "alpn": "http/1.1,h2"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			row["protocol"], row["settings"] = source, coreProtocolSettings(source)
+			before, _ := json.Marshal(row)
+			next, err := prepareManagedCoreEdit(row, Record{"protocol": target})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if next["protocol"] != target || !sameCoreInbound(row["streamSettings"].(Record), next["streamSettings"].(Record)) {
+				t.Fatal("protocol switch altered Host, ALPN, or TLS")
+			}
+			if _, exposed := managedCoreFields(next)["network"]; exposed {
+				t.Fatal("lossy transport switch enabled")
+			}
+			if _, err := prepareManagedCoreEdit(next, Record{"network": "grpc"}); err == nil {
+				t.Fatal("transport switch discarded retained fields")
+			}
+			after, _ := json.Marshal(row)
+			if string(before) != string(after) {
+				t.Fatal("source mutated")
+			}
+			user, err := NewUser(next)
+			if err != nil {
+				t.Fatal(err)
+			}
+			next["settings"].(Record)["clients"] = []any{user}
+			if _, err := prepareManagedCoreEdit(next, Record{"protocol": source}); err == nil {
+				t.Fatal("retained user allowed conversion")
+			}
+		}
+	}
+}
+
+func TestProtocolSwitchRetainsExtensionGuards(t *testing.T) {
+	for _, change := range []func(Record){
+		func(r Record) {
+			r["streamSettings"].(Record)["wsSettings"].(Record)["headers"] = Record{"X-Custom": "keep"}
+		},
+		func(r Record) {
+			r["streamSettings"].(Record)["wsSettings"].(Record)["headers"] = Record{"Host": "bad/path"}
+		},
+		func(r Record) { r["streamSettings"].(Record)["tlsSettings"].(Record)["alpn"] = []any{"custom"} },
+		func(r Record) { r["streamSettings"].(Record)["sockopt"] = Record{"mark": 1} },
+	} {
+		row := transportEditFixture(t)
+		row["settings"] = coreProtocolSettings("vless")
+		row, err := prepareManagedCoreEdit(row, Record{"network": "ws"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(row)
+		if _, err := prepareManagedCoreEdit(row, Record{"protocol": "trojan"}); err == nil {
+			t.Fatal("unknown or invalid transport accepted")
+		}
+	}
+}

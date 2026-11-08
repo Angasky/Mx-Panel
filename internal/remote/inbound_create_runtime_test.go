@@ -219,7 +219,10 @@ func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
 	for _, template := range []string{"vless-grpc-tls", "vmess-grpc-tls", "trojan-grpc-tls", "vless-ws-tls", "vmess-ws-tls", "trojan-ws-tls", "vless-tcp-tls", "vmess-tcp-tls", "trojan-tls"} {
 		t.Run(template, func(t *testing.T) {
 			payload := Record{"template": template, "serverName": "node.example.com", "certFile": "/fixture/cert.pem",
-				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1", "path": "/vpn-test"}
+				"keyFile": "/fixture/key.pem", "port": 24001, "grpcService": "vpn-test_1", "path": "/vpn-test", "wsHost": "cdn.example.com"}
+			if !grpcTemplate(template) {
+				payload["alpn"] = "http/1.1,h2"
+			}
 			row, err := buildInboundTemplate(payload, "")
 			if err != nil {
 				t.Fatal(err)
@@ -246,6 +249,9 @@ func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if !grpcTemplate(template) && strings.Join(anyStrings(node["alpn"]), ",") != "http/1.1,h2" {
+				t.Fatal("creation ALPN priority lost during sharing")
+			}
 			options, _ := node["grpc-opts"].(Record)
 			if node["tls"] != true || node["servername"] != "node.example.com" || (grpcTemplate(template) &&
 				(node["network"] != "grpc" || options["grpc-service-name"] != "vpn-test_1" || strings.Join(anyStrings(node["alpn"]), ",") != "h2")) {
@@ -253,7 +259,7 @@ func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
 			}
 			if wsTemplate(template) {
 				ws, _ := node["ws-opts"].(Record)
-				if node["network"] != "ws" || ws["path"] != "/vpn-test" {
+				if node["network"] != "ws" || ws["path"] != "/vpn-test" || ws["headers"].(Record)["Host"] != "cdn.example.com" {
 					t.Fatal("subscription export lost the WebSocket path")
 				}
 			}
@@ -305,7 +311,7 @@ func TestTransportTemplatesExportAndValidateNativeConfig(t *testing.T) {
 func TestXHTTPTemplateRoundTripsToXrayOutbound(t *testing.T) {
 	row, err := buildInboundTemplate(Record{"template": "vless-xhttp-tls", "port": 24001,
 		"serverName": "node.example.com", "certFile": "/fixture/cert", "keyFile": "/fixture/key",
-		"path": "/vpn-test", "xhttpMode": "packet-up"}, "")
+		"path": "/vpn-test", "xhttpMode": "packet-up", "xhttpHost": "cdn.example.com"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +338,7 @@ func TestXHTTPTemplateRoundTripsToXrayOutbound(t *testing.T) {
 	}
 	stream := outbound["streamSettings"].(Record)
 	opts, _ := stream["xhttpSettings"].(Record)
-	if stream["network"] != "xhttp" || opts["path"] != "/vpn-test" || opts["mode"] != "packet-up" ||
+	if stream["network"] != "xhttp" || opts["path"] != "/vpn-test" || opts["mode"] != "packet-up" || opts["host"] != "cdn.example.com" ||
 		parsed["servername"] != "node.example.com" || strings.Join(anyStrings(parsed["alpn"]), ",") != "h2" {
 		t.Fatal("XHTTP transport options lost during URI round trip")
 	}

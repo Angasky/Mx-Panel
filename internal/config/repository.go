@@ -18,11 +18,12 @@ import (
 )
 
 type Repository struct {
-	Root       string
-	mu         sync.Mutex
-	cache      map[string]*configEntry
-	cacheBytes int
-	cacheClock uint64
+	Root         string
+	mu           sync.Mutex
+	cache        map[string]*configEntry
+	cacheBytes   int
+	cacheClock   uint64
+	profileCache *profileIndexEntry
 }
 type Profile struct {
 	ID               string           `json:"id"`
@@ -42,15 +43,18 @@ type Profile struct {
 type Document = map[string]any
 
 func (r *Repository) profiles() ([]Profile, error) {
-	data, err := os.ReadFile(filepath.Join(r.Root, "profiles.json"))
+	entry, data, err := r.indexEntry()
 	if err != nil {
-		return nil, errors.New("订阅索引读取失败")
+		return nil, err
+	}
+	if entry.profiles != nil {
+		return cloneProfiles(entry.profiles), nil
 	}
 	var index struct {
 		Profiles          []Profile       `json:"profiles"`
 		SubscriptionPlans json.RawMessage `json:"subscriptionPlans"`
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	if decoder.Decode(&index) != nil || index.Profiles == nil {
 		return nil, errors.New("订阅索引格式无效")
@@ -72,7 +76,8 @@ func (r *Repository) profiles() ([]Profile, error) {
 	for i := range index.Profiles {
 		index.Profiles[i].Plans = plans
 	}
-	return index.Profiles, nil
+	entry.profiles = index.Profiles
+	return cloneProfiles(entry.profiles), nil
 }
 func public(p Profile) map[string]any {
 	info, err := TrafficInfo(Document{"id": p.ID, "traffic": p.Traffic, "remoteNodes": p.RemoteNodes, "accessRevoked": p.AccessRevoked, "enforcementError": p.EnforcementError, "lastEnforcedAt": p.LastEnforcedAt}, time.Now())
@@ -295,19 +300,18 @@ func (r *Repository) mutateGuardedLocked(id string, change func(Document) error,
 		return err
 	}
 	doc := cloneConfig(original).(Document)
-	protected := protectedComponents(doc, p)
 	if err = change(doc); err != nil {
 		return err
-	}
-	if err = validate(doc); err != nil {
-		return err
-	}
-	if protect && protected != protectedComponents(doc, p) {
-		return errors.New("节点或策略组被主备链路引用，请先删除对应主备组")
 	}
 	unchanged := equalConfig(original, doc)
 	next := raw
 	if !unchanged {
+		if err = validate(doc); err != nil {
+			return err
+		}
+		if protect && protectedComponents(original, p) != protectedComponents(doc, p) {
+			return errors.New("节点或策略组被主备链路引用，请先删除对应主备组")
+		}
 		next, err = yaml.Marshal(doc)
 		if err != nil {
 			return errors.New("配置序列化失败")
@@ -382,6 +386,7 @@ func (r *Repository) mutateGuardedLocked(id string, change func(Document) error,
 		}
 	}
 	committed = true
+	r.pruneBackups()
 	return nil
 }
 

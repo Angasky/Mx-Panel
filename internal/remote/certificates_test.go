@@ -42,7 +42,7 @@ func waitCertificate(t *testing.T, m *Manager, server, id string) Record {
 	return nil
 }
 func TestCertificateShellAndValidation(t *testing.T) {
-	for _, domain := range []string{"", "*.example.com", "https://example.com", "example.com;id", "example..com", "-x.example.com", "127.0.0.1", "你好.example.com"} {
+	for _, domain := range []string{"", "*.example.com", "https://example.com", "example.com;id", "example..com", "-x.example.com", "127.0.0.1"} {
 		if _, err := certificateScript(Record{"host": "198.51.100.20"}, domain); err == nil {
 			t.Fatal("invalid domain", domain)
 		}
@@ -238,5 +238,51 @@ func TestCertificateGlobalConcurrencyLimit(t *testing.T) {
 	}
 	if done := waitCertificate(t, m, ids[4], value(job["id"])); done["status"] != "succeeded" {
 		t.Fatal(done)
+	}
+}
+
+func TestCertificateInternationalDomainNormalization(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"你好.example.com", "xn--6qq79v.example.com"},
+		{" 例子.测试. ", "xn--fsqu00a.xn--0zwm56d"},
+		{"XN--6QQ79V.EXAMPLE.COM.", "xn--6qq79v.example.com"},
+	} {
+		domain, err := certificateDomain(tc.input)
+		if err != nil || domain != tc.want {
+			t.Fatal(tc, domain, err)
+		}
+		script, err := certificateScript(Record{"host": "198.51.100.20", "installType": "xray"}, tc.input)
+		if err != nil || !strings.Contains(script, "cert_domain='"+tc.want+"'") || !strings.Contains(script, "cert_dir='/etc/mxioc-certificates/"+tc.want+"'") {
+			t.Fatal("international certificate paths", err)
+		}
+	}
+	for _, domain := range []string{"你好..example.com", "你好.example.com/other", "例子.测试;id", "\u200d.example.com"} {
+		if _, err := certificateDomain(domain); err == nil {
+			t.Fatal("invalid IDN", domain)
+		}
+	}
+}
+
+func TestCertificateFailureSanitizesCredentialLinesBeforeTruncation(t *testing.T) {
+	m, id := certificateFixture(t)
+	m.certificateRun = func(context.Context, Connection, string) (string, error) {
+		return "diagnostic\r\n\x1b[31mprivate_key: " + strings.Repeat("x", 3000) + "private-value\x1b[0m\nsecret=acme-token\nDNS validation failed", errors.New("api_token: error-token")
+	}
+	job, err := m.StartCertificate(id, "node.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitCertificate(t, m, id, value(job["id"]))
+	message := value(done["error"])
+	if done["status"] != "failed" || !strings.Contains(message, "DNS validation failed") {
+		t.Fatal("lost failure diagnostic", done)
+	}
+	for _, secret := range []string{"private-value", "acme-token", "error-token", "\x1b", "\r"} {
+		if strings.Contains(message, secret) {
+			t.Fatal("credential or terminal control exposed", secret)
+		}
+	}
+	if len([]rune(message)) > 2000 {
+		t.Fatal("unbounded certificate error")
 	}
 }

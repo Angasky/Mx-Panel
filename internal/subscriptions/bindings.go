@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sort"
+
+	"github.com/Angasky/dingzhi-ban/internal/config"
 )
 
 func (c *Controller) CleanupBindings(ctx context.Context, profile string, confirmed bool) (Record, error) {
@@ -16,8 +18,21 @@ func (c *Controller) CleanupBindings(ctx context.Context, profile string, confir
 	if err != nil {
 		return nil, err
 	}
+	state, err := c.Repository.State(profile)
+	if err != nil {
+		return nil, err
+	}
+	retained := 0
+	for _, binding := range objects(state["remoteNodes"]) {
+		switch binding["status"] {
+		case "detached", "revoked", "missing", "identity_changed":
+			if config.BindingCleanupPending(binding) {
+				retained++
+			}
+		}
+	}
 	info, err := c.Info(profile)
-	return Record{"removed": removed, "traffic": info}, err
+	return Record{"removed": removed, "retainedPending": retained, "traffic": info}, err
 }
 func (c *Controller) RemoveBinding(ctx context.Context, profile string, index int, token string, confirmed bool) (Record, error) {
 	release, err := c.lock(ctx, profile)
@@ -41,6 +56,11 @@ func (c *Controller) ForgetServer(ctx context.Context, server string, confirmed 
 	if !ok {
 		return nil, errors.New("服务器注册表不支持移除")
 	}
+	serverRelease, err := c.lockServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	defer serverRelease()
 	profiles, err := c.Repository.Profiles()
 	if err != nil {
 		return nil, err

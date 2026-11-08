@@ -1,4 +1,64 @@
+# 当前迁移状态（2026-11-07 集中收尾）
+
+最新订阅索引优化及性能复测见 [INDEX-CACHE-20261108.md](INDEX-CACHE-20261108.md)，管理器本地包为 `dist/go-local-20261108-index-cache/`；历史测量与包名保留。
+
+2026-11-08 更新：已制作并验证 Reality/Snell 本地兼容补丁，详情见 [CORE-COMPAT-20261108.md](CORE-COMPAT-20261108.md)。下方原版内核失败记录保留；修复需使用兼容内核，未部署或改变默认安装版本。
+
+最新性能补齐、全量回归和新发现的 Snell 复用边界见 [PERFORMANCE-AUDIT.md](PERFORMANCE-AUDIT.md)。本轮本地包为 `dist/go-local-20261107-performance-audit/`；下方历史包名保留作审计记录。
+
+当前能力与真实剩余边界以 [REMAINING.md](REMAINING.md) 为准，验证和本地包以 [CLOSURE.md](CLOSURE.md) 为准。以下历史条目中的“bind 拒绝”“sing-box 传统 SS 未实现”“purgeData 拒绝”“TLS 跳过校验拒绝”已全部或部分被本轮实现取代（跳过校验仅 sing-box 可用，当前 Xray 仍拒绝）。
+
+本轮新增：专属用户及整入站完整生命周期、独立核端口计量、专属整入站套餐限速继承、sing-box 三种传统 SS AEAD 多用户、旧绑定与旧中转显式证据迁移、带持久屏障的新独立核主备取消、清空数据卸载、sing-box 普通 TLS 显式校验策略兼容。界面与回执已同步更新。
+
+本轮继续核对安装流程：Xray 不再执行下载的最新安装脚本，改为固定官方 26.10.31 包、amd64/arm64 SHA256、候选配置预检、原程序/配置/服务状态回滚；两核补充 SIGTERM 和回滚失败保留恢复副本。跨核 Reality 已找到 1.14.4 → 26.4.25 的通过组合，但未修改默认安装版本。
+
+主备取消进一步补齐批量本地屏障：先验证全部请求 ID，全部路径的取消意图落盘后再联系远端；首路径离线不会漏掉后续路径，重启后仍禁止迟到创建。
+
+## 历史实施记录（按当时状态保留）
+
 # Go 重构状态
+
+- 2026-11-07（保留数据卸载失败回滚）：安装脚本在停止服务前保存 unit 权限、current 原始链接及 active/enabled 状态；停止、部分删除、daemon-reload 或可捕获终止失败时，在同一发布锁内恢复文件并按原状态恢复启用/运行。恢复失败明确报错并保留 .remove.* 中的 unit 副本，不假报成功。隔离测试覆盖五类故障与四种初始运行/启用组合，含 SIGTERM；已有成功卸载、版本变化拒绝及数据保留测试继续通过。
+
+- 2026-11-07（旧 QUIC 单字符串 ALPN）：兼容 Python 的 Hysteria2/TUIC alpn 单字符串写法，配置导入规范为数组，分享 URI 保留协议及顺序，sing-box 中转直接转换也做同样规范且不改源节点。修复分享导出仅接受 []any 导致字符串/[]string 静默丢失 ALPN；错误类型、空协议、控制字符、逗号和超过 255 字节的协议明确拒绝。保留空数组及未填写时原有默认行为。
+
+- 2026-11-07（旧 Trojan 隐式 TLS）：Python 分享链接解析生成的 Trojan 节点常省略 tls，Go 通用出站转换此前会生成 security=none 或拒绝带 SNI/ALPN 的旧节点。现在仅在 Trojan 的 tls 字段缺省时，使用副本补 TLS 默认值，供 Xray/sing-box 中转及 v2rayN/v2rayNG 主备导出使用；保留显式 false 的原有语义，null/错误类型及跳过校验仍拒绝，源节点不改写。真实内核覆盖 Trojan TCP/WS/gRPC（Xray 客户端到 Xray/sing-box 服务端），sing-box 同核另验证认证计量及撤销。
+
+- 2026-11-07（sing-box 出站 UDP 禁用）：旧节点 udp=false 现在映射为 sing-box 原生 network=tcp，支持 SOCKS5、SS、VMess、VLESS、Trojan、Hysteria2、TUIC；省略/true 保持默认。仅在 sing-box 转换的临时副本上绕开 Xray 无法表达此选项的检查，原始节点不改写，其他扩展和 TLS 检查仍执行；Xray 继续拒绝无法表达的 UDP 禁用。七协议 true/false 原生配置检查通过，SOCKS5 真实回环验证启用→禁用→再启用时 TCP 保持可用、禁用阶段无 UDP 到达目标。此项是旧节点 UDP 策略兼容补齐，不声称 Python 已有同等中转强制限制。
+
+- 2026-11-07（HTTP/HTTPS 导入到中转及 Xray 主备导出）：修复 HTTP 解析器设置 udp=false 后被通用出站转换拒绝的问题。HTTP CONNECT 的 TCP-only 属性现在可转换到 Xray 与 sing-box；显式请求 HTTP UDP 仍拒绝，其他协议的 UDP 限制不放宽。保留未适配 headers/证书指纹及跳过证书验证的拒绝行为。新增 URI→出站认证/SNI/源数据不变测试、v2rayN/v2rayNG 主备导出测试；真实 Xray 26.10.31 和 sing-box 1.14.4 验证 HTTP/HTTPS CONNECT 成功，以及错误密码、不可信证书、错误 SNI 拒绝。
+
+- 2026-11-07（旧 QUIC 节点转 sing-box 中转）：兼容 Python YAML 的隐式 TLS、servername 别名与 Hysteria2 的整数 Mbps 带单位速率。省略 TLS 仍生成启用 TLS 的配置，显式 false/null/错误类型继续拒绝；SNI 冲突或非字符串拒绝。速率支持正整数字符串、数值及 N Mbps，不四舍五入，不忽略异常字段；小数、其他单位、零/负数及溢出拒绝。新增旧 YAML 转换和输入不变测试，并使用真实 sing-box 1.14.4 验证 Hysteria2/TUIC 的 TCP、UDP、计量及撤销。
+
+- 2026-11-07（旧转义分享链接兼容）：补齐 Python parse_node_link 支持的外层成对引号和转义 URI 粘贴；单条、批量（含 Mieru 多端口）、Markdown 与文本/Base64 外部订阅统一识别。仅在 scheme 明确使用反斜杠转义时还原旧转义，普通 URI 与百分号编码凭据不改写；裸链接末尾单引号保留。新增导入保存分享、凭据保持、失败行号与多端口回归。此项为输入兼容，不增加高级传输或整入站生命周期能力。
+
+- 2026-11-07（旧端口限速清理归属核验）：修复 SetBandwidth 清除分支未检查其他订阅绑定的遗漏。设置、清除以及清理回执本地收尾前均核验同入站有效或待处理归属；跨订阅 active/provisioning、待删除记录和同订阅冲突拒绝操作，已完成撤销历史不阻断。新增本地速率不变、远端调用为零及正常历史兼容测试。此项不提供共用入站按用户限速。
+
+- 2026-11-07（旧迁移前置数据核验与原子收尾）：修复对象断言失败被当成空登记的问题：旧 bandwidths、meters、绑定 bandwidth 字段允许缺省，显式存在必须为对象，null/字符串/数组明确拒绝；目标计量端口必须有效且与绑定匹配。残留限速回执只用于验证，速率归零推迟到迁移成功与身份/计数基线同一次保存，不在归属核验前修改状态。新增异常登记前置拒绝、无远端读取/修改及迁移失败保留原速率测试。此轮为迁移数据一致性修复，不增加整入站接管能力。
+
+- 2026-11-07（旧限速清除后的迁移收尾）：清除端口限速时，若服务器显式 bandwidths 登记已无目标项且 goBandwidthCleared 回执的 ID/端口匹配，可直接把本地残留速率置零，不再连接远端重复清除。旧绑定迁移也核验该回执并同步残留速率，避免已清除限速仍阻断迁移。目标策略仍存在（含 null）、登记/回执缺失或端口不符均不跳过远端核验。新增重开仓库恢复、失败保留速率、费用不变及带残留速率完整迁移回归。此项不是共用入站单用户限速实现。
+
+- 2026-11-07（历史清理保留恢复记录）：修复批量清理历史绑定会移除尚有 `inboundDeletePending` / `localCleanupPending` 的记录、丢失后续核对依据的问题。批量清理跳过这些记录，接口返回 `retainedPending`，页面显示保留数量及同步/刷新提示。完成恢复后可再正常批量清理。新增重开仓库、费用与 YAML 不变、无远端调用及 DOM 提示验证。单条明确确认的本地移除仍保持原语义；本轮不实现主备草稿远端取消屏障。
+
+- 2026-11-07（旧计量清理回执核验）：收紧上轮本地收尾判断。登记项缺失本身不再证明已清理；远端清理确认后，同一次服务器登记提交保存 `goMeterCleared[inboundId]=port`。远端适配器重复清理及订阅残留标记收尾均要求对应回执，目标仍存在（包括 null）时不得跳过核验。新增错端口、错入站、缺失/异常回执和重启后回执恢复测试。早期版本已移除登记但未写回执的记录不自动补造成功证据，保留标记等待核对。
+
+- 2026-11-07（旧计量清理的本地收尾恢复）：旧规则已获远端确认且服务器 meters 登记已提交、但订阅标记保存失败时，重试可依据显式登记中目标已不存在的结果完成本地收尾，不再依赖此时认证计数在线，不重复执行远端清理。仅对仍有 legacyMeterRetained 的有效用户绑定开放；缺失/空值/异常登记、目标键仍存在、身份变化、撤销、待删除及其他活动旧绑定均不走收尾捷径。新增重开仓库恢复、费用不变和保护条件测试。此项是清理结果恢复，不是无凭据资源接管。
+
+- 2026-11-07（现有用户登记适配层验收）：新增 `TestExistingUserEnrollmentRecoversNativeJournal`，直接调用真实内核适配器的登记计划、加密日志和磁盘状态流程，覆盖 Xray / sing-box 已存在用户登记；sing-box 写入后断连、重开管理器恢复、配置漂移拒绝、成功后重复登记不写配置、原用户及无关元数据保留。扩展统计初始化恢复测试，覆盖现有用户在首次启用统计时断连、sing-box gRPC 查询失败和再次重启恢复。此轮只增加验收测试，未新增运行时功能；SSH 和统计返回仍为测试替身，不是实机验收。
+
+- 2026-11-07（旧用户计量登记中断恢复）：独立内核旧绑定切换计数来源时，先核验订阅唯一归属，再直接进入可恢复的现有用户计量登记；不再以普通读取成功作为恢复前提，避免远端已写入但本地元数据尚未提交时被状态差异卡住。登记不提供新凭据，不会重建缺失用户。新增远端写入后断连、重新打开配置仓库继续迁移及完成回执重试测试，验证历史费用、订阅 YAML 和用户不变；另验证 Xray/sing-box 缺失、改凭据、停用用户的登记拒绝。仅替身故障测试，未执行生产 SSH 操作。
+
+- 2026-11-07（旧绑定迁移响应丢失恢复）：迁移成功时同一次持久写入保存原确认标识、迁移后的绑定身份和计数切换方式。客户端未收到响应时，原请求可在重启后返回完成结果；只读取本地状态，不重新结算、不重建计数基线、不操作远端。绑定身份变化、跨订阅、撤销、暂停、待删除或未确认时拒绝回执复用。新增实际重新打开配置仓库的回归，验证原 YAML、费用和远端调用次数不变。此项不接管无凭据旧 SS，也不补整入站绑定。
+
+- 2026-11-07（面板旧计量清理）：修复 `ClearLegacyMeter` 仅支持独立内核的遗漏。3x-ui / X-ui / X-Panel 现通过既有面板 SSH 通道及操作互斥执行同一受保护清理流程。新增三种面板互斥入口测试，以及面板旧绑定迁移→认证用户计数基线→旧规则清理回归；计数缺失或 SSH 清理结果不明时保留 `legacyMeterRetained`，确认后才清除标记。保留原订阅 YAML、历史费用及其他入站计量规则。未执行真实远端 nftables 修改。
+
+- 2026-11-07（面板传统 Shadowsocks 模板）：补齐 Python `shadowsocks` 模板的面板创建路径，AES-128-GCM、24 字节安全随机密码、TCP/UDP、可选随机端口。沿用加密创建意图和单次下发，断连/重启后核对时保留同一密码；显式端口冲突拒绝，远端配置变化不复用。网页新增“创建单密码 SS”，提交到 `/servers/inbounds`，返回连接但不自动导入订阅、不启用订阅计量；`/servers/users` 明确拒绝。此项只补面板单密码模板，不代表 sing-box 传统 SS 独立订阅隔离或整入站绑定已完成。真实 Xray 的分享链接往返、TCP HTTP 与 SOCKS5 UDP echo 已验证；真实 3x-ui API 验收仍待独立环境。
+
+- 2026-11-07（原始面板入站新增）：迁移 Python `create_inbound` 的原始对象分支与网页入口。按白名单校验端口、协议、JSON、用户列表与大小，保留管理员配置及原凭据；不会自动给当前订阅授权、导入或绑定。复用加密创建记录和单次下发机制，端口冲突不换端口，断连/重启后只核对结果，配置或凭据被远端修改时拒绝复用。新增 HTTP 认证/Origin、订阅无副作用、失败重试、凭据不明文落盘和 DOM 测试。原始配置由管理员提供，不自动申请证书或进行模板 SNI 扫描；独立内核使用原生入站管理，真实 3x-ui 验收仍待测试机。本轮启用三内核的全量测试、remote/subscriptions/web 竞态、vet、DOM、双架构构建及包内外 SHA-256 校验通过。
+
+- 2026-11-06（集中收尾）：新增面板保留数据卸载：当前账号密码与确认文字校验、更新/卸载共享互斥任务、工作进程版本与安装路径核验、内嵌安装器执行，保留订阅、账号及远端资源。新增队列、HTTP、临时目录脚本及 DOM 回归；修复卸载任务显示为“更新成功”的文案。真实 systemd 生命周期测试脚本已接入新工作进程，但未在本机或外部执行。清空数据卸载仍未实现。
+
+- 2026-11-06（集中收尾验收）：真实 sing-box HY2 / TUIC 与 Xray HY2 完成 SOCKS5 UDP ASSOCIATE 到回环 UDP 目标、双用户计量、单用户撤销和末用户暂停/恢复/移除验证；Xray→Xray、sing-box→sing-box Reality 完成相同用户生命周期 TCP 验证。三内核全量测试、全包 race、vet 通过。sing-box→Xray Reality 另行复现失败，已定位到版本间混合密钥握手不兼容，详见 CLOSURE.md；没有关闭证书验证绕过，也没有因此宣称全量完成。
 
 基准：老仓库 `Angasky/mxioc-vpn-manager` 的 `8c199c643fceaa1de9afa009850d835b07f0dcb2`。
 目标：完整 Go 后端发布到 `Angasky/dingzhi-ban`，不保留 Python 运行时依赖。
@@ -6,6 +66,40 @@
 **此分支仍在重构中，尚不能替代完整面板。Go HTTP 服务已经独立运行，不调用 Python；根目录旧版 `install.sh` 仍安装 Python 版，独立 Go 预览安装器在 `deploy/install-go.sh`，正式切换与回滚验收尚未完成。**
 
 ## 已实现并验证
+
+- 2026-11-06（本地续迁，带传输参数的协议切换）：Go 托管、无保留用户的 VLESS / VMess / Trojan TLS 入站，在配置 WS Host 或受支持的自定义 ALPN 后仍可互换协议。协议兼容判断与传输切换解耦，切换协议只替换空用户认证配置，保留路径、Host、ALPN 顺序、证书与密钥。未知请求头 / ALPN、socket 扩展、Reality、XHTTP 及未托管旧记录继续拒绝；会丢失参数的传输切换仍不开放。前端沿用原编辑器与固定请求重试，新增断线后重开仓库恢复、创建身份保留以及带 Host / HTTP1.1 的真实 WS 连接回归。启用 Xray / sing-box 的全量回归、remote 竞态、vet、DOM 和双架构包校验通过。此项扩展协议切换范围，不表示其他模板和全量迁移完成，也不代替远端验收。
+
+- 2026-11-06（本地续迁，Markdown 边界修复）：复核上一批提取器后修复无空格相邻 Markdown 链接被合并的问题。改为逐条扫描并匹配包装括号，保留节点名中的嵌套括号、编码后的密码字符和裸 URI 标点；继续扫描包装之后的相邻链接。覆盖 Markdown 标题、中文分隔标点、文本 / Base64 订阅及 HTTP 导入保存分享。此项是上一批功能的边界修复，不增加已完成迁移模块数。
+
+- 2026-11-06（本地续迁，复制粘贴提取）：手动导入与外部订阅共用候选链接提取，支持同一行多节点、Markdown 链接、反引号及尖括号包装，统一 CRLF / CR / LF 并保留原始失败行号。代码块边界与 [proxy] 标题忽略，Snell 策略行整体交给原适配器，Mieru 单链接多端口展开流程保持不变。保留无可识别链接的非空行作为失败项；不会像旧 Python 无条件裁剪裸 URI 尾部标点，以免修改密码或节点名。新增文本 / Base64 外部订阅、HTTP 批量导入与保存分享、特殊字符保留及行号测试。此项不表示全部高级协议已适配。
+
+- 2026-11-06（本地续迁，旧 IPv6 链接）：通用 URI 导入兼容 Python 的无方括号 IPv6 + 末尾明确端口写法。仅对有效 IPv6 与 1–65535 十进制端口补括号，保留用户名密码、路径、查询与片段原文；域名、标准带括号地址保持不变，无效或含作用域的非标准地址拒绝。覆盖 VLESS、Trojan、HY2、TUIC、SOCKS5、HTTP(S) 和带明文端点的 SS；VMess Base64 JSON 与 Mieru 仍由原适配器处理。分享统一为标准带括号地址。新增压缩 IPv6、IPv4 映射 IPv6、特殊凭据、非法端口、文本 / Base64 外部订阅和 HTTP 导入保存分享测试。此项为解析兼容，不代表真实 IPv6 网络连通验收。
+
+- 2026-11-06（本地续迁，QUIC 链接默认值）：HY2 未指定或填写空 ALPN 时补 h3；TUIC 默认补 bbr 和 native，显式设置继续保留。新增只提取 Python 纯解析函数的 AST 对照生成器与固定样例，逐字段核对默认值及凭据。明确兼容差异：TUIC 未指定 ALPN 时不沿用 Python 强制 h3，因为真实 sing-box 默认 TUIC 入站不选择该 ALPN，强制添加会导致 TLS 握手失败；显式 ALPN 原样保留。原失败日志保存在 artifacts/quic-defaults-native.log，修复后启用 Xray / sing-box 的全量回归、links / subsource 竞态、vet 和双架构包校验通过。QUIC 回归主要为本地 TCP 目标流量，不代替真实 UDP 目标、客户端 App 或远端验收。
+
+- 2026-11-06（本地续迁，Python 凭据兼容）：TUIC 支持查询参数 password，以及 congestion-controller / udp-relay-mode 别名；账号区和查询参数同时提供不同密码、重复参数或冲突别名时明确拒绝，不静默挑选。采用 URL 用户名 / 密码分别解码，保留特殊字符。HY2 按 Python 规则优先使用用户信息中的密码，否则使用用户名，编码在单一用户名中的冒号仍保留为密码内容。VMess 未提供 SNI 时按 Python 回退到 Host，明确的 SNI 优先。新增链接往返、特殊字符、无效输入、外部文本 / Base64 订阅、HTTP 导入保存分享和失败脱敏测试。此项为解析兼容，不代表真实 TUIC / HY2 客户端握手验收。
+
+- 2026-11-06（本地续迁，创建时的 ALPN）：VLESS / VMess / Trojan TCP、WS、gRPC TLS 及 VLESS XHTTP TLS 模板支持创建时指定 ALPN，创建和编辑共用顺序、重复项、长度、控制字符及 HTTP/2 要求校验。未传参数保持原默认，TCP / WS 可明确清空，gRPC 仅允许 h2，XHTTP 必须包含 h2；HY2 / TUIC、非 TLS 模板拒绝该自定义参数。表单随协议显示并设置默认值，提交后重试保留原值。新增模板默认兼容、非法组合、创建到编辑 / 分享往返、内核配置校验和前端回归。并修复 TCP / WS 节点导出丢失 ALPN 的遗漏（包括上一批编辑流程）；测试直接断言指定顺序，而非只比较两个可能同时缺字段的节点。修复后启用 Xray / sing-box 的全量测试、remote / subscriptions 竞态、vet、DOM 与双架构包校验通过。此项不代表全部高级传输参数或实机验收完成。
+
+- 2026-11-06（本地续迁，TLS ALPN 编辑）：Go 创建的 VLESS / VMess / Trojan TCP、WS、gRPC、XHTTP TLS 托管入站可调整 ALPN。支持 h2、http/1.1 顺序及 TCP / WS 清空使用内核默认；gRPC 仅允许 h2，XHTTP 必须包含 h2。未知扩展 ALPN、旧未托管记录、Reality 和 QUIC 不开放此编辑。只克隆并修改 TLS 的 alpn，保留证书、密钥和用户；沿用活动绑定保护、关联资源检查和持久化编辑重试。前端切换传输同步默认值，重试使用原提交。新增分享往返、非法组合、源记录不变、重启恢复及真实内核 WS HTTP/1.1 回归。其余高级传输参数仍未全部迁移。本轮启用 Xray / sing-box 的全量测试、remote 竞态、vet、DOM 和双架构构建通过；未进行远端验收。
+
+- 2026-11-06（本地续迁，创建时的传输 Host）：VLESS / VMess / Trojan WS TLS 及 VLESS XHTTP TLS 模板增加可选 Host，创建表单按协议发送 wsHost / xhttpHost；Host 纳入创建请求摘要，幂等重试沿用原提交。WS 创建复用编辑校验，拒绝非字符串、空白、查询和片段等不能在现有编辑 / 分享流程中稳定表示的路径；未提供或空路径保持 /。创建时保留 Host 到分享链接与原生客户端出站，空 Host 仍保持旧版默认。测试覆盖三类 WS 与 XHTTP 的字段、无效参数、请求摘要变化、URI 往返和前端失败重试。属于模板参数补齐，尚不表示剩余高级模板全部完成。启用 Xray / sing-box 的全量测试、remote 竞态、vet、DOM 回归及双架构构建通过；本轮未启用 Mihomo，未部署远端。
+
+- 2026-11-06（本地续迁，WebSocket Host）：托管 WS 入站支持设置、修改和清空 Host，支持切换到 WS 时一并填写。编辑器保留传输草稿，失败重试固定原请求；后端克隆请求头，仅修改 Host，保留其他请求头及认证信息，拒绝重复大小写 Host、非字符串或并存的新式原生 host 表示。已有非空 Host 不开放会丢失该字段的传输切换，清空后恢复基础切换。沿用订阅归属、关联计量、配置校验和持久化重试；测试覆盖断线后重开仓库继续保存、不同 Host 重试拒绝、创建身份不变。Xray / sing-box 本地真实内核验证带 Host 分享链接的正常认证及错误用户 / 路径拒绝；Host 是连接请求头，不作为独立认证机制。前端 DOM、全量 Go 测试、remote / config 竞态和 vet 回归通过，未部署远端。
+
+本轮最终验证：三内核启用的全量 Go 测试复验、全量竞态检测、vet、DOM 冒烟及双架构打包通过。真实内核首次出现的启动时序失败与修正后的复验日志均保留在工作区 artifacts；DOM 检查不等于实机浏览器验收。
+
+- 2026-11-06（本地继续迁移，未推送）：补齐 DELETE /admin/api/nodes/bulk 的原子删除及 deleted / names 返回，保留 POST 兼容；首页与管理页一致，HEAD 保留 GET 状态和响应头并移除响应体，节点验证返回可分享的 uri。新增按 Python 0869964 AST 提取的 HTTP 方法清单及路由回归；该清单只证明入口覆盖，不代表全部业务语义一致，网页卸载仍未实现。
+- 服务器已有连接导入改为读取后端实时凭据，忽略浏览器传入的 links；校验节点选择、停用状态、订阅限制与跨订阅归属，事务保存、去重和自动改名。独立内核只导入核验为 present 的连接。已有活动 / 创建中独立用户的入站沿用独立用户流程，为当前订阅生成或恢复自己的凭据并启用计量；重复导入不增用户。整入站 bind 尚未迁移，保护性拒绝不计作功能完成。
+- 补齐 SOCKS / SOCKS5 默认端口、UDP 和 TLS 参数往返；Reality 显式保留 support-x25519mlkem768，规范化空 Short ID 并严格检查非空格式。XHTTP 托管编辑新增 Host，沿用身份核对、持久化重试及配置校验。
+- 增加多订阅冷读取 / 写入 / 镜像一致性压力、预取消与等待取消回归；修复操作锁在取消和锁可用同时发生时仍可能执行的问题。远端包竞态检测发现的三个测试夹具共享计数 / 状态已改为原子访问。
+
+
+- 2026-11-06（本地续迁第三批，未推送）：补齐 HTTP / HTTPS 代理链接。支持缺省 80 / 443 端口、IPv6、转义账号密码、Host / User-Agent（含 ua 别名）、SNI、SHA-256 证书指纹、name-cert-verify 与显式证书校验开关，并在导入、保存、分享、外部订阅和完整 Mihomo YAML 中保留。支持已有 YAML 的小写请求头及 servername；未知扩展、自定义非 Host / User-Agent 请求头、冲突别名、CRLF / 控制字符、HTTPS 降级和不适用的 TLS / UDP 设置明确拒绝分享或导入，避免静默丢失配置。HTTP 指纹是证书固定值，不映射为客户端指纹。以 Python 原仓库 0869964 的实际解析函数生成固定对照样例，Go 逐字段结果一致；原生单元、外部文本 / Base64 订阅、HTTP 鉴权 / Origin、导入保存再分享及 YAML 回归通过，Go 全量测试、vet、本地构建通过。真实 HTTP CONNECT / TLS 客户端握手尚未验收；任意请求头仍可保留在完整 YAML，分享链接不能无损表达时拒绝。
+
+- 2026-11-06（本地续迁第二批，未推送）：补齐 HY2 / TUIC 内嵌证书及 SHA-256 指纹转换。支持 `tls_certificate` / `tls-certificate` 的单张 PEM 证书，含逗号分行，解析实际 X.509 DER 后计算指纹；支持 HY2 `pinSHA256` 与 TUIC `pinned_certchain_sha256` 导入、分享往返，规范化为 Mihomo 大写冒号分隔指纹。多份证书 / 指纹参数必须一致，重复参数、畸形证书、证书链、错误协议或关闭 TLS 均拒绝。尚未适配证书指纹的其他协议分享明确报错，不再静默遗漏指纹；完整 YAML 保持原配置。兼容 Python TUIC `allow_insecure`，同时拒绝相互矛盾的 TLS 校验开关。生成真实 X.509 测试证书，验证 DER 摘要、PEM / 逗号格式、分享往返、冲突和脱敏；外部文本 / Base64 订阅、HTTP 导入保存分享及 Mihomo YAML 回归通过。Go 全量测试、vet 和本地构建通过。此处只验证证书结构及转换，不验证信任链 / 有效期，也不表示真实 TLS 握手或客户端 App 验收完成。损坏的 URL 编码、任意二进制伪证书和多证书链不会沿用旧 Python 的宽松处理。
+
+- 2026-11-06（本地续迁，未推送）：补齐旧 Python 分享链接的参数别名：VLESS / Trojan 的客户端指纹，VLESS Reality 的 publicKey / shortId，通用传输 network、SNI peer / servername、gRPC service_name，以及 HY2 的 obfsPassword / up / down；SOCKS5 支持 servername。别名先规范化再走原有严格参数检查，同义参数相同可合并，重复或冲突值拒绝；HTTP 证书 fingerprint 不会误当作客户端指纹。WebSocket 缺省路径和 gRPC 缺省服务名分别统一为 / 和 grpc，含 VMess。单链接往返、文本 / Base64 外部订阅、HTTP 导入保存再分享回归通过；Go 全量测试通过。该批是链接兼容补齐，不代表高级传输或整机验收全部完成。
 
 - 2026-11-06：独立 Xray 新增传统 Shadowsocks AEAD 托管模板：AES-128-GCM、AES-256-GCM、ChaCha20-Poly1305。每份订阅生成独立随机密码，并为每用户明确写入加密方式；接入认证用户计量、到期撤销、月额度暂停 / 恢复和写入重试。服务端基础密码、占位凭据、创建归属与加密方式纳入端点身份；每用户加密方式固定为端点方式，改动、凭据复用或混入 SS2022 模式时拒绝操作。空用户使用不导出的随机占位用户，分享链接仅含该订阅的密码。已有传统 SS 入站维持读取，不自动接管；sing-box 不开放传统 SS 多用户模板。真实本地 Xray 验证三种模板的双用户连通与独立计数、错误 / 基础密码拒绝、删除一个用户不影响另一个、末用户暂停 / 恢复与删除后失效。另以 Mihomo v1.19.33 真实内核验证三种模板的连通与撤销后失效，ChaCha20 使用兼容的 `chacha20-ietf-poly1305` 导出名称。控制器回归覆盖双订阅独立密码、重开后重复导入不增用户、空闲计数不涨和到期只撤销所属用户；浏览器覆盖三种模板显示与提交。远端服务器、UDP 目标报文及客户端 App 仍待验收。
 
@@ -292,3 +386,79 @@ v2rayn-ha / v2rayng-ha 现已导出完整 Xray 主备 JSON 数组，支持 VLESS
 正式替换标准：上述能力通过原接口对照、并发 / 故障测试和真实内核数据链路验证；不以调用 Python 子进程或反向代理 Python 代替迁移。
 
 原定制版备份分支：`go-rewrite-backup-20261102`。
+
+## 旧数值参数兼容补齐
+
+sing-box 非 QUIC 中转此前校验字符串端口后仍原样输出，导致内核拒绝；现在输出规范整数，保留源节点不变。八协议 × 三种端口表示的真实 sing-box 配置检查通过，错误类型、越界和小数端口继续拒绝，证据 `legacy-port-native.log`。
+
+Python 套餐 `rate_kbps` 支持字符串小数，Go 现仅对 speedMbps 增加相同输入兼容，验证后保存为 JSON 数字；普通额度/价格类型要求不变。控制器前置检查统一使用精确 Kbps 解析，错误不再被忽略；共用用户拒绝非零速率，专属整入站继承字符串小数速率、重试和清除有覆盖。全量回归 `numeric-compat-all.log`，配置/远端/订阅 race `numeric-compat-race.log`，vet `numeric-compat-vet.log`。最新本地包 `dist/go-local-20261107-numeric-compat/`，未推送或部署；既有外部验收与历史未知结果边界未改变。
+
+## 批量取消原子落盘及并发验证
+
+批量取消进一步改为同一互斥锁内准备整批日志，核验通过后一次原子替换；容量不足、后续记录归属错误不再留下部分取消记录。取消与面板创建登记竞争时，先创建则记录取消意图，先取消则拒绝后续登记，不丢失取消标记。重复 ID 和重试保持幂等；原有远端结果未知边界不变。
+
+验证日志：`cancel-atomic-focused.log`、`cancel-atomic-concurrent.log`（20 次并发竞争，race）、`cancel-atomic-all.log`、`cancel-atomic-race.log`、`cancel-atomic-vet.log`。最新包：`dist/go-local-20261107-atomic-cancel/`，本地保存，未推送或部署。
+
+## HTTP 代理请求头到 sing-box 中转
+
+HTTP/HTTPS 节点的 headers 现可转换为 sing-box 原生请求头，覆盖旧链接 Host/User-Agent 和普通字符串自定义头；转换复制对象，不改源节点。名称规范化并拒绝大小写重复、非法名称、控制字符、错误类型和过长内容；认证与连接控制字段不允许覆盖内核行为。Xray 仍明确拒绝未适配的 headers，不静默丢弃。
+
+真实 Xray/sing-box CONNECT 回归通过，sing-box 的 HTTP 和 HTTPS 场景均验证 User-Agent/X-Legacy-Route 到达代理，代理认证仍有效；错误密码、证书、SNI 继续拒绝。Host 映射另有导入转换单元测试，未声称独立验证所有 HTTP 代理的 Host 路由语义。
+
+证据：`http-headers-native.log`、`http-headers-all.log`、`http-headers-race.log`、`http-headers-vet.log`。最新本地双架构包 `dist/go-local-20261107-http-headers/`；未推送、未部署。既有 REMAINING.md 中的远端未知结果和实机验收边界仍在。
+
+## Reality SNI 别名与 TLS ALPN 转换补齐
+
+通用出站此前 Reality 只取 servername，现兼容旧节点 sni，并拒绝两字段冲突及非字符串/控制字符输入，适用于 Xray 与 sing-box 中转。普通 TLS 的 ALPN 复用统一协议列表验证，支持 []string/JSON 数组，拒绝空协议、控制字符、逗号和超长项；转换结果不引用原数组。Reality 的 ALPN 不扩展支持。
+
+验证：`tls-alias-all.log`、`tls-alias-race.log`、`tls-alias-vet.log`；真实内核 `tls-alias-native.log`，第二个 Reality 用户显式仅保留 sni，测试独立计量及撤销。该验证使用 Xray 同核、sing-box 同核，不将已知失败的新版跨核组合标记通过。最新本地包 `dist/go-local-20261107-tls-alias/`，未推送、未部署。
+
+## Xray HTTP 请求头及主备导出补齐
+
+核对 Xray 26.10.31 的 HTTPClientConfig.Headers 和实际 CONNECT 实现后，开放普通 HTTP/HTTPS 请求头映射。Xray 把头值视为 Go 模板执行，转换器将导入字符串包装为模板字面常量，防止 `{{.Target}}` 等内容被意外插值。自定义 Host 在该实现中不会覆盖 Request.Host，因此仍明确拒绝；sing-box 原有 Host 支持保持不变。认证与连接控制头继续禁止覆盖。
+
+Xray/sing-box HTTP 与 HTTPS 真实 CONNECT 均验证自定义头和字面花括号原样到达，错误密码、证书、SNI 拒绝；v2rayN/v2rayNG 主备导出保留普通头、保留认证、通过真实 Xray 配置检查，包含不支持 Host 的组仍整体拒绝。日志 `xray-http-headers-native.log`、`xray-http-headers-ha.log`、`xray-http-headers-all.log`、`xray-http-headers-race.log`、`xray-http-headers-vet.log`。
+
+最新双架构本地包 `dist/go-local-20261107-xray-http-headers/`，构建/校验日志 `xray-http-headers-build.log`、`xray-http-headers-package-check.log`。只保存本地，未部署或推送；既有远端未知结果、跨核 Reality 和外部验收边界未改变。
+
+## Python TUIC 默认行为与混淆参数迁移
+
+Python core_adapter.sing_quic_outbound 对缺省 TUIC 拥塞控制使用 bbr、UDP 模式使用 native。此前 Go 省略拥塞字段会触发 sing-box 原生 cubic 默认值；现显式保留 Python 默认，同时支持 bbr/cubic/new_reno 和 native/quic 的显式选择。null、错误类型、空或未知枚举拒绝，不默默改成原生默认。Hysteria2 仅接受 salamander 与非空字符串混淆密码；孤立 obfs-password 不再被忽略。源节点不修改。
+
+证据：`quic-defaults-native.log`（真实 HY2/TUIC UDP、独立计量、撤销及默认缺省节点）；`quic-defaults-tcp.log`（真实 TUIC TCP）；`quic-defaults-all.log`、`quic-defaults-race.log`、`quic-defaults-vet.log`。最新本地包 `dist/go-local-20261107-quic-defaults/`，未推送、未部署。既有跨核兼容和外部验收边界不变。
+
+## 持续目标：逐行为审计（2026-11-07）
+
+全面迁移目标保持 active，验收入口改为 [ACCEPTANCE-MATRIX.md](ACCEPTANCE-MATRIX.md) 和 [BEHAVIOR-REVIEW.md](BEHAVIOR-REVIEW.md)，全量索引包含 13 模块、309 个入口。已补主备流量/到期说明、Snell 统一校验及无损分享、畸形本地归属记录拒绝清理；监控热插拔/时间边界/计数溢出/失败恢复已有竞态测试；Snell 六种混淆配置与 Mieru 四种组合通过真实 Mihomo 配置检查。仍需继续集中审计限速脚本分阶段失败与其余远端行为，不因本批测试通过标记全部完成。
+
+本批最新已校验包：`dist/go-local-20261107-behavior-audit/`；`../artifacts/mxioc` 同步更新。具体测试和剩余项见 CLOSURE 本批记录，不能将打包视为持续目标结束。
+
+## 持续审计：限速、用户与配置事务
+
+已统一精确带宽/倍率小数解析，补字符串与科学计数法并拒绝分数语法；限速真实 shell 替身执行覆盖 11 个失败/重试/模拟重启场景。共用用户增加损坏 peers 列表拒绝；独立内核写入增加 TERM/INT 回滚保护及双核 16 场景脚本执行测试。证书输入支持 IDNA 规范化。具体证据及仍未验收边界见 BEHAVIOR-REVIEW，本目标继续 active。此前 behavior-audit 发布包尚不含本段新增修改，当前源代码为最新状态，后续统一重建交付。
+
+### 2026-11-07 持续迁移：认证与历史索引
+
+补齐低迭代 PBKDF2 成功登录升级，升级/会话/限流一次持久写入，原会话重启后保留；账号更新按 Unicode 字符校验并撤销旧会话。补齐安装日志引用键/secret 脱敏和面板列表响应类型校验，拒绝尾随 JSON。历史短 slug、已知身份变化绑定在 RunBackground 前迁移，普通请求失败与 --check-data 保持只读约束。首轮隐式读迁移破坏回滚测试，已修正；全量与相关回归证据详见 CLOSURE.md、BEHAVIOR-REVIEW.md。最新校验包 go-local-20261107-auth-profile，未推送、未部署。持续目标仍 active，未声称全面完成。
+
+### 2026-11-07 持续迁移：备份、导入与计费
+
+磁盘备份保留 100 份并拒绝链接恢复；外部导入拒绝遮蔽内置动作，批量粘贴补 link 别名、默认分组、-02 命名与 names 返回；Bearer 去空白与头优先一致。补齐未启用强制限制套餐的月度重置，额度/套餐及用户登记后非阻塞唤醒后台。相关竞态、最终全量和 vet 已通过，最新本地检查包 go-local-20261107-policy-parity 已校验。持续目标不变，完整迁移尚未验收完成。
+
+### 2026-11-07 持续迁移：服务器生命周期互斥
+
+服务器保存和移除现与首次创建共用 server lock，绑定尚未写入也不会漏掉进行中的创建；获取锁后重查归属。批量删除按原节点顺序返回，支持名称去空白；规则移动支持任意整数偏移与边界钳制。诊断日志复用凭据字段过滤并限制 64 KiB。相关竞态与 Web 回归通过，最新本地包 go-local-20261107-server-serialization 已校验，未提交、推送或部署。
+
+### 2026-11-07 历史数据完整性与套餐小数收尾
+
+上一批完整回归 goal-legacy-decimal-final-all.log、静态检查 goal-legacy-decimal-final-vet.log 通过；双架构包 go-local-20261107-legacy-integrity 已完成内外 SHA256、界面一致性和 amd64 启动帮助检查（goal-legacy-integrity-package-check.log）。包含空模板路径、重复订阅 ID、Unicode 初始化凭据、完整 JSON 校验、套餐十进制输入及旧零速率兼容。后续规则/排序/账号/模板/任务展示补齐已写入源码，详见 BEHAVIOR-REVIEW；不把先前包视为包含这些新修改。
+
+### 2026-11-07 规则、排序和远端状态续迁移
+
+补齐六类行为：规则显式空字段及组规则空匹配拒绝；仅用 provider 的策略组排序不增空 proxies；畸形 HTTP/SOCKS 账号不导出匿名节点；多段 YAML 模板整体拒绝；服务器安装任务按当前类型显示。完整结论及回归见 BEHAVIOR-REVIEW；最终全量、配置/远端竞态和 vet 通过，双架构包 go-local-20261107-template-job 已校验并同步 artifacts/mxioc。仍未把实机验收或完整迁移目标标为完成。
+
+### 2026-11-07 注册表与退出生命周期补齐
+
+损坏订阅更名/删除在落盘前拒绝；服务器索引拒绝重复或非法 ID；策略模板坏列表不再被新保存覆盖；面板完整入站身份核验先于待删除中转清理。新增后台计量退出等待，main 在信号退出时等待 HTTP 与计量工作结束，保持 10 秒上限。全量、相关竞态、20 次 Web 退出竞争复测通过，最新双架构包 go-local-20261107-registry-shutdown 已校验；隔离真实进程 SIGTERM/SIGINT 退出验证通过。仅本地保存，完整迁移与实机验收尚未全部完成。
+
+本批最终补充：自动证书失败日志先脱敏后截断，防止长行凭据尾部暴露。最终全量/vet 与证书竞态通过，最终校验包为 go-local-20261107-registry-cert，artifacts/mxioc 已同步。验收范围与外部边界不变，详见 CLOSURE。

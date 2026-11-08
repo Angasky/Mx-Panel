@@ -40,9 +40,6 @@ func legacyNativeInbound(kind string, row Record) (Record, error) {
 	protocol, listen := value(row["protocol"]), value(row["listen"])
 	if protocol == "shadowsocks" {
 		if _, classic := row["goSSAEADGuard"]; classic {
-			if kind != "xray" {
-				return nil, invalidCoreInbound
-			}
 			clients, err = ssAEADNativeClients(row, clients)
 			if err != nil {
 				return nil, err
@@ -91,7 +88,16 @@ func legacyNativeInbound(kind string, row Record) (Record, error) {
 		if _, exists := settings["users"]; exists {
 			return nil, invalidCoreInbound // Legacy metadata uses clients; do not ignore a second user model.
 		}
-		if _, multi := settings["clients"]; multi {
+		if _, classic := row["goSSAEADGuard"]; classic {
+			users := []any{}
+			for _, raw := range clients {
+				client := raw.(Record)
+				users = append(users, Record{"name": client["email"], "password": client["password"]})
+			}
+			native["users"] = users
+			// Native AEAD multi-user authentication uses only user passwords.
+			delete(native, "password")
+		} else if _, multi := settings["clients"]; multi {
 			method := value(settings["method"])
 			if len(clients) == 0 || !shadowsocks2022Key(method, value(settings["password"]), true) {
 				return nil, invalidCoreInbound // Empty SS2022 users must not fall back to server-key authentication.

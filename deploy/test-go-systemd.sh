@@ -66,7 +66,23 @@ if apply_bundle rollback "$stage/mismatch" "$current"; then
 fi
 [[ $(readlink -- "$base/current") == "$current" ]]
 expect_health v0.0.2
-bash "$stage/old/install-go.sh" uninstall
+# Exercise the same durable worker used by the web action, in the isolated VM.
+python3 - "$base/update-status.json" <<'PYJOB'
+import json, sys, time
+with open(sys.argv[1], 'w') as handle:
+    json.dump({'id': 'ci-uninstall', 'operation': 'uninstall', 'version': 'v0.0.2',
+               'status': 'queued', 'stage': 'queued', 'startedAt': int(time.time())}, handle)
+PYJOB
+chmod 0600 "$base/update-status.json"
+systemd-run --quiet --wait --collect --unit=mxioc-go-test-uninstall.service \
+    --property=Type=exec --property=RuntimeMaxSec=3min \
+    "$base/current/mxioc" --remove-service=true --update-job=ci-uninstall
+python3 - "$base/update-status.json" <<'PYJOB'
+import json, sys
+with open(sys.argv[1]) as handle:
+    status = json.load(handle)
+assert status['operation'] == 'uninstall' and status['status'] == 'succeeded', status
+PYJOB
 [[ ! -e "$unit" && ! -L "$base/current" && -f "$auth" && -d "$data" ]]
 "$new_binary" --root "$data" --auth "$auth" --check-data
 echo 'systemd lifecycle passed: install, upgrade, rollback, and uninstall with data retained'

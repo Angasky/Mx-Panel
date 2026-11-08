@@ -15,7 +15,7 @@ func TestSingInstallBuildAndRollback(t *testing.T) {
 	if err != nil {
 		bash = "C:/Program Files/Git/bin/bash.exe"
 	}
-	for _, scenario := range []string{"fresh", "arm64", "fresh-service", "existing", "checksum", "build", "capability", "config", "service", "inactive-service"} {
+	for _, scenario := range []string{"fresh", "arm64", "fresh-service", "existing", "checksum", "build", "capability", "config", "service", "inactive-service", "term-service", "rollback-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := filepath.ToSlash(t.TempDir())
 			fresh := scenario == "fresh" || scenario == "arm64" || scenario == "fresh-service"
@@ -101,7 +101,7 @@ disable) rm -f "$FIXTURE_ROOT/enabled" ;;
 stop) rm -f "$FIXTURE_ROOT/active" ;;
 daemon-reload) exit 0 ;;
 restart)
- case "$SCENARIO" in service|inactive-service|fresh-service) if [ ! -f "$FIXTURE_ROOT/failed-once" ]; then touch "$FIXTURE_ROOT/failed-once";exit 35;fi;; esac
+ case "$SCENARIO" in rollback-failure) exit 35;; term-service) if [ ! -f "$FIXTURE_ROOT/failed-once" ]; then touch "$FIXTURE_ROOT/failed-once"; kill -TERM "$PPID"; exit 35;fi;; service|inactive-service|fresh-service) if [ ! -f "$FIXTURE_ROOT/failed-once" ]; then touch "$FIXTURE_ROOT/failed-once";exit 35;fi;; esac
  touch "$FIXTURE_ROOT/active" ;;
 *) exit 36 ;;
 esac
@@ -159,7 +159,7 @@ esac
 				if scenario == "checksum" {
 					stage = "download"
 				}
-				if scenario == "service" || scenario == "inactive-service" {
+				if scenario == "service" || scenario == "inactive-service" || scenario == "term-service" || scenario == "rollback-failure" {
 					stage = "service"
 				}
 				if !strings.Contains(string(output), "MXIOC_STAGE="+stage+"\n") {
@@ -168,8 +168,12 @@ esac
 				if strings.Contains(string(output), "MXIOC_STAGE=installed") {
 					t.Fatal("failed install marked complete")
 				}
-				if scenario == "service" || scenario == "inactive-service" {
-					if !strings.Contains(string(output), "MXIOC_ROLLBACK_RESTORED") {
+				if scenario == "service" || scenario == "inactive-service" || scenario == "term-service" || scenario == "rollback-failure" {
+					if scenario == "rollback-failure" {
+						if !strings.Contains(string(output), "MXIOC_ROLLBACK_FAILED") || !strings.Contains(string(output), "Recovery copies retained") {
+							t.Fatal(string(output))
+						}
+					} else if !strings.Contains(string(output), "MXIOC_ROLLBACK_RESTORED") {
 						t.Fatal("rollback not confirmed", string(output))
 					}
 				}
@@ -182,7 +186,11 @@ esac
 				}
 			}
 			entries, _ := os.ReadDir(filepath.Join(root, "tmp"))
-			if len(entries) != 0 {
+			if scenario == "rollback-failure" {
+				if len(entries) < 2 {
+					t.Fatal("rollback recovery copies lost")
+				}
+			} else if len(entries) != 0 {
 				t.Fatal("temporary toolchain/config retained")
 			}
 		})

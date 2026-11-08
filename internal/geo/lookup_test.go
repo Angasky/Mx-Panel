@@ -36,7 +36,7 @@ func TestPublicIPLookupCacheAndProviderContract(t *testing.T) {
 		t.Fatal("expired cache used", err)
 	}
 }
-func TestPrivateMixedDNSBadResponsesAndCancellation(t *testing.T) {
+func TestPrivateDNSBadResponsesAndCancellation(t *testing.T) {
 	r := New()
 	r.interval = 0
 	r.lookup = func(context.Context, string, string) ([]netip.Addr, error) {
@@ -46,7 +46,7 @@ func TestPrivateMixedDNSBadResponsesAndCancellation(t *testing.T) {
 		t.Fatal("nonpublic node sent to provider")
 		return "", nil
 	}
-	for _, host := range []string{"127.0.0.1", "10.0.0.1", "mixed.example.com"} {
+	for _, host := range []string{"127.0.0.1", "10.0.0.1"} {
 		if _, err := r.Lookup(context.Background(), host); err == nil {
 			t.Fatal("private target accepted")
 		}
@@ -62,5 +62,38 @@ func TestPrivateMixedDNSBadResponsesAndCancellation(t *testing.T) {
 	cancel()
 	if _, err := r.Lookup(ctx, "1.1.1.1"); err == nil {
 		t.Fatal("cancellation ignored")
+	}
+}
+
+func TestMixedDNSUsesFirstPublicAddressLikePython(t *testing.T) {
+	for _, answers := range [][]netip.Addr{
+		{netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("1.1.1.1")},
+		{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("127.0.0.1")},
+		{netip.MustParseAddr("::1"), netip.MustParseAddr("::ffff:8.8.8.8")},
+	} {
+		r := New()
+		r.interval = 0
+		r.lookup = func(context.Context, string, string) ([]netip.Addr, error) { return answers, nil }
+		r.fetch = func(_ context.Context, target string) (string, error) {
+			if target != "https://api.country.is/8.8.8.8" {
+				t.Fatal("nonpublic or wrong DNS answer sent", target)
+			}
+			return `{"country":"US"}`, nil
+		}
+		result, err := r.Lookup(context.Background(), "mixed.example.net")
+		if err != nil || result.IP != "8.8.8.8" {
+			t.Fatal(result, err)
+		}
+	}
+	r := New()
+	r.lookup = func(context.Context, string, string) ([]netip.Addr, error) {
+		return []netip.Addr{netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("::1")}, nil
+	}
+	r.fetch = func(context.Context, string) (string, error) {
+		t.Fatal("private-only answers contacted provider")
+		return "", nil
+	}
+	if _, err := r.Lookup(context.Background(), "private.example.net"); err == nil {
+		t.Fatal("private-only DNS accepted")
 	}
 }

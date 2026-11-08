@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Only known stage markers are published while the SSH process is running.
@@ -113,14 +114,27 @@ func installFailure(stage string, code int) string {
 }
 
 var installTerminalEscape = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
-var installSecretLine = regexp.MustCompile(`(?i)(password|passwd|passphrase|username|api[ _-]*token|private[ _-]*key|authorization|用户名|密码|令牌|私钥)\s*[:：=]`)
+var installSecretLine = regexp.MustCompile(`(?i)(password|passwd|passphrase|username|api[ _-]*token|private[ _-]*key|secret|authorization|用户名|密码|令牌|私钥)["'\s]*[:：=]`)
 
 func redactInstallLog(output string) string {
-	lines := strings.Split(installTerminalEscape.ReplaceAllString(output, ""), "\n")
+	lines := strings.Split(strings.ReplaceAll(installTerminalEscape.ReplaceAllString(output, ""), "\r", "\n"), "\n")
 	for i, line := range lines {
 		if installSecretLine.MatchString(line) {
 			lines[i] = "[敏感输出已隐藏]"
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// CleanDiagnosticLog shares credential-field and terminal sanitization with
+// installation logs, then bounds the result exposed by the diagnostics API.
+func CleanDiagnosticLog(output string) string {
+	output = strings.ToValidUTF8(redactInstallLog(output), "�")
+	if len(output) > 64<<10 {
+		output = output[len(output)-(64<<10):]
+		for len(output) > 0 && !utf8.RuneStart(output[0]) {
+			output = output[1:]
+		}
+	}
+	return output
 }

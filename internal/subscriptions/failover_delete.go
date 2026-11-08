@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+type pendingCreateCanceler interface {
+	CancelPendingCreates(context.Context, string, []string, func(string, string, int, Record) error) (Record, error)
+}
+
 type unsentCreateCanceler interface {
 	CancelUnsentCreates(string, []string) error
 }
@@ -36,14 +40,59 @@ func (c *Controller) DeleteFailover(ctx context.Context, profile, name string) (
 		return nil, err
 	}
 	if len(requests) > 0 {
-		canceler, ok := c.Backend.(unsentCreateCanceler)
-		if !ok {
-			unlock()
-			return nil, errors.New("尚不能核对草稿中未完成的远端请求")
-		}
-		if err := canceler.CancelUnsentCreates(profile, requests); err != nil {
+		if err := c.Repository.RequestFailoverCancel(profile, name); err != nil {
 			unlock()
 			return nil, err
+		}
+		if backend, ok := c.Backend.(pendingCreateCanceler); ok {
+			_, err := backend.CancelPendingCreates(ctx, profile, requests, func(request, server string, id int, row Record) error {
+				return c.Repository.GuardCanceledCreate(profile, request, server, id, row)
+			})
+			if err != nil {
+				unlock()
+				return nil, err
+			}
+		} else {
+			canceler, ok := c.Backend.(unsentCreateCanceler)
+			if !ok {
+				unlock()
+				return nil, errors.New("尚不能核对草稿中未完成的远端请求")
+			}
+			if err := canceler.CancelUnsentCreates(profile, requests); err != nil {
+				unlock()
+				return nil, err
+			}
+		}
+	}
+	if len(requests) > 0 {
+		state, err := c.Repository.State(profile)
+		if err != nil {
+			unlock()
+			return nil, err
+		}
+		wanted := map[string]bool{}
+		for _, request := range requests {
+			wanted[request] = true
+		}
+		for _, binding := range objects(state["remoteNodes"]) {
+			if !wanted[text(binding["chainRequest"])] {
+				continue
+			}
+			id, err := number(binding["inboundId"], 0)
+			if err != nil || id < 1 {
+				unlock()
+				return nil, errors.New("取消后的归属记录无效")
+			}
+			server := text(binding["serverId"])
+			observed, err := c.Repository.BindingSnapshot(server)
+			if err != nil {
+				unlock()
+				return nil, err
+			}
+			if _, err = c.Repository.ConfirmInboundDeleted(server, int(id), observed); err != nil {
+				unlock()
+				return nil, err
+			}
 		}
 	}
 	paths, err := c.Repository.BeginFailoverDelete(profile, name, draft)

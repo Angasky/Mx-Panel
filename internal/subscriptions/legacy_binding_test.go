@@ -2,6 +2,9 @@ package subscriptions
 
 import (
 	"context"
+	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
@@ -17,12 +20,19 @@ func TestMigrateLegacyBindingSettlesOnceWithoutRewritingNodes(t *testing.T) {
 	t.Run("standalone-inbound", func(t *testing.T) {
 		testMigrateLegacyBinding(t, "inbound", true)
 	})
+	t.Run("panel-retained-meter", func(t *testing.T) {
+		testMigrateLegacyBinding(t, "inbound", false, true)
+	})
+	t.Run("cleared-bandwidth-receipt", func(t *testing.T) {
+		testMigrateLegacyBinding(t, "inbound", false, false, true)
+	})
 }
 
 type legacyCoreMigrationBackend struct {
 	*fakeBackend
-	enrolls int
-	clears  int
+	enrolls    int
+	clears     int
+	clearError error
 }
 
 func (b *legacyCoreMigrationBackend) ClearLegacyMeter(_ context.Context, server string, id, port int) error {
@@ -30,7 +40,7 @@ func (b *legacyCoreMigrationBackend) ClearLegacyMeter(_ context.Context, server 
 		panic("unexpected meter target")
 	}
 	b.clears++
-	return nil
+	return b.clearError
 }
 
 func (b *legacyCoreMigrationBackend) Record(id string) (Record, error) {
@@ -51,7 +61,7 @@ func (b *legacyCoreMigrationBackend) EnrollLegacyCoreUser(ctx context.Context, i
 	return b.fakeBackend.SubscriptionUser(ctx, id, binding, "read", nil)
 }
 
-func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
+func testMigrateLegacyBinding(t *testing.T, source string, standalone bool, panelMeter ...bool) {
 	t.Helper()
 	c, backend, _ := controllerFixture(t)
 	row := backend.rows[0]
@@ -84,6 +94,10 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 	}
 	binding := Record{"serverId": "s", "inboundId": 1, "port": 24001, "status": "active",
 		"identityHash": hash, "up": 20, "down": 0, "counterSource": source, "multiplierUnits": 2000}
+	recoverBandwidth := len(panelMeter) > 1 && panelMeter[1]
+	if recoverBandwidth {
+		binding["bandwidth"] = Record{"uploadKbps": 1000}
+	}
 	if err := c.Repository.UpdateState("clash", func(p Record) error {
 		p["remoteNodes"] = []any{binding}
 		p["traffic"] = Record{"upload": 5, "enabled": true, "enforce": true}
@@ -93,9 +107,15 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 	}
 	token := config.BindingToken("clash", stateBinding(t, c))
 	core := &legacyCoreMigrationBackend{fakeBackend: backend}
+	withMeter := standalone || len(panelMeter) > 0 && panelMeter[0]
 	if standalone {
 		backend.kind, backend.missingCounters = "xray", true
 		c.Backend = core
+	} else if withMeter {
+		c.Backend = &legacyPanelMigrationBackend{legacyCoreMigrationBackend: core}
+	}
+	if recoverBandwidth {
+		c.Backend = &bandwidthReceiptBackend{bandwidthCleanupBackend: &bandwidthCleanupBackend{fakeBackend: backend, fail: true}, policies: Record{}, receipt: Record{"1": 24001}}
 	}
 	backend.stats["legacy@example.test"] = Record{"up": int64(30), "down": int64(0), "source": "authenticated-client"}
 	if _, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err == nil {
@@ -103,6 +123,9 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 	}
 	if core.enrolls != 0 {
 		t.Fatal("unverified ownership should not configure counters")
+	}
+	if recoverBandwidth && text(stateBinding(t, c)["bandwidth"].(Record)["uploadKbps"]) != "1000" {
+		t.Fatal("failed migration changed local bandwidth before commit")
 	}
 	put(other, []any{})
 	before, err := c.Repository.Raw("clash")
@@ -120,14 +143,25 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 	if standalone && (core.enrolls != 1 || result["legacyMeterRetained"] != true) {
 		t.Fatal("expected one verified enrollment while keeping the old meter")
 	}
-	if standalone {
+	if withMeter {
+		if result["legacyMeterRetained"] != true {
+			t.Fatal("retained meter not reported")
+		}
 		token := config.BindingToken("clash", stateBinding(t, c))
 		backend.missingCounters = true
 		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err == nil || core.clears != 0 {
 			t.Fatal("missing authenticated counters should preserve the old meter")
 		}
 		backend.missingCounters = false
-		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err != nil || core.clears != 1 {
+		core.clearError = errors.New("SSH result unknown")
+		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err == nil || core.clears != 1 {
+			t.Fatal("ambiguous cleanup reported success", err)
+		}
+		if stateBinding(t, c)["legacyMeterRetained"] != true {
+			t.Fatal("lost retained meter before confirmed cleanup")
+		}
+		core.clearError = nil
+		if _, err := c.ClearLegacyMeter(context.Background(), "clash", 0, token, true); err != nil || core.clears != 2 {
 			t.Fatal("verified meter cleanup failed", err)
 		}
 		if stateBinding(t, c)["legacyMeterRetained"] != nil {
@@ -142,6 +176,9 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 		t.Fatal(err)
 	}
 	newBinding := stateBinding(t, c)
+	if recoverBandwidth && text(newBinding["bandwidth"].(Record)["uploadKbps"]) != "0" {
+		t.Fatal("migration retained cleared rate")
+	}
 	want := "25"
 	if cutover {
 		want = "5"
@@ -159,12 +196,66 @@ func testMigrateLegacyBinding(t *testing.T, source string, standalone bool) {
 			t.Fatal("first post-migration sample must bill only the user delta", err)
 		}
 	}
-	if _, err := c.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err == nil {
-		t.Fatal("stale migration token accepted")
+	// Simulate a lost success response and a fresh controller after restart.
+	restarted := New(&config.Repository{Root: c.Repository.Root}, c.Backend)
+	beforeReplay, err := c.Repository.State("clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeOps, beforeEnrolls := len(backend.ops), core.enrolls
+	replayed, err := restarted.MigrateLegacyBinding(context.Background(), "clash", 0, token, true)
+	if err != nil || replayed["reused"] != true || replayed["counterBaselineRebuilt"] != cutover {
+		t.Fatal("completed migration was not recoverable", replayed, err)
+	}
+	afterReplay, err := c.Repository.State("clash")
+	if err != nil || !reflect.DeepEqual(beforeReplay, afterReplay) || len(backend.ops) != beforeOps || core.enrolls != beforeEnrolls {
+		t.Fatal("completed retry changed billing or remote user", err)
+	}
+	if _, err := restarted.MigrateLegacyBinding(context.Background(), "clash", 0, strings.Repeat("0", 64), true); err == nil {
+		t.Fatal("unrelated migration token accepted")
+	}
+	if _, err := restarted.MigrateLegacyBinding(context.Background(), "clash", 0, token, false); err == nil {
+		t.Fatal("replay skipped confirmation")
+	}
+	if err := c.Repository.UpdateState("clash", func(p Record) error {
+		objects(p["remoteNodes"])[0]["status"] = "revoked"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restarted.MigrateLegacyBinding(context.Background(), "clash", 0, token, true); err == nil {
+		t.Fatal("receipt accepted after revocation")
 	}
 	for _, op := range backend.ops {
 		if op != "read" {
 			t.Fatal("migration modified remote user")
 		}
+	}
+}
+
+// A panel exposes its own client counters; it must not use core enrollment.
+type legacyPanelMigrationBackend struct{ *legacyCoreMigrationBackend }
+
+func (b *legacyPanelMigrationBackend) Inbounds(ctx context.Context, id string) (Record, error) {
+	return b.fakeBackend.Inbounds(ctx, id)
+}
+
+func TestCompletedLegacyMigrationReceiptRejectsLifecycleAndIdentityChanges(t *testing.T) {
+	binding := Record{"scope": "user", "status": "active", "counterSource": "authenticated-client", "identityHash": "endpoint", "userHash": "user", "operationId": "operation", "legacyMigrationToken": strings.Repeat("a", 64)}
+	binding["legacyMigrationGeneration"] = config.BindingToken("clash", binding)
+	if !completedLegacyMigration("clash", binding, strings.Repeat("a", 64)) {
+		t.Fatal("valid receipt rejected")
+	}
+	for _, patch := range []Record{{"monthlyPaused": true}, {"monthlyBaselinePending": true}, {"status": "revoked"}, {"inboundDeletePending": Record{}}, {"userHash": "other"}, {"identityHash": "changed"}, {"operationId": "new"}, {"counterSource": "inbound"}} {
+		changed := clone(binding)
+		for key, value := range patch {
+			changed[key] = value
+		}
+		if completedLegacyMigration("clash", changed, strings.Repeat("a", 64)) {
+			t.Fatal("changed binding accepted", patch)
+		}
+	}
+	if completedLegacyMigration("other", binding, strings.Repeat("a", 64)) {
+		t.Fatal("receipt crossed profiles")
 	}
 }

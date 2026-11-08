@@ -156,3 +156,20 @@ func TestSourceImportMirrorFailureRestoresAndBoundsResult(t *testing.T) {
 		t.Fatal(result, err)
 	}
 }
+
+func TestSourceImportCannotShadowBuiltinActions(t *testing.T) {
+	r, primary, _ := fixture(t)
+	before, err := os.ReadFile(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"DIRECT", "REJECT", "REJECT-DROP", "PASS"} {
+		if _, err := r.ImportSubscription("clash", []map[string]any{node(name)}, "rename", nil, 0); err == nil {
+			t.Fatal("builtin shadowed", name)
+		}
+		after, err := os.ReadFile(primary)
+		if err != nil || string(after) != string(before) {
+			t.Fatal("rejected import changed subscription", err)
+		}
+	}
+}

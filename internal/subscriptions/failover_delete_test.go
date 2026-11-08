@@ -155,3 +155,69 @@ func testCancelFailoverDraft(t *testing.T, completed bool) {
 		t.Fatal("draft was not canceled safely", err)
 	}
 }
+
+type pendingFailoverBackend struct {
+	*failoverDeleteBackend
+	fail  bool
+	calls int
+}
+
+func (b *pendingFailoverBackend) CancelPendingCreates(ctx context.Context, profile string, requests []string, guard func(string, string, int, Record) error) (Record, error) {
+	b.calls++
+	if b.fail {
+		return nil, errors.New("late result not yet visible")
+	}
+	for _, request := range requests {
+		if request == config.FailoverPathRequest(strings.Repeat("d", 32), 0) {
+			if err := guard(request, "primary", 1, clone(b.rows[0])); err != nil {
+				return nil, err
+			}
+			b.rows = b.rows[1:]
+		}
+	}
+	return Record{"canceled": true}, nil
+}
+func TestFailoverCancellationIsDurableAndCleansPartialUser(t *testing.T) {
+	c, base, root := controllerFixture(t)
+	b := &pendingFailoverBackend{failoverDeleteBackend: &failoverDeleteBackend{fakeBackend: base}, fail: true}
+	c.Backend = b
+	if _, err := c.Batch(context.Background(), "clash", "primary", []int{1}); err != nil {
+		t.Fatal(err)
+	}
+	op := strings.Repeat("d", 32)
+	requests := []any{config.FailoverPathRequest(op, 0), config.FailoverPathRequest(op, 1)}
+	if err := c.Repository.UpdateState("clash", func(p Record) error {
+		objects(p["remoteNodes"])[0]["chainRequest"] = requests[0]
+		p["failoverDrafts"] = []any{Record{"name": "HA", "status": "creating", "requestId": op, "requestHash": "hash", "operationId": op, "paths": []any{"HA / 1", "HA / 2"}, "entries": []any{"first", "second"}, "pathRequests": requests, "exit": "exit"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.DeleteFailover(context.Background(), "clash", "HA"); err == nil {
+		t.Fatal("pending cancellation reported complete")
+	}
+	c.Repository = &config.Repository{Root: root}
+	state, _ := c.Repository.State("clash")
+	draft := objects(state["failoverDrafts"])[0]
+	if draft["cancelRequested"] != true {
+		t.Fatal("lost durable cancellation")
+	}
+	if err := c.Repository.BeginFailover("clash", draft); err == nil {
+		t.Fatal("canceled draft restarted creation")
+	}
+	b.fail = false
+	if _, err := c.DeleteFailover(context.Background(), "clash", "HA"); err != nil {
+		t.Fatal(err)
+	}
+	state, _ = c.Repository.State("clash")
+	if len(objects(state["failoverDrafts"])) != 0 || len(objects(state["failovers"])) != 0 || stateBinding(t, c)["status"] != "missing" {
+		t.Fatal("cancel cleanup incomplete", state)
+	}
+	snapshot, _ := c.Repository.Snapshot("clash")
+	if len(snapshot["nodes"].([]any)) != 0 {
+		t.Fatal("partially imported node retained")
+	}
+	if b.adds != 1 {
+		t.Fatal("cancellation created another user")
+	}
+}

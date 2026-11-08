@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -129,9 +130,9 @@ func TestAmbiguousUserWriteIsNotAutomaticallyRetried(t *testing.T) {
 		t.Fatal(err)
 	}
 	binding := bindingFor(t, row, user)
-	calls := 0
+	var calls atomic.Int64
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		io.Copy(io.Discard, r.Body)
 		conn, _, _ := w.(http.Hijacker).Hijack()
 		conn.Close()
@@ -139,7 +140,7 @@ func TestAmbiguousUserWriteIsNotAutomaticallyRetried(t *testing.T) {
 	defer host.Close()
 	base, _ := url.Parse(host.URL)
 	panel := newPanel(base, host.Client().Transport, Record{}, "", "fixture-token", nil)
-	if _, err = ChangeUser(context.Background(), panel, row, binding, "add", user); err == nil || calls != 1 {
+	if _, err = ChangeUser(context.Background(), panel, row, binding, "add", user); err == nil || calls.Load() != 1 {
 		t.Fatal("ambiguous mutation replayed or reported success")
 	}
 }
@@ -273,5 +274,29 @@ func TestPanelFallbackRequiresExplicit404(t *testing.T) {
 				t.Fatal("mutation replayed after rejection", calls, err)
 			}
 		})
+	}
+}
+
+func TestMalformedPeerListsCannotBypassUserNamespaceChecks(t *testing.T) {
+	for _, clients := range []any{nil, "[]", Record{"email": "owner"}, true, []any{nil}, []any{`{"email":"owner"}`}} {
+		row := Record{"id": 1, "protocol": "vless", "port": 443, "settings": Record{"clients": clients}, "streamSettings": Record{"security": "reality"}}
+		if err := CheckEmailNamespace([]Record{row}, "owner"); err == nil {
+			t.Fatal("malformed namespace accepted", clients)
+		}
+		if err := CheckEmailTarget([]Record{row}, "2", "owner"); err == nil {
+			t.Fatal("malformed other inbound ignored", clients)
+		}
+		if _, err := NewUser(row); err == nil {
+			t.Fatal("created user with malformed peers", clients)
+		}
+	}
+	for _, settings := range []any{Record{}, Record{"clients": []any{}}, `{"clients":[]}`} {
+		row := Record{"id": 1, "protocol": "vless", "port": 443, "settings": settings, "streamSettings": Record{"security": "reality"}}
+		if err := CheckEmailNamespace([]Record{row}, "owner"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := NewUser(row); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

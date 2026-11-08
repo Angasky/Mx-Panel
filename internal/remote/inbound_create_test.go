@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -67,14 +68,15 @@ func TestInboundTemplatesNoUnownedCredentials(t *testing.T) {
 	}
 }
 
-func createPanelFixture(t *testing.T) (*Panel, *[]Record, *int, *string) {
+func createPanelFixture(t *testing.T) (*Panel, *[]Record, *atomic.Int64, *atomic.Value) {
 	t.Helper()
 	rows := []Record{}
-	writes := 0
-	mode := ""
+	var writes atomic.Int64
+	var mode atomic.Value
+	mode.Store("")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/list") {
-			if mode == "malformed" {
+			if mode.Load() == "malformed" {
 				json.NewEncoder(w).Encode(Record{"success": true, "obj": Record{}})
 				return
 			}
@@ -86,8 +88,8 @@ func createPanelFixture(t *testing.T) (*Panel, *[]Record, *int, *string) {
 			w.WriteHeader(404)
 			return
 		}
-		writes++
-		if mode == "unauthorized" {
+		writes.Add(1)
+		if mode.Load() == "unauthorized" {
 			w.WriteHeader(401)
 			return
 		}
@@ -106,10 +108,10 @@ func createPanelFixture(t *testing.T) (*Panel, *[]Record, *int, *string) {
 				row[k] = v
 			}
 		}
-		if mode != "not-applied" {
+		if mode.Load() != "not-applied" {
 			rows = append(rows, row)
 		}
-		if mode == "disconnect" {
+		if mode.Load() == "disconnect" {
 			connection, _, _ := w.(http.Hijacker).Hijack()
 			connection.Close()
 			return
@@ -136,7 +138,7 @@ func TestInboundCreateDisconnectRestartReconcilesWithoutReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, _, writes, mode := createPanelFixture(t)
-	*mode = "disconnect"
+	mode.Store("disconnect")
 	entry := createEntry(t)
 	persist := func(e Record) error { return manager.persistCreate("fixture", e) }
 	if err = persist(entry); err != nil {
@@ -158,12 +160,12 @@ func TestInboundCreateDisconnectRestartReconcilesWithoutReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved["desired"] = desired
-	*mode = ""
+	mode.Store("")
 	result, err := createPanelInbound(context.Background(), p, Record{}, Record{"template": "vmess-tcp", "port": 24001}, saved, persist)
-	if err != nil || *writes != 1 || result["reused"] != true {
-		t.Fatal(result, err, *writes)
+	if err != nil || writes.Load() != 1 || result["reused"] != true {
+		t.Fatal(result, err, writes.Load())
 	}
-	if _, err = createPanelInbound(context.Background(), p, Record{}, Record{}, saved, persist); err != nil || *writes != 1 {
+	if _, err = createPanelInbound(context.Background(), p, Record{}, Record{}, saved, persist); err != nil || writes.Load() != 1 {
 		t.Fatal("confirmed retry rewrote inbound", err)
 	}
 }
@@ -172,7 +174,7 @@ func TestInboundCreateNeverReplaysOrWritesBeforeDurableIntent(t *testing.T) {
 	for _, mode := range []string{"unauthorized", "not-applied", "malformed"} {
 		t.Run(mode, func(t *testing.T) {
 			p, _, writes, behavior := createPanelFixture(t)
-			*behavior = mode
+			behavior.Store(mode)
 			entry := createEntry(t)
 			persist := func(Record) error { return nil }
 			_, err := createPanelInbound(context.Background(), p, Record{}, Record{"template": "vmess-tcp", "port": 24001}, entry, persist)
@@ -184,16 +186,16 @@ func TestInboundCreateNeverReplaysOrWritesBeforeDurableIntent(t *testing.T) {
 			if mode == "malformed" {
 				want = 0
 			}
-			if err == nil || *writes != want {
-				t.Fatal("request replayed", err, *writes)
+			if err == nil || writes.Load() != int64(want) {
+				t.Fatal("request replayed", err, writes.Load())
 			}
 		})
 	}
 	p, _, writes, _ := createPanelFixture(t)
 	entry := createEntry(t)
 	_, err := createPanelInbound(context.Background(), p, Record{}, Record{"template": "vmess-tcp"}, entry, func(Record) error { return errors.New("disk full") })
-	if err == nil || *writes != 0 {
-		t.Fatal("granted before durable intent", err, *writes)
+	if err == nil || writes.Load() != 0 {
+		t.Fatal("granted before durable intent", err, writes.Load())
 	}
 }
 
@@ -202,16 +204,16 @@ func TestInboundCreateCollisionAndConfirmedIDReuse(t *testing.T) {
 	entry := createEntry(t)
 	*rows = []Record{{"id": 2, "port": 24001, "protocol": "vmess", "remark": "existing"}}
 	_, err := createPanelInbound(context.Background(), p, Record{}, Record{"template": "vmess-tcp", "port": 24001}, entry, func(Record) error { return nil })
-	if err == nil || *writes != 0 {
+	if err == nil || writes.Load() != 0 {
 		t.Fatal("used explicit port", err)
 	}
 	entry = createEntry(t)
 	result, err := createPanelInbound(context.Background(), p, Record{}, Record{"template": "vmess-tcp"}, entry, func(Record) error { return nil })
-	if err != nil || *writes != 1 || value(result["inbound"].(Record)["port"]) == "24001" {
+	if err != nil || writes.Load() != 1 || value(result["inbound"].(Record)["port"]) == "24001" {
 		t.Fatal(result, err)
 	}
 	(*rows)[1]["port"] = 25001
-	if _, err = createPanelInbound(context.Background(), p, Record{}, Record{}, entry, func(Record) error { return nil }); err == nil || *writes != 1 {
+	if _, err = createPanelInbound(context.Background(), p, Record{}, Record{}, entry, func(Record) error { return nil }); err == nil || writes.Load() != 1 {
 		t.Fatal("reused ID accepted")
 	}
 }
@@ -286,12 +288,12 @@ func TestCertificateValidationPrecedesInboundWrite(t *testing.T) {
 		return "", errors.New("mismatch")
 	}
 	_, err = createPanelInbound(context.Background(), p, Record{}, payload, entry, func(Record) error { return nil })
-	if err == nil || *writes != 0 || entry["status"] != "prepared" {
+	if err == nil || writes.Load() != 0 || entry["status"] != "prepared" {
 		t.Fatal("bad certificate created inbound", err)
 	}
 	p.run = func(context.Context, string, int) (string, error) { return "MXIOC_CERTIFICATE_OK\n", nil }
-	if _, err = createPanelInbound(context.Background(), p, Record{}, payload, entry, func(Record) error { return nil }); err != nil || *writes != 1 {
-		t.Fatal(err, *writes)
+	if _, err = createPanelInbound(context.Background(), p, Record{}, payload, entry, func(Record) error { return nil }); err != nil || writes.Load() != 1 {
+		t.Fatal(err, writes.Load())
 	}
 }
 

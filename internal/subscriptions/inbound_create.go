@@ -17,6 +17,9 @@ type relayCreator interface {
 }
 
 func (c *Controller) CreateInbound(ctx context.Context, profile, server string, payload Record) (Record, error) {
+	if _, raw := payload["inbound"]; raw || payload["template"] == "shadowsocks" {
+		return c.createRawPanelInbound(ctx, profile, server, payload)
+	}
 	return c.createInbound(ctx, profile, server, payload, false, nil, nil)
 }
 func (c *Controller) CreateRelay(ctx context.Context, profile, server string, payload Record) (Record, error) {

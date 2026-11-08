@@ -46,3 +46,42 @@ func TestParseChinesePanelSettings(t *testing.T) {
 		t.Fatal("invalid panel path accepted")
 	}
 }
+
+func TestInboundJSONRejectsTrailingDocumentsBeforeIdentityAndExport(t *testing.T) {
+	for _, raw := range []string{`{"clients":[]} {"clients":[{"email":"other"}]}`, `{"clients":[]} garbage`, `{} null`} {
+		if _, err := object(raw); err == nil {
+			t.Fatal("trailing JSON accepted")
+		}
+		row := Record{"id": 1, "protocol": "vless", "settings": raw, "streamSettings": Record{}, "port": 443}
+		if _, err := InboundNodes(row, Record{"host": "example.com"}); err == nil {
+			t.Fatal("export accepted ambiguous settings")
+		}
+		if _, err := userSettings(row); err == nil {
+			t.Fatal("identity accepted ambiguous settings")
+		}
+	}
+	if _, err := object("{\"clients\":[]} \n\t"); err != nil {
+		t.Fatal("valid trailing whitespace rejected", err)
+	}
+}
+
+func TestPanelCleanupInventoryRejectsAmbiguousIdentity(t *testing.T) {
+	for _, input := range [][]any{
+		{Record{"id": 1}, nil}, {Record{"id": 1}, `{"id":2}`},
+		{Record{"id": 1}, Record{"id": "01"}}, {Record{"id": 0}},
+		{Record{"id": true}}, {Record{"id": json.Number("1.5")}},
+	} {
+		live, err := panelLiveInboundIDs(input)
+		if err == nil || live != nil {
+			t.Fatal("partial or ambiguous inventory could authorize cleanup", input, live, err)
+		}
+	}
+	live, err := panelLiveInboundIDs([]any{Record{"id": json.Number("1")}, Record{"id": "02"}})
+	if err != nil || !live["1"] || !live["2"] || len(live) != 2 {
+		t.Fatal(live, err)
+	}
+	live, err = panelLiveInboundIDs([]any{})
+	if err != nil || live == nil || len(live) != 0 {
+		t.Fatal("valid empty inventory rejected", live, err)
+	}
+}

@@ -37,7 +37,14 @@ func (r *Repository) CheckInboundAvailable(server string, ids ...int) error {
 }
 
 func checkInboundBinding(row, binding Document) error {
+	if binding["scope"] == "inbound" && binding["dedicated"] == true {
+		_, err := remote.DedicatedPasswordBinding(row, binding)
+		return err
+	}
 	if binding["scope"] == "user" {
+		if binding["dedicated"] == true {
+			return remote.VerifyDedicatedBinding(row, binding, false)
+		}
 		_, err := remote.FindUser(row, binding, binding["status"] == "provisioning")
 		return err
 	}

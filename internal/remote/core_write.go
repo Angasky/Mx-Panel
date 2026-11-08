@@ -16,7 +16,7 @@ func CoreWriteScript(kind string, previous []byte, next Record) (string, error) 
 	return coreWriteScript(kind, previous, next, "", "")
 }
 
-func coreWriteScript(kind string, previous []byte, next Record, managedTag, verify string) (string, error) {
+func coreWriteScript(kind string, previous []byte, next Record, managedTag, verify string, cancelKey ...string) (string, error) {
 	var path, binary, check string
 	switch kind {
 	case "xray":
@@ -63,6 +63,7 @@ applied=0
 cleanup() {
  rc=$?
  trap - EXIT
+ trap '' TERM INT
  if [ "$applied" = 1 ] && [ "$rc" != 0 ]; then
   if cp -p "$backup" "$config" && systemctl restart ` + kind + ` && systemctl is-active --quiet ` + kind + `; then
    printf 'MXIOC_CORE_ROLLED_BACK\n'
@@ -74,6 +75,8 @@ cleanup() {
  exit "$rc"
 }
 trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 cp -p "$config" "$backup"
 chmod 0600 "$candidate" "$backup"
 printf '%s' ` + quote(base64.StdEncoding.EncodeToString(raw)) + ` | base64 -d > "$candidate"
@@ -92,6 +95,14 @@ systemctl is-active --quiet ` + kind + `
 ` + verify + `
 printf 'MXIOC_CORE_APPLIED\n'
 `
+	if len(cancelKey) > 0 {
+		key := cancelKey[0]
+		raw, err := hex.DecodeString(key)
+		if err != nil || len(raw) != 32 || len(key) != 64 {
+			return "", errors.New("创建取消标识无效")
+		}
+		script = strings.Replace(script, "flock -n 9 || exit 75\n", "flock -n 9 || exit 75\n[ ! -e "+quote(coreCreateFencePath(key))+" ] || exit 77\n", 1)
+	}
 	return script, nil
 }
 

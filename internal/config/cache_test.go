@@ -309,3 +309,87 @@ func TestFailedCommitNeverPublishesWarmCache(t *testing.T) {
 		t.Fatal("rollback returned attempted config")
 	}
 }
+
+func TestRawJSONCacheIsolationAndSameMetadataRewrite(t *testing.T) {
+	r, primary, _ := fixture(t)
+	first, err := r.RawJSON("clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]string
+	if err = json.Unmarshal(first, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(primary)
+	if err != nil || decoded["yaml"] != string(original) {
+		t.Fatal("raw response changed", err)
+	}
+	first[0] = '!'
+	second, err := r.RawJSON("clash")
+	if err != nil || !json.Valid(second) {
+		t.Fatal("response corrupted cache", err)
+	}
+	info, err := os.Stat(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := bytes.Replace(original, []byte("9007199254740993"), []byte("9007199254740994"), 1)
+	if err = os.WriteFile(primary, changed, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Chtimes(primary, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	third, err := r.RawJSON("clash")
+	if err != nil || !bytes.Contains(third, []byte("9007199254740994")) {
+		t.Fatal("stale JSON returned", err)
+	}
+	if err = os.WriteFile(primary, []byte("proxies: [broken"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.RawJSON("clash"); err == nil {
+		t.Fatal("corruption hidden by cache")
+	}
+}
+
+func TestNodeNoopFastPathValidatesAndRepairsMirrors(t *testing.T) {
+	r, primary, mirror := fixture(t)
+	if err := r.EditNode("clash", "POST", Document{"config": node("A")}); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(primary)
+	backups, _ := r.Backups("clash")
+	if err := r.EditNode("clash", "PUT", Document{"oldName": "A", "config": node("A")}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.Stat(primary)
+	later, _ := r.Backups("clash")
+	if before.ModTime() != after.ModTime() || len(backups) != len(later) {
+		t.Fatal("noop wrote files")
+	}
+	bad := node("A")
+	bad["port"] = -1
+	if err := r.EditNode("clash", "PUT", Document{"oldName": "A", "config": bad}); err == nil {
+		t.Fatal("invalid edit bypassed validation")
+	}
+	if err := os.WriteFile(mirror, []byte("broken mirror"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.EditNode("clash", "PUT", Document{"oldName": "A", "config": node("A")}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := os.ReadFile(primary)
+	b, _ := os.ReadFile(mirror)
+	if !bytes.Equal(a, b) {
+		t.Fatal("noop skipped mirror repair")
+	}
+	changed := node("A")
+	changed["password"] = "changed"
+	if err := r.EditNode("clash", "PUT", Document{"oldName": "A", "config": changed}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ = os.ReadFile(primary)
+	if !bytes.Contains(a, []byte("changed")) {
+		t.Fatal("real edit skipped")
+	}
+}

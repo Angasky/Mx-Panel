@@ -117,8 +117,18 @@ printf 'MXIOC_LEGACY_METER_CLEARED\n'
 `
 
 func (m *Manager) ClearLegacyMeter(ctx context.Context, server string, id, port int) error {
-	_, err := m.withCore(ctx, server, func(ctx context.Context, _ string, record Record, run coreRunner) (Record, error) {
-		return nil, m.clearLegacyMeter(ctx, record, id, port, run)
+	record, err := m.Record(server)
+	if err != nil {
+		return err
+	}
+	if _, err := corePath(value(record["installType"])); err == nil {
+		_, err := m.withCore(ctx, server, func(ctx context.Context, _ string, record Record, run coreRunner) (Record, error) {
+			return nil, m.clearLegacyMeter(ctx, record, id, port, run)
+		})
+		return err
+	}
+	_, err = m.WithPanel(ctx, server, func(panel *Panel, record Record) (any, error) {
+		return nil, m.clearLegacyMeter(ctx, record, id, port, panel.run)
 	})
 	return err
 }
@@ -131,9 +141,16 @@ func (m *Manager) clearLegacyMeter(ctx context.Context, record Record, id, port 
 	if err != nil {
 		return err
 	}
+	cleared, err := inboundObject(record["goMeterCleared"])
+	if err != nil {
+		return err
+	}
 	key := strconv.Itoa(id)
-	if meters[key] == nil {
-		return nil // No remaining registered meter, including a completed retry.
+	if _, exists := meters[key]; !exists {
+		if value(cleared[key]) == strconv.Itoa(port) {
+			return nil
+		}
+		return errors.New("服务器没有对应的旧计量记录或清理回执，无法核对归属")
 	}
 	if value(meters[key]) != strconv.Itoa(port) {
 		return errors.New("旧计量端口和订阅绑定不一致")
@@ -168,7 +185,8 @@ func (m *Manager) clearLegacyMeter(ctx context.Context, record Record, id, port 
 		return err
 	}
 	delete(meters, key)
-	fresh["meters"] = meters
+	cleared[key] = port
+	fresh["meters"], fresh["goMeterCleared"] = meters, cleared
 	if err := m.flush(data); err != nil {
 		return errors.New("远端旧计量已清理，总控保存待重试")
 	}

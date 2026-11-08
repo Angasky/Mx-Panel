@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
@@ -64,12 +63,17 @@ func drawQR(w http.ResponseWriter, value string) {
 func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Links       string
-		AddToGroups bool
+		Link        string
+		AddToGroups *bool
 	}
 	if err := readJSON(w, r, &input); err != nil {
 		problem(w, 400, err.Error())
 		return
 	}
+	if input.Links == "" {
+		input.Links = input.Link
+	}
+	addToGroups := input.AddToGroups == nil || *input.AddToGroups
 	if len(input.Links) > 2<<20 {
 		problem(w, 400, "导入内容超过限制")
 		return
@@ -78,12 +82,9 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 	renamed := []any{}
 	nodes := []map[string]any{}
 	total := 0
-	for line, value := range strings.Split(input.Links, "\n") {
-		if strings.TrimSpace(value) == "" {
-			continue
-		}
+	for _, candidate := range links.Candidates(input.Links) {
 		total++
-		parsed, err := links.ParseMany(value)
+		parsed, err := links.ParseMany(candidate.Value)
 		if err == nil {
 			for _, node := range parsed {
 				if e := config.ValidateNode(node); e != nil {
@@ -93,7 +94,7 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err != nil {
-			failed = append(failed, map[string]any{"line": line + 1, "reason": "节点链接无效，或含暂未适配参数"})
+			failed = append(failed, map[string]any{"line": candidate.Line, "reason": "节点链接无效，或含暂未适配参数"})
 			continue
 		}
 		if len(nodes)+len(parsed) > 20000 {
@@ -107,7 +108,7 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(nodes) == 0 {
-		respond(w, 200, map[string]any{"total": total, "added": 0, "failed": failed, "renamed": renamed})
+		respond(w, 200, map[string]any{"total": total, "added": 0, "failed": failed, "renamed": renamed, "names": []string{}})
 		return
 	}
 	err := s.repository.Mutate(r.Header.Get("X-Profile"), func(doc config.Document) error {
@@ -124,14 +125,14 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 			original := fmt.Sprint(node["name"])
 			name := original
 			for i := 2; names[name]; i++ {
-				name = original + " (" + strconv.Itoa(i) + ")"
+				name = fmt.Sprintf("%s-%02d", original, i)
 			}
 			if name != original {
 				renamed = append(renamed, map[string]any{"from": original, "to": name})
 				node["name"] = name
 			}
 			names[name] = true
-			if err := config.EditNode(doc, "POST", map[string]any{"config": node, "addToGroups": input.AddToGroups}); err != nil {
+			if err := config.EditNode(doc, "POST", map[string]any{"config": node, "addToGroups": addToGroups}); err != nil {
 				return err
 			}
 		}
@@ -141,7 +142,14 @@ func (s *Server) importNodes(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
-	respond(w, 200, map[string]any{"total": total, "added": len(nodes), "failed": failed, "renamed": renamed})
+	names := []string{}
+	for _, node := range nodes {
+		if len(names) == 50 {
+			break
+		}
+		names = append(names, fmt.Sprint(node["name"]))
+	}
+	respond(w, 200, map[string]any{"total": total, "added": len(nodes), "failed": failed, "renamed": renamed, "names": names})
 }
 
 func (s *Server) linkRoutes(w http.ResponseWriter, r *http.Request) bool {

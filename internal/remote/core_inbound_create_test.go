@@ -19,7 +19,7 @@ func TestStandaloneInboundCreateRecoversAfterInterruptedWrite(t *testing.T) {
 
 func TestStandaloneSSAEADCreateRecoversAfterInterruptedWrite(t *testing.T) {
 	for _, template := range []string{"ss-aes-128-gcm", "ss-aes-256-gcm", "ss-chacha20-poly1305"} {
-		testStandaloneInboundCreate(t, template, []string{"xray"}, false)
+		testStandaloneInboundCreate(t, template, []string{"xray", "sing-box"}, false)
 	}
 }
 
@@ -75,7 +75,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				payload["serverName"], payload["certFile"], payload["keyFile"] = "node.example.net", "/etc/test.crt", "/etc/test.key"
 			}
 			if relay {
-				payload["landingLink"] = "vless://3c5827c6-2f92-4861-a1f8-562d5388bca7@landing.example.net:443"
+				payload["landingLink"] = "vless://3c5827c6-2f92-4861-a1f8-562d5388bca7@landing.example.net:443?security=tls"
 				if kind == "sing-box" {
 					payload["landingLink"] = "hysteria2://fixture-password@landing.example.net:443?sni=landing.example.net&upmbps=50"
 				}
@@ -313,6 +313,7 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 				patch := Record{"port": 19998, pathField: newPath}
 				if template == "vless-xhttp-tls" {
 					patch["xhttpMode"] = "packet-up"
+					patch["xhttpHost"] = "cdn.example.net"
 				}
 				hasMeter = true
 				if _, err := edit(patch); err == nil || writes != 2 {
@@ -427,6 +428,73 @@ func testStandaloneInboundCreate(t *testing.T, template string, kinds []string, 
 					if err != nil || replay["inbound"].(Record)["protocol"] != target || writes != 8 {
 						t.Fatal("protocol switch lost its creation identity", err)
 					}
+					// Exercise Host edits through the persistent journal, including
+					// a transport change and a later Host-only update.
+					for i, hostPatch := range []Record{
+						{"network": "ws", "wsPath": "/host-edit", "wsHost": "first.example.com"},
+						{"wsHost": "second.example.com", "alpn": "http/1.1"},
+					} {
+						version, err = InboundVersion(replay["inbound"].(Record))
+						if err != nil {
+							t.Fatal(err)
+						}
+						beforeWrites := 8 + i*2
+						interruptWrite = true
+						if _, err := edit(hostPatch); err == nil || writes != beforeWrites+1 {
+							t.Fatal("Host edit did not preserve interrupted intent", err)
+						}
+						m, err = Open(root)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if _, err := edit(Record{"wsHost": "different.example.com"}); err == nil || writes != beforeWrites+1 {
+							t.Fatal("changed Host accepted during recovery")
+						}
+						if _, err := edit(hostPatch); err != nil || writes != beforeWrites+2 {
+							t.Fatal("Host edit could not resume", err)
+						}
+						replay, err = create(hash, payload)
+						if err == nil && i == 1 && managedCoreFields(replay["inbound"].(Record))["alpn"] != "http/1.1" {
+							t.Fatal("ALPN lost after journal recovery")
+						}
+						if err != nil || managedCoreFields(replay["inbound"].(Record))["wsHost"] != hostPatch["wsHost"] || writes != beforeWrites+2 {
+							t.Fatal("Host edit lost persisted fields or creation identity", err)
+						}
+					}
+					version, err = InboundVersion(replay["inbound"].(Record))
+					if err != nil {
+						t.Fatal(err)
+					}
+					target = map[string]string{"vless": "vmess", "vmess": "trojan", "trojan": "vless"}[value(replay["inbound"].(Record)["protocol"])]
+					protocolPatch = Record{"protocol": target}
+					record, err = m.Record(serverID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					interruptWrite = true
+					if _, err := changeProtocol(record); err == nil || writes != 13 {
+						t.Fatal("retained-options conversion failed to journal", err)
+					}
+					m, err = Open(root)
+					if err != nil {
+						t.Fatal(err)
+					}
+					record, err = m.Record(serverID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := changeProtocol(record); err != nil || writes != 14 {
+						t.Fatal("retained-options conversion recovery failed", err)
+					}
+					replay, err = create(hash, payload)
+					if err != nil {
+						t.Fatal(err)
+					}
+					finalFields := managedCoreFields(replay["inbound"].(Record))
+					if finalFields["protocol"] != target || finalFields["wsHost"] != "second.example.com" || finalFields["alpn"] != "http/1.1" {
+						t.Fatal("conversion lost retained transport fields")
+					}
+
 				}
 			}
 			if template != "vmess-tcp" {

@@ -23,6 +23,16 @@ type Subscription struct {
 // PublicSubscription resolves capability tokens only. Profile IDs, old index
 // paths and HTTP profile headers never authorize a public subscription read.
 func (r *Repository) PublicSubscription(slug string, now time.Time) (Subscription, error) {
+	return r.publicSubscription(slug, now, true)
+}
+
+// PublicRawSubscription shares authorization and validation with conversion,
+// without cloning a parsed document that a raw download never uses.
+func (r *Repository) PublicRawSubscription(slug string, now time.Time) (Subscription, error) {
+	return r.publicSubscription(slug, now, false)
+}
+
+func (r *Repository) publicSubscription(slug string, now time.Time, includeDocument bool) (Subscription, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !slugPattern.MatchString(slug) {
@@ -45,10 +55,14 @@ func (r *Repository) PublicSubscription(slug string, now time.Time) (Subscriptio
 	if record == nil {
 		return Subscription{}, ErrSubscriptionMissing
 	}
-	return r.subscriptionRecord(record, now)
+	return r.subscriptionRecordView(record, now, includeDocument)
 }
 
 func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscription, error) {
+	return r.subscriptionRecordView(record, now, true)
+}
+
+func (r *Repository) subscriptionRecordView(record Document, now time.Time, includeDocument bool) (Subscription, error) {
 	info, err := TrafficInfo(record, now)
 	if err != nil {
 		return Subscription{}, err
@@ -93,7 +107,11 @@ func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscri
 		}
 		managed[key] = list
 	}
-	return Subscription{Name: p.Name, Slug: p.Slug, Document: cloneConfig(doc).(Document), Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
+	var document Document
+	if includeDocument {
+		document = cloneConfig(doc).(Document)
+	}
+	return Subscription{Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available

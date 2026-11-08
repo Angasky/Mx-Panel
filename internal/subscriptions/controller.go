@@ -35,11 +35,13 @@ type Controller struct {
 	locks       map[string]chan struct{}
 	serverLocks map[string]chan struct{}
 	started     atomic.Bool
+	wake        chan struct{}
+	stopped     chan struct{}
 	Now         func() time.Time
 }
 
 func New(repository *config.Repository, backend Backend) *Controller {
-	return &Controller{Repository: repository, Backend: backend, locks: map[string]chan struct{}{}, Now: time.Now}
+	return &Controller{Repository: repository, Backend: backend, locks: map[string]chan struct{}{}, wake: make(chan struct{}, 1), Now: time.Now}
 }
 func text(v any) string {
 	switch n := v.(type) {
@@ -118,6 +120,9 @@ func (c *Controller) lockServer(ctx context.Context, id string) (func(), error) 
 	return c.operationLock(ctx, id, true)
 }
 func (c *Controller) operationLock(ctx context.Context, id string, server bool) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if id == "" {
 		id = "clash"
 	}
@@ -143,6 +148,10 @@ func (c *Controller) operationLock(ctx context.Context, id string, server bool) 
 	c.mu.Unlock()
 	select {
 	case guard <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-guard
+			return nil, err
+		}
 		return func() { <-guard }, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -267,12 +276,12 @@ func (c *Controller) preflight(record Record, server string) error {
 		return errors.New("订阅已到期或流量用尽，请先续期")
 	}
 	t := traffic(record)
-	speed, err := number(t["speedMbps"], 0)
+	speed, err := planSpeedKbps(t["speedMbps"])
 	if err != nil || speed != 0 {
 		return errors.New("共用用户暂不支持按用户限速")
 	}
 	for _, b := range objects(record["remoteNodes"]) {
-		if (b["status"] == "active" || b["status"] == "provisioning") && b["scope"] != "user" {
+		if (b["status"] == "active" || b["status"] == "provisioning") && !managedBinding(b) {
 			return errors.New("订阅仍有旧版入站绑定，请先迁移用户计量")
 		}
 	}
@@ -311,6 +320,9 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 			}
 			binding = b
 		}
+	}
+	if binding != nil && binding["dedicated"] == true {
+		return nil, errors.New("此入站为专属绑定，请使用专属绑定入口重试")
 	}
 	if chain != nil && binding != nil && binding["chainRequest"] != chain.Request {
 		return nil, errors.New("该入站已有其他订阅链路归属")
@@ -378,6 +390,7 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 			return nil, err
 		}
 	}
+	defer c.wakeEnforcement()
 	if binding["scope"] != "user" {
 		return nil, errors.New("此入站仍有旧版绑定")
 	}

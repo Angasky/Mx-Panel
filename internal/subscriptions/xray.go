@@ -50,6 +50,9 @@ func convertXrayHA(source config.Subscription) (Export, error) {
 			result.Skipped = append(result.Skipped, Record{"name": group.item["name"], "type": "fallback", "reason": err.Error()})
 			continue
 		}
+		if label := usageLabel(source.Traffic); label != "" {
+			doc["remarks"] = text(group.item["name"]) + " | " + label
+		}
 		configs = append(configs, doc)
 	}
 	if len(configs) == 0 {

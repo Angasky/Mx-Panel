@@ -27,6 +27,11 @@ func TestInboundEditProtectsOwnedUserAndPendingCreation(t *testing.T) {
 	if err := r.GuardInboundEdit("s", 1, old, next); err != nil {
 		t.Fatal(err)
 	}
+	next["streamSettings"] = Document{"network": "ws", "wsSettings": Document{"path": "/", "headers": Document{"Host": "cdn.example.com"}}}
+	if err := r.GuardInboundEdit("s", 1, old, next); err == nil {
+		t.Fatal("bound endpoint Host changed")
+	}
+	next["streamSettings"] = old["streamSettings"]
 	next["settings"] = Document{"clients": []any{}}
 	if err := r.GuardInboundEdit("s", 1, old, next); err == nil {
 		t.Fatal("owned user removed")

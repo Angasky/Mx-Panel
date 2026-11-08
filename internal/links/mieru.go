@@ -128,6 +128,10 @@ func NormalizeMieru(input map[string]any) (map[string]any, error) {
 
 func ParseMany(value string) ([]map[string]any, error) {
 	value = strings.TrimSpace(value)
+	if len(value) > 65536 {
+		return nil, ErrURI
+	}
+	value = normalizePastedURI(value)
 	if strings.HasPrefix(strings.ToLower(value), "mierus://") || strings.HasPrefix(strings.ToLower(value), "mieru://") {
 		return parseMieru(value)
 	}

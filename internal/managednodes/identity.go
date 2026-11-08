@@ -29,7 +29,11 @@ func Identity(node map[string]any) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 func Owns(binding, node map[string]any) bool {
-	refs, _ := binding["importedNodes"].([]any)
+	refs, valid := binding["importedNodes"].([]any)
+	// Malformed ownership evidence must never enable the legacy fallback.
+	if raw := binding["importedNodes"]; raw != nil && !valid {
+		return false
+	}
 	if len(refs) > 0 {
 		for _, v := range refs {
 			if r, ok := v.(map[string]any); ok && r["identity"] == Identity(node) {

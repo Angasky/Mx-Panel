@@ -18,10 +18,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/geo"
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
+	"github.com/Angasky/dingzhi-ban/internal/links"
 	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
 	"github.com/Angasky/dingzhi-ban/internal/subsource"
 )
@@ -30,6 +32,7 @@ type Options struct {
 	Root, AuthFile, AdminHTML, Version   string
 	TrustLoopbackProxy, LocalDevelopment bool
 	ReleaseUpdater                       *releaseupdate.Manager
+	ServiceUninstaller                   ServiceUninstaller
 }
 type account struct {
 	Username   string `json:"username"`
@@ -84,8 +87,9 @@ func New(options Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	repository := &config.Repository{Root: options.Root}
 	ignored, _ := doc["goIgnoredRelease"].(string)
-	return &Server{options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: &config.Repository{Root: options.Root}}, nil
+	return &Server{options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -147,7 +151,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, value any) error {
 func requestSessionToken(r *http.Request) string {
 	token := ""
 	if strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		return strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	}
 	if token == "" {
 		if cookie, err := r.Cookie("mxioc_session"); err == nil {
@@ -176,6 +180,12 @@ func (s *Server) authorized(r *http.Request) bool {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodHead {
+		w = headResponse{w}
+		copy := r.Clone(r.Context())
+		copy.Method = http.MethodGet
+		r = copy
+	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -183,7 +193,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"ok": true, "runtime": "go", "version": s.options.Version})
 		return
 	}
-	if r.URL.Path == "/admin" || r.URL.Path == "/admin/" {
+	if r.URL.Path == "/" || r.URL.Path == "/admin" || r.URL.Path == "/admin/" {
 		if r.Method != "GET" && r.Method != "HEAD" {
 			problem(w, 405, "请求方法不支持")
 			return
@@ -238,6 +248,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"ok": true})
 		return
 	}
+	if s.uninstallRoute(w, r) {
+		return
+	}
 	if s.goUpdateRoutes(w, r) {
 		return
 	}
@@ -271,12 +284,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(value)
 			return
 		case "/admin/api/raw":
-			value, err := s.repository.Raw(id)
+			value, err := s.repository.RawJSON(id)
 			if err != nil {
 				problem(w, 400, err.Error())
 				return
 			}
-			respond(w, 200, map[string]any{"yaml": value})
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(200)
+			_, _ = w.Write(value)
 			return
 		}
 	}
@@ -290,7 +306,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			problem(w, 400, err.Error())
 			return
 		}
-		respond(w, 200, map[string]any{"ok": true, "config": input.Config})
+		var uri any
+		if shared, err := links.Export(input.Config); err == nil {
+			uri = shared
+		}
+		respond(w, 200, map[string]any{"ok": true, "config": input.Config, "uri": uri})
 		return
 	}
 	if r.URL.Path == "/admin/api/nodes" && (r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE") || r.URL.Path == "/admin/api/nodes/move" && r.Method == "POST" {
@@ -299,12 +319,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			problem(w, 400, "请求 JSON 必须为对象")
 			return
 		}
-		err := s.repository.Mutate(r.Header.Get("X-Profile"), func(doc config.Document) error {
-			if r.URL.Path == "/admin/api/nodes/move" {
-				return config.MoveNode(doc, payload)
+		if r.Method == "POST" && r.URL.Path == "/admin/api/nodes" {
+			if _, exists := payload["addToGroups"]; !exists {
+				payload["addToGroups"] = true
 			}
-			return config.EditNode(doc, r.Method, payload)
-		})
+		}
+		var err error
+		if r.URL.Path == "/admin/api/nodes/move" {
+			err = s.repository.MoveNode(r.Header.Get("X-Profile"), payload)
+		} else {
+			err = s.repository.EditNode(r.Header.Get("X-Profile"), r.Method, payload)
+		}
 		if err != nil {
 			problem(w, 400, err.Error())
 			return
@@ -321,7 +346,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
-	if len(input.Username) > 64 || len(input.Password) > 1024 {
+	if utf8.RuneCountInString(input.Username) > 64 || len(input.Password) > 1024 {
 		problem(w, 400, "账号或密码长度无效")
 		return
 	}
@@ -373,8 +398,18 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	auth := s.account
 	s.mu.Unlock()
 	valid := legacycrypto.VerifyPassword(input.Password, auth.Salt, auth.Hash, auth.Iterations)
-	<-s.hashSlots
 	valid = valid && subtle.ConstantTimeCompare([]byte(input.Username), []byte(auth.Username)) == 1
+	nextAuth := auth
+	var upgradeErr error
+	if valid && auth.Iterations < 600000 {
+		nextAuth.Salt, nextAuth.Hash, upgradeErr = legacycrypto.NewPassword(input.Password)
+		nextAuth.Iterations = 600000
+	}
+	<-s.hashSlots
+	if upgradeErr != nil {
+		problem(w, 500, "密码安全升级失败，请重试")
+		return
+	}
 	if !valid {
 		problem(w, 403, "账号或密码错误")
 		return
@@ -386,21 +421,12 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(random)
 	s.mu.Lock()
-	if s.account.Hash != auth.Hash || s.account.Username != auth.Username {
+	if s.account != auth {
 		s.mu.Unlock()
 		problem(w, 403, "账号已变更，请重新登录")
 		return
 	}
-	nextFailures = copyLoginFailures(s.failures, s.now())
-	for _, key := range keys {
-		delete(nextFailures, key)
-	}
-	if err := s.persistLoginFailures(nextFailures); err != nil {
-		s.mu.Unlock()
-		problem(w, 500, "登录限流保存失败，请重试")
-		return
-	}
-	if err := s.updateSessions(func(entries map[[32]byte]session) { addSession(entries, sha256.Sum256([]byte(token)), s.now()) }); err != nil {
+	if err := s.completeLogin(auth, nextAuth, keys, sha256.Sum256([]byte(token))); err != nil {
 		s.mu.Unlock()
 		problem(w, 500, "登录会话保存失败，请重试")
 		return

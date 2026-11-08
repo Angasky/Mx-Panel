@@ -202,6 +202,15 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 		}
 		if !withStats {
 			inventory["provisionInbounds"] = provision
+			dedicated := []any{}
+			for _, row := range anyRecords(inventory["inbounds"]) {
+				if row["coreStatus"] == "present" {
+					if _, err := DedicatedPasswordBinding(byID[value(row["id"])], Record{}); err == nil {
+						dedicated = append(dedicated, byID[value(row["id"])])
+					}
+				}
+			}
+			inventory["dedicatedInbounds"] = dedicated
 		}
 		if withStats && len(stats) != 0 {
 			if err := readCoreCounters(ctx, kind, doc, stats, inventory, run); err != nil {

@@ -131,3 +131,23 @@ func TestLegacyXUIFallbackOnlyAfterRead404(t *testing.T) {
 		t.Fatal("legacy API fallback did not follow explicit read 404")
 	}
 }
+
+func TestPanelListRejectsMalformedSuccessAndTrailingJSON(t *testing.T) {
+	for _, body := range []string{
+		`{"success":true,"obj":null}`,
+		`{"success":true,"obj":{}}`,
+		`{"success":true,"obj":"inbounds"}`,
+		`{"success":true,"obj":[]} {"success":false}`,
+		`{"success":true,"obj":[]} garbage`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(body)) }))
+			defer server.Close()
+			base, _ := url.Parse(server.URL + "/")
+			panel := newPanel(base, server.Client().Transport, Record{"panelUser": "admin"}, "password", "api-fixture", nil)
+			if _, err := panel.Request(context.Background(), "panel/api/inbounds/list", nil, ""); err == nil {
+				t.Fatal("malformed success accepted")
+			}
+		})
+	}
+}

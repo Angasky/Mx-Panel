@@ -9,14 +9,16 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
-func inboundWriteFixture(t *testing.T) (*Panel, *Record, *int, *string) {
+func inboundWriteFixture(t *testing.T) (*Panel, *Record, *atomic.Int64, *atomic.Value) {
 	t.Helper()
 	row := Record{"id": 1, "tag": "inbound-24001", "port": 24001, "protocol": "vless", "enable": true, "up": json.Number("9007199254740993"), "down": 0, "total": 0, "expiryTime": 0, "remark": "old", "listen": "", "settings": Record{"clients": []any{Record{"id": "user-id", "email": "fixture", "unknown": "keep"}}, "decryption": "none"}, "streamSettings": Record{"network": "tcp", "security": "none"}, "sniffing": Record{"enabled": true}}
-	writes := 0
-	mode := ""
+	var writes atomic.Int64
+	var mode atomic.Value
+	mode.Store("")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/panel/api/inbounds/list" {
@@ -24,18 +26,18 @@ func inboundWriteFixture(t *testing.T) (*Panel, *Record, *int, *string) {
 			if row != nil {
 				obj = []any{row}
 			}
-			if mode == "malformed" {
+			if mode.Load() == "malformed" {
 				obj = Record{}
 			}
 			json.NewEncoder(w).Encode(Record{"success": true, "obj": obj})
 			return
 		}
-		writes++
-		if mode == "unauthorized" {
+		writes.Add(1)
+		if mode.Load() == "unauthorized" {
 			w.WriteHeader(401)
 			return
 		}
-		if mode == "disconnect" {
+		if mode.Load() == "disconnect" {
 			c, _, _ := w.(http.Hijacker).Hijack()
 			c.Close()
 			return
@@ -66,7 +68,7 @@ func inboundWriteFixture(t *testing.T) (*Panel, *Record, *int, *string) {
 				}
 			}
 		} else if strings.Contains(r.URL.Path, "/del/") {
-			if mode != "not-applied" {
+			if mode.Load() != "not-applied" {
 				row = nil
 			}
 		} else {
@@ -85,8 +87,8 @@ func TestInboundEditFreshComparePreservesUsersAndCounters(t *testing.T) {
 	(*row)["up"] = json.Number("9007199254740993")
 	(*row)["down"] = json.Number("55")
 	out, err := editPanelInbound(context.Background(), p, Record{}, 1, Record{"remark": "新名称", "enable": false, "id": 999, "tag": "spoof", "up": 1}, expected, func(old, next Record) error { return nil })
-	if err != nil || out["updated"] != true || *writes != 1 {
-		t.Fatal(out, err, *writes)
+	if err != nil || out["updated"] != true || writes.Load() != 1 {
+		t.Fatal(out, err, writes.Load())
 	}
 	settings := (*row)["settings"].(Record)
 	if settings["clients"].([]any)[0].(Record)["unknown"] != "keep" {
@@ -109,12 +111,12 @@ func TestInboundWriteRejectsStaleTokensAndGuards(t *testing.T) {
 			} else {
 				_, err = editPanelInbound(context.Background(), p, Record{}, 1, Record{"enable": false}, expected, func(Record, Record) error { t.Fatal("guard before compare"); return nil })
 			}
-			if err == nil || *writes != 0 {
-				t.Fatal("stale configuration changed", err, *writes)
+			if err == nil || writes.Load() != 0 {
+				t.Fatal("stale configuration changed", err, writes.Load())
 			}
 			expected, _ = InboundVersion(*row)
 			_, err = editPanelInbound(context.Background(), p, Record{}, 1, Record{"enable": false}, expected, func(Record, Record) error { return errors.New("owned user removed") })
-			if err == nil || *writes != 0 {
+			if err == nil || writes.Load() != 0 {
 				t.Fatal("guard ignored")
 			}
 		})
@@ -126,7 +128,7 @@ func TestInboundDeleteConfirmsAbsenceAndNeverReplays(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			p, row, writes, behavior := inboundWriteFixture(t)
 			expected, _ := InboundVersion(*row)
-			*behavior = mode
+			behavior.Store(mode)
 			guarded := 0
 			result, err := deletePanelInbound(context.Background(), p, Record{}, 1, expected, func(Record) error { guarded++; return nil })
 			if mode == "" {
@@ -144,8 +146,8 @@ func TestInboundDeleteConfirmsAbsenceAndNeverReplays(t *testing.T) {
 			if mode == "malformed" {
 				want = 0
 			}
-			if *writes != want {
-				t.Fatal("write repeated", *writes)
+			if writes.Load() != int64(want) {
+				t.Fatal("write repeated", writes.Load())
 			}
 			if guarded != want {
 				t.Fatal("invalid inventory reached guard", guarded)
@@ -159,11 +161,11 @@ func TestInboundDependencyAndStrictJSON(t *testing.T) {
 	expected, _ := InboundVersion(*row)
 	registry := Record{"meters": Record{"1": Record{}}}
 	_, err := deletePanelInbound(context.Background(), p, registry, 1, expected, func(Record) error { return nil })
-	if err == nil || *writes != 0 {
+	if err == nil || writes.Load() != 0 {
 		t.Fatal("orphaned remote meter")
 	}
 	_, err = editPanelInbound(context.Background(), p, registry, 1, Record{"port": 24002}, expected, func(Record, Record) error { return nil })
-	if err == nil || *writes != 0 {
+	if err == nil || writes.Load() != 0 {
 		t.Fatal("changed metered endpoint")
 	}
 	for _, settings := range []any{`{} {}`, `[]`, Record{"clients": "bad"}} {

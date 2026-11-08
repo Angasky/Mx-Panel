@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net"
 	"net/netip"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -148,7 +147,7 @@ func (m *Manager) load() (map[string]any, error) {
 	var data map[string]any
 	decoder := json.NewDecoder(strings.NewReader(string(raw)))
 	decoder.UseNumber()
-	if decoder.Decode(&data) != nil || data == nil {
+	if decoder.Decode(&data) != nil || data == nil || !json.Valid(raw) {
 		return nil, errors.New("服务器索引损坏")
 	}
 	for _, key := range []string{"servers", "jobs"} {
@@ -158,6 +157,18 @@ func (m *Manager) load() (map[string]any, error) {
 		if _, ok := data[key].([]any); !ok {
 			return nil, errors.New("服务器索引格式无效")
 		}
+	}
+	identities := map[string]bool{}
+	for _, item := range data["servers"].([]any) {
+		record, ok := item.(map[string]any)
+		if !ok || record == nil {
+			return nil, errors.New("服务器记录损坏")
+		}
+		id, ok := record["id"].(string)
+		if !ok || strings.TrimSpace(id) == "" || identities[id] {
+			return nil, errors.New("服务器 ID 无效或重复，请先修复索引")
+		}
+		identities[id] = true
 	}
 	return data, nil
 }
@@ -232,7 +243,11 @@ func (m *Manager) List() ([]Record, error) {
 		row := publicServer(record)
 		for _, j := range data["jobs"].([]any) {
 			job, ok := j.(map[string]any)
-			if ok && job["serverId"] == record["id"] {
+			jobKind := value(job["installType"])
+			if jobKind == "" {
+				jobKind = "3x-ui"
+			}
+			if ok && job["serverId"] == record["id"] && jobKind == row["installType"] {
 				filtered := Record{}
 				for _, key := range []string{"id", "status", "stage", "error", "startedAt", "finishedAt"} {
 					filtered[key] = job[key]
@@ -343,6 +358,11 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if strings.TrimSpace(value(record["name"])) == "" || len(value(record["name"])) > 300 {
 		return nil, errors.New("服务器名称无效")
 	}
+	host := strings.TrimSpace(value(record["host"]))
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		host = ip.String()
+	}
+	record["host"] = host
 	if !validHost(value(record["host"])) {
 		return nil, errors.New("服务器 IP 或域名无效")
 	}
@@ -385,6 +405,15 @@ func (m *Manager) Save(payload Record) (Record, error) {
 			strconv.Itoa(port) != previousSSHPort) {
 		return nil, errors.New("独立内核用户变更待核对，暂不能更换服务器身份")
 	}
+	if raw, exists := record["bandwidths"]; exists && raw != nil {
+		policies, err := inboundObject(raw)
+		if err != nil {
+			return nil, errors.New("服务器限速记录损坏，请先核对")
+		}
+		if len(policies) > 0 && (kind != previousKind || serverHostKey(value(record["host"])) != serverHostKey(previousHost) || strconv.Itoa(port) != previousSSHPort || value(record["fingerprint"]) != previousFingerprint) {
+			return nil, errors.New("服务器仍有节点限速，请先取消限速再修改地址、指纹、端口或内核类型")
+		}
+	}
 	if kind != previousKind {
 		for _, key := range []string{"panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "managed", "lastXrayBackup", "coreConfig", "coreState", "coreUserPending", "meters", "bandwidths", "goBandwidthCleared", "relays"} {
 			delete(record, key)
@@ -399,38 +428,44 @@ func (m *Manager) Save(payload Record) (Record, error) {
 			if !panel || mode != "existing" {
 				return nil, errors.New("面板完整地址仅用于接入已安装面板")
 			}
-			u, err := url.Parse(text)
-			if err != nil || (u.Scheme != "https" && u.Scheme != "http") || !validHost(u.Hostname()) || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-				return nil, errors.New("面板地址无效")
-			}
-			panelPort := 443
-			if u.Scheme == "http" {
-				panelPort = 80
-			}
-			if u.Port() != "" {
-				panelPort, err = strconv.Atoi(u.Port())
-				if err != nil || panelPort < 1 || panelPort > 65535 {
-					return nil, errors.New("面板端口无效")
-				}
-			}
-			if !strings.HasSuffix(u.Path, "/") {
-				u.Path += "/"
+			u, panelPort, err := parsePanelAddress(text)
+			if err != nil {
+				return nil, err
 			}
 			record["panelAddress"] = u.String()
 			record["panelUrl"] = u.String()
 			record["panelPort"] = panelPort
-			record["panelPath"] = u.Path
+			record["panelPath"] = u.EscapedPath()
 			record["panelTLS"] = u.Scheme == "https"
 		}
 	}
 	if !panel && value(record["domain"]) != "" {
 		return nil, errors.New("独立内核的域名和 TLS 请在内核配置中设置")
 	}
-	if address := value(record["nodeAddress"]); address != "" && !validHost(address) {
-		return nil, errors.New("节点访问地址无效")
+	if address := strings.TrimSpace(value(record["nodeAddress"])); address != "" {
+		if ip := net.ParseIP(strings.Trim(address, "[]")); ip != nil {
+			address = ip.String()
+			if !validHost(address) {
+				return nil, errors.New("节点访问地址无效")
+			}
+		} else {
+			address, err = certificateDomain(address)
+			if err != nil {
+				return nil, errors.New("节点访问域名无效")
+			}
+		}
+		record["nodeAddress"] = address
+	} else {
+		record["nodeAddress"] = ""
 	}
-	if domain := value(record["domain"]); domain != "" && !hostPattern.MatchString(domain) {
-		return nil, errors.New("面板域名无效")
+	if domain := strings.TrimSpace(value(record["domain"])); domain != "" {
+		normalized, err := certificateDomain(domain)
+		if err != nil {
+			return nil, errors.New("面板域名无效")
+		}
+		record["domain"] = normalized
+	} else {
+		record["domain"] = ""
 	}
 	if raw, ok := payload["coreConfig"]; ok && value(raw) != "" {
 		if panel || mode == "existing" || len(value(raw)) > 128<<10 {

@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"strconv"
 	"strings"
 
 	"github.com/Angasky/dingzhi-ban/internal/links"
@@ -22,7 +24,7 @@ func object(v any) (Record, error) {
 		decoder := json.NewDecoder(strings.NewReader(text))
 		decoder.UseNumber()
 		var result Record
-		if decoder.Decode(&result) == nil && result != nil {
+		if decoder.Decode(&result) == nil && result != nil && decoder.Decode(new(any)) == io.EOF {
 			return result, nil
 		}
 	}
@@ -60,15 +62,18 @@ func InboundNodes(row, record Record) ([]Record, error) {
 		return Record{"name": name, "type": protocol, "server": nodeAddress(record), "port": row["port"]}
 	}
 	if protocol == "socks" || protocol == "http" {
-		accounts, _ := settings["accounts"].([]any)
+		accounts, validAccounts := settings["accounts"].([]any)
+		if settings["accounts"] != nil && !validAccounts {
+			return nil, errors.New("远端入站 accounts 必须为数组")
+		}
 		if len(accounts) == 0 {
 			accounts = []any{Record{}}
 		}
 		result := []Record{}
 		for _, v := range accounts {
-			account, err := object(v)
-			if err != nil {
-				return nil, err
+			account, ok := v.(map[string]any)
+			if !ok || account == nil {
+				return nil, errors.New("远端入站账号必须为对象")
 			}
 			node := makeNode()
 			if protocol == "socks" {
@@ -196,7 +201,7 @@ func InboundNodes(row, record Record) ([]Record, error) {
 				sni = value(record["domain"])
 			}
 			node["servername"] = sni
-			if (network == "grpc" || network == "xhttp") && security == "tls" && tls["alpn"] != nil {
+			if security == "tls" && tls["alpn"] != nil {
 				node["alpn"] = tls["alpn"]
 			}
 			if protocol == "hysteria2" || protocol == "tuic" {
@@ -277,11 +282,9 @@ func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Reco
 			return nil, errors.New("面板未返回有效的入站列表")
 		}
 		rows := []any{}
-		live := map[string]bool{}
-		for _, v := range input {
-			if row, ok := v.(map[string]any); ok {
-				live[value(row["id"])] = true
-			}
+		live, err := panelLiveInboundIDs(input)
+		if err != nil {
+			return nil, err
 		}
 		cleanupErrors := []string{}
 		for _, relay := range anyRecords(record["relays"]) {
@@ -307,6 +310,11 @@ func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Reco
 				return nil, versionErr
 			}
 			row["editToken"] = version
+			for _, relay := range anyRecords(record["relays"]) {
+				if value(relay["inboundId"]) == value(row["id"]) && relay["deletePending"] != true && relay["outboundHash"] == nil && relay["routeHash"] == nil && relay["inboundTag"] == nil {
+					row["legacyRelayNeedsProof"] = true
+				}
+			}
 			nodes, nodeErr := InboundNodes(row, record)
 			if nodeErr != nil {
 				row["shareError"] = nodeErr.Error()
@@ -330,4 +338,21 @@ func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Reco
 		return nil, err
 	}
 	return value.(map[string]any), nil
+}
+
+// Validate the complete inventory before treating any managed inbound as absent.
+func panelLiveInboundIDs(input []any) (map[string]bool, error) {
+	live := map[string]bool{}
+	for _, v := range input {
+		row, ok := v.(map[string]any)
+		if !ok {
+			return nil, errors.New("面板入站记录格式无效，未执行清理")
+		}
+		n, err := strconv.Atoi(value(row["id"]))
+		if err != nil || n <= 0 || live[strconv.Itoa(n)] {
+			return nil, errors.New("面板入站 ID 无效或重复，未执行清理")
+		}
+		live[strconv.Itoa(n)] = true
+	}
+	return live, nil
 }

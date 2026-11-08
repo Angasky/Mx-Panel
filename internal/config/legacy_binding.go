@@ -82,15 +82,25 @@ func (r *Repository) MigrateLegacyBinding(profile string, position int, token st
 	if settle == nil {
 		return nil
 	}
+	source := "authenticated-client"
+	if proposed["scope"] == "inbound" && proposed["dedicated"] == true {
+		source = "inbound"
+	}
+	cutover := binding["counterSource"] != source
 	if err := settle(record, binding); err != nil {
 		return err
 	}
-	for _, key := range []string{"scope", "identityHash", "userEmail", "userHash", "operationId"} {
+	for _, key := range []string{"scope", "identityHash", "userEmail", "userHash", "operationId", "dedicated", "dedicatedEndpointHash"} {
 		binding[key] = proposed[key]
 	}
 	if proposed["legacyMeterRetained"] == true {
 		binding["legacyMeterRetained"] = true
 	}
+	// Receipt identifies only this completed migration; later lifecycle changes
+	// invalidate replay in the controller. No credentials are added to it.
+	binding["legacyMigrationToken"] = token
+	binding["legacyMigrationGeneration"] = BindingToken(profile, binding)
+	binding["legacyMigrationCutover"] = cutover
 	binding["importedNames"] = []any{name}
 	binding["importedNodes"] = []any{Document{"name": name, "identity": identity}}
 	bindingErrors(record)

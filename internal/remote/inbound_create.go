@@ -63,7 +63,7 @@ func (m *Manager) saveCreate(key string, entry Record) error {
 		return errors.New("入站创建历史已达上限，请先归档创建记录")
 	}
 	if previous, ok := data[key].(map[string]any); ok {
-		if previous["status"] == "canceled" {
+		if previous["status"] == "canceled" || previous["cancelRequested"] == true {
 			return errors.New("此入站创建请求已取消")
 		}
 		for _, field := range []string{"serverId", "scope", "revision", "requestHash"} {
@@ -176,6 +176,13 @@ func confirmCreation(rows []Record, desired, entry Record) (Record, error) {
 				if err != nil || hash != entry["endpointHash"] {
 					return nil, errors.New("已创建入站身份已变化，未重复创建")
 				}
+				if entry["rawPanel"] == true {
+					want, wantErr := creationIdentity(desired)
+					got, gotErr := creationIdentity(row)
+					if wantErr != nil || gotErr != nil || want != got {
+						return nil, errors.New("入站配置或凭据已变化，未重复创建；请刷新核对")
+					}
+				}
 				return row, nil
 			}
 		}
@@ -246,7 +253,7 @@ func createPanelInbound(ctx context.Context, panel *Panel, record, payload, entr
 	}
 	port, _ := parsedPort(desired["port"], 0)
 	if used[port] {
-		if payload["port"] != nil && payload["port"] != "" {
+		if _, raw := payload["inbound"]; raw || (payload["port"] != nil && payload["port"] != "") {
 			return nil, errors.New("监听端口已存在，请使用其他端口并重新打开创建窗口")
 		}
 		for attempt := 0; attempt < 128 && used[port]; attempt++ {
@@ -260,8 +267,10 @@ func createPanelInbound(ctx context.Context, panel *Panel, record, payload, entr
 		}
 		desired["port"] = port
 	}
-	if err = validateTemplateCertificate(ctx, panel, payload); err != nil {
-		return nil, err
+	if _, raw := payload["inbound"]; !raw {
+		if err = validateTemplateCertificate(ctx, panel, payload); err != nil {
+			return nil, err
+		}
 	}
 	body, _, err := prepareInboundEdit(desired, Record{})
 	if err != nil {
@@ -299,6 +308,10 @@ func createPanelInbound(ctx context.Context, panel *Panel, record, payload, entr
 }
 
 func (m *Manager) CreateInbound(ctx context.Context, server, scope string, payload Record) (Record, error) {
+	rawDesired, raw, err := panelCreationPayload(payload)
+	if err != nil {
+		return nil, err
+	}
 	key, requestHash, err := createRequestIdentity(scope, payload)
 	if err != nil {
 		return nil, err
@@ -308,15 +321,18 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 		return nil, err
 	}
 	if _, err := corePath(value(record["installType"])); err == nil {
+		if raw {
+			return nil, errors.New("单密码模板和原始入站新增仅支持面板服务器；独立内核请使用原生入站管理")
+		}
 		return m.createStandaloneInbound(ctx, server, key, requestHash, payload, nil)
 	}
-	if templateName(payload) == "tuic" {
+	if !raw && templateName(payload) == "tuic" {
 		return nil, errors.New("TUIC 模板需要独立 sing-box")
 	}
-	if grpcTemplate(templateName(payload)) {
+	if !raw && grpcTemplate(templateName(payload)) {
 		return nil, errors.New("当前 gRPC 模板需要独立 Xray 或 sing-box")
 	}
-	if templateName(payload) == "vless-xhttp-tls" {
+	if !raw && templateName(payload) == "vless-xhttp-tls" {
 		return nil, errors.New("当前 XHTTP 模板需要独立 Xray")
 	}
 	revision := createServerRevision(record)
@@ -326,7 +342,7 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 	}
 	prepared := payload
 	if entry != nil {
-		if entry["status"] == "canceled" {
+		if entry["status"] == "canceled" || entry["cancelRequested"] == true {
 			return nil, errors.New("此入站创建请求已取消")
 		}
 		if entry["serverId"] != server || entry["scope"] != scope || entry["revision"] != revision || entry["requestHash"] != requestHash {
@@ -338,16 +354,28 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 		}
 		entry["desired"] = desired
 	} else {
-		var address string
-		prepared, address, err = m.templatePayload(server, record, payload)
-		if err != nil {
-			return nil, err
+		desired := rawDesired
+		if raw && desired == nil {
+			desired, err = buildPanelShadowsocks(payload)
+			if err != nil {
+				return nil, err
+			}
 		}
-		desired, e := buildInboundTemplate(prepared, address)
-		if e != nil {
-			return nil, e
+		if !raw {
+			var address string
+			prepared, address, err = m.templatePayload(server, record, payload)
+			if err != nil {
+				return nil, err
+			}
+			desired, err = buildInboundTemplate(prepared, address)
+			if err != nil {
+				return nil, err
+			}
 		}
 		entry = Record{"serverId": server, "scope": scope, "revision": revision, "requestHash": requestHash, "status": "prepared", "createdAt": time.Now().Unix(), "desired": desired}
+		if raw {
+			entry["rawPanel"] = true
+		}
 	}
 	persist := func(current Record) error { return m.persistCreate(key, current) }
 	result, err := m.WithPanel(ctx, server, func(panel *Panel, latest Record) (any, error) {
@@ -375,7 +403,7 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 		} else if e = persist(entry); e != nil {
 			return nil, e
 		}
-		if value(entry["status"]) == "prepared" && templateName(payload) == "vless-reality" {
+		if !raw && value(entry["status"]) == "prepared" && templateName(payload) == "vless-reality" {
 			_, address, e := m.templatePayload(server, latest, payload)
 			if e != nil {
 				return nil, e
@@ -392,7 +420,7 @@ func (m *Manager) CreateInbound(ctx context.Context, server, scope string, paylo
 				return nil, errors.New("SNI 实测地址已变化，请先核对之前的创建记录")
 			}
 		}
-		if value(entry["status"]) == "prepared" && tlsTemplate(templateName(payload)) {
+		if !raw && value(entry["status"]) == "prepared" && tlsTemplate(templateName(payload)) {
 			// Certificate jobs may have expired since the first request. The desired
 			// configuration remains fixed; validation below uses its original paths.
 			stream, _ := inboundObject(entry["desired"].(Record)["streamSettings"])

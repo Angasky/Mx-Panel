@@ -2,8 +2,8 @@ package remote
 
 import (
 	"errors"
+	"github.com/Angasky/dingzhi-ban/internal/links"
 	"maps"
-	"strconv"
 	"strings"
 )
 
@@ -15,12 +15,46 @@ func singRelayOutbound(node Record, tag string) (Record, error) {
 	if kind == "hysteria2" || kind == "tuic" {
 		return singQUICRelayOutbound(node, tag, kind)
 	}
-	checked, err := NodeOutbound(node, tag)
+	// Xray's shared converter cannot represent a per-outbound UDP ban.
+	// sing-box can, through its native network restriction. Validate a copy
+	// without that one flag, and preserve all other fail-closed checks.
+	checkedNode := node
+	if node["udp"] == false && kind != "http" {
+		checkedNode = maps.Clone(node)
+		delete(checkedNode, "udp")
+	}
+	// Current Xray removed allowInsecure, but sing-box still supports insecure.
+	// Validate the TLS transport first and preserve the explicit policy below.
+	if node["skip-cert-verify"] == true {
+		checkedNode = maps.Clone(checkedNode)
+		checkedNode["skip-cert-verify"] = false
+	}
+	var headers Record
+	if raw, exists := node["headers"]; exists && kind == "http" {
+		var err error
+		headers, err = singHTTPHeaders(raw)
+		if err != nil {
+			return nil, err
+		}
+		checkedNode = maps.Clone(checkedNode)
+		delete(checkedNode, "headers")
+	}
+	checked, err := nodeOutbound(checkedNode, tag, false)
+	if err != nil {
+		return nil, err
+	}
+	port, err := parsedPort(node["port"], 0)
 	if err != nil {
 		return nil, err
 	}
 	protocol := value(checked["protocol"])
-	next := Record{"type": protocol, "tag": tag, "server": node["server"], "server_port": node["port"]}
+	next := Record{"type": protocol, "tag": tag, "server": node["server"], "server_port": port}
+	if headers != nil {
+		next["headers"] = headers
+	}
+	if node["udp"] == false && kind != "http" {
+		next["network"] = "tcp"
+	}
 	switch kind {
 	case "vless":
 		next["uuid"] = node["uuid"]
@@ -46,10 +80,16 @@ func singRelayOutbound(node Record, tag string) (Record, error) {
 		}
 	}
 	stream := checked["streamSettings"].(Record)
+	if node["skip-cert-verify"] == true && stream["security"] != "tls" {
+		return nil, errors.New("跳过证书校验仅适用于普通 TLS")
+	}
 	switch stream["security"] {
 	case "tls":
 		tls := stream["tlsSettings"].(Record)
 		next["tls"] = singRelayTLS(tls, tls["serverName"])
+		if insecure, exists := node["skip-cert-verify"]; exists {
+			next["tls"].(Record)["insecure"] = insecure
+		}
 	case "reality":
 		reality := stream["realitySettings"].(Record)
 		tls := singRelayTLS(reality, reality["serverName"])
@@ -90,6 +130,12 @@ func singRelayOutbound(node Record, tag string) (Record, error) {
 
 func singRelayTLS(options Record, name any) Record {
 	tls := Record{"enabled": true}
+	if insecure, exists := options["allowInsecure"]; exists {
+		tls["insecure"] = insecure
+	}
+	if insecure, exists := options["skip-cert-verify"]; exists {
+		tls["insecure"] = insecure
+	}
 	if value(name) != "" {
 		tls["server_name"] = name
 	}
@@ -103,20 +149,32 @@ func singRelayTLS(options Record, name any) Record {
 }
 
 func singQUICRelayOutbound(node Record, tag, kind string) (Record, error) {
+	if raw, exists := node["alpn"]; exists {
+		list, err := links.ALPNValues(raw, true)
+		if err != nil {
+			return nil, errors.New("QUIC ALPN 必须为有效协议字符串或字符串数组")
+		}
+		node = maps.Clone(node)
+		node["alpn"] = list
+	}
 	port, err := parsedPort(node["port"], 0)
 	if err != nil || port < 1 || !validHost(value(node["server"])) || tag == "" {
 		return nil, errors.New("落地地址或端口无效")
 	}
 	for key := range node {
 		switch key {
-		case "name", "type", "server", "port", "password", "tls", "sni", "alpn":
+		case "name", "type", "server", "port", "password", "tls", "alpn":
+		case "sni", "servername":
+			if _, ok := node[key].(string); !ok {
+				return nil, errors.New("QUIC 落地节点的 SNI 必须为字符串")
+			}
 		case "skip-cert-verify":
-			if node[key] != false {
-				return nil, errors.New("中转落地节点必须校验证书")
+			if _, ok := node[key].(bool); !ok {
+				return nil, errors.New("证书校验开关必须为布尔值")
 			}
 		case "udp":
-			if node[key] != true {
-				return nil, errors.New("此 QUIC 落地节点的 UDP 限制尚未适配")
+			if _, ok := node[key].(bool); !ok {
+				return nil, errors.New("QUIC 落地节点的 UDP 开关必须为布尔值")
 			}
 		case "uuid", "congestion-controller", "udp-relay-mode":
 			if kind != "tuic" {
@@ -130,30 +188,73 @@ func singQUICRelayOutbound(node Record, tag, kind string) (Record, error) {
 			return nil, errors.New("QUIC 落地节点包含未适配的扩展参数")
 		}
 	}
-	if node["tls"] != true || value(node["password"]) == "" {
+	if tls, exists := node["tls"]; exists && tls != true {
+		return nil, errors.New("QUIC 落地节点必须启用 TLS")
+	}
+	if value(node["password"]) == "" {
 		return nil, errors.New("QUIC 落地节点需要 TLS 和认证密码")
 	}
+	sni := value(node["sni"])
+	if alternate := value(node["servername"]); alternate != "" {
+		if sni != "" && sni != alternate {
+			return nil, errors.New("QUIC 落地节点的 SNI 参数冲突")
+		}
+		sni = alternate
+	}
 	next := Record{"type": kind, "tag": tag, "server": node["server"], "server_port": port,
-		"password": node["password"], "tls": singRelayTLS(node, node["sni"])}
+		"password": node["password"], "tls": singRelayTLS(node, sni)}
+	if node["udp"] == false {
+		next["network"] = "tcp"
+	}
 	if kind == "tuic" {
 		if value(node["uuid"]) == "" {
 			return nil, errors.New("TUIC 落地节点缺少 UUID")
 		}
 		next["uuid"] = node["uuid"]
-		if node["congestion-controller"] != nil {
-			next["congestion_control"] = node["congestion-controller"]
+		congestion := "bbr"
+		if raw, exists := node["congestion-controller"]; exists {
+			var ok bool
+			congestion, ok = raw.(string)
+			if !ok {
+				return nil, errors.New("TUIC 拥塞控制必须为字符串")
+			}
 		}
-		if node["udp-relay-mode"] != nil {
-			next["udp_relay_mode"] = node["udp-relay-mode"]
+		switch congestion {
+		case "bbr", "cubic", "new_reno":
+		default:
+			return nil, errors.New("TUIC 拥塞控制不受支持")
 		}
+		mode := "native"
+		if raw, exists := node["udp-relay-mode"]; exists {
+			var ok bool
+			mode, ok = raw.(string)
+			if !ok {
+				return nil, errors.New("TUIC UDP 中继模式必须为字符串")
+			}
+		}
+		if mode != "native" && mode != "quic" {
+			return nil, errors.New("TUIC UDP 中继模式不受支持")
+		}
+		next["congestion_control"], next["udp_relay_mode"] = congestion, mode
 	} else {
-		if node["obfs"] != nil {
-			next["obfs"] = Record{"type": node["obfs"], "password": node["obfs-password"]}
+		rawObfs, hasObfs := node["obfs"]
+		rawPassword, hasPassword := node["obfs-password"]
+		if hasObfs {
+			if rawObfs != "salamander" {
+				return nil, errors.New("Hysteria2 仅支持 salamander 混淆")
+			}
+			password, ok := rawPassword.(string)
+			if !ok || password == "" {
+				return nil, errors.New("Hysteria2 混淆密码缺失或类型无效")
+			}
+			next["obfs"] = Record{"type": "salamander", "password": password}
+		} else if hasPassword {
+			return nil, errors.New("Hysteria2 混淆密码要求启用混淆")
 		}
 		for _, direction := range []string{"up", "down"} {
-			if raw := value(node[direction]); raw != "" {
-				n, err := strconv.Atoi(raw)
-				if err != nil || n < 1 {
+			if raw, exists := node[direction]; exists {
+				n, err := legacyHysteriaMbps(raw)
+				if err != nil {
 					return nil, errors.New("Hysteria2 带宽必须是以 Mbps 为单位的正整数")
 				}
 				next[direction+"_mbps"] = n

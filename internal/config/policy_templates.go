@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -25,7 +26,8 @@ func (r *Repository) blankProfile() (Document, error) {
 		return nil, err
 	}
 	var doc Document
-	if yaml.Unmarshal(raw, &doc) != nil || doc == nil {
+	decoder := yaml.NewDecoder(strings.NewReader(string(raw)))
+	if decoder.Decode(&doc) != nil || doc == nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("内置模板损坏")
 	}
 	doc["proxies"] = []any{}

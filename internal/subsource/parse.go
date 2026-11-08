@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -28,6 +29,8 @@ func (b *Batch) skip(reason string) {
 		b.Skipped = append(b.Skipped, reason)
 	}
 }
+
+var snellPolicyMarker = regexp.MustCompile(`(?i)=\s*snell\s*,`)
 
 var shortIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{2}(?:[0-9a-fA-F]{2}){0,7}$`)
 
@@ -103,20 +106,20 @@ func Parse(text string) (Batch, error) {
 			}
 		}
 	}
-	compact := strings.Join(strings.Fields(text), "")
+	encoded := text
+	if unescaped, err := url.PathUnescape(encoded); err == nil {
+		encoded = unescaped
+	}
+	compact := strings.Join(strings.Fields(encoded), "")
 	for _, encoding := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
 		decoded, err := encoding.DecodeString(compact)
-		if err == nil && utf8.Valid(decoded) && (strings.Contains(string(decoded), "://") || strings.Contains(strings.ToLower(string(decoded)), "snell,")) {
+		if err == nil && utf8.Valid(decoded) && (strings.Contains(string(decoded), "://") || snellPolicyMarker.Match(decoded)) {
 			text = string(decoded)
 			break
 		}
 	}
-	for _, line := range strings.Split(strings.ReplaceAll(text, "\r", ""), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.EqualFold(line, "[proxy]") {
-			continue
-		}
-		parsed, err := links.ParseMany(line)
+	for _, candidate := range links.Candidates(text) {
+		parsed, err := links.ParseMany(candidate.Value)
 		if err == nil {
 			for _, node := range parsed {
 				if e := normalize(node); e != nil {

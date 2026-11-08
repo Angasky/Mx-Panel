@@ -40,7 +40,11 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 404, "订阅不存在")
 		return true
 	}
-	source, err := s.repository.PublicSubscription(parts[1], s.now())
+	readSubscription := s.repository.PublicSubscription
+	if raw {
+		readSubscription = s.repository.PublicRawSubscription
+	}
+	source, err := readSubscription(parts[1], s.now())
 	if err != nil {
 		if errors.Is(err, config.ErrSubscriptionBlocked) {
 			problem(w, 403, "订阅已过期或流量已用尽")

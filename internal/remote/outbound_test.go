@@ -23,3 +23,27 @@ func TestNodeOutboundRejectsLossyOptionsAndPreservesReality(t *testing.T) {
 		}
 	}
 }
+
+func TestExplicitTLSVerificationPolicy(t *testing.T) {
+	for _, kind := range []string{"http", "trojan", "vless", "vmess", "hysteria2", "tuic"} {
+		for _, insecure := range []bool{false, true} {
+			node := Record{"type": kind, "server": "example.net", "port": 443, "uuid": "11111111-1111-4111-8111-111111111111", "password": "secret", "tls": true, "skip-cert-verify": insecure}
+			if kind != "hysteria2" && kind != "tuic" {
+				out, err := NodeOutbound(node, "proxy")
+				if insecure {
+					if err == nil {
+						t.Fatal("unsupported Xray allowInsecure emitted")
+					}
+				} else if err != nil || out["streamSettings"].(Record)["tlsSettings"].(Record)["allowInsecure"] != insecure {
+					t.Fatal(kind, out, err)
+				}
+			} else if kind == "hysteria2" {
+				delete(node, "uuid")
+			}
+			out, err := singRelayOutbound(node, "proxy")
+			if err != nil || out["tls"].(Record)["insecure"] != insecure {
+				t.Fatal(kind, out, err)
+			}
+		}
+	}
+}

@@ -29,10 +29,31 @@ func (m *Manager) OpenUser(token string) (Record, error) {
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.UseNumber()
 	var client Record
-	if decoder.Decode(&client) != nil || client == nil {
+	if decoder.Decode(&client) != nil || client == nil || !json.Valid(data) {
 		return nil, errors.New("待创建用户凭据格式无效")
 	}
 	return client, nil
+}
+
+// userSettings rejects malformed peer lists before namespace or ownership checks.
+func userSettings(row Record) (Record, error) {
+	model, err := object(row["settings"])
+	if err != nil {
+		return nil, err
+	}
+	if raw, exists := model["clients"]; exists {
+		clients, ok := raw.([]any)
+		if !ok {
+			return nil, errors.New("入站用户列表格式无效")
+		}
+		for _, raw := range clients {
+			client, ok := raw.(map[string]any)
+			if !ok || client == nil {
+				return nil, errors.New("入站用户记录格式无效")
+			}
+		}
+	}
+	return model, nil
 }
 
 func credentialField(row, user Record) string {
@@ -57,7 +78,7 @@ func FindUser(row, binding Record, missingOK bool) (Record, error) {
 	if endpoint != binding["identityHash"] {
 		return nil, errors.New("远端入站身份已变化，停止用户操作")
 	}
-	model, err := object(row["settings"])
+	model, err := userSettings(row)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +86,9 @@ func FindUser(row, binding Record, missingOK bool) (Record, error) {
 	_, hasClients := model["clients"]
 	if !ok && hasClients {
 		return nil, errors.New("入站用户列表格式无效")
+	}
+	if binding["dedicated"] == true && len(clients) > 1 {
+		return nil, errors.New("专属绑定入站新增了其他用户，请先核对归属")
 	}
 	matches := []Record{}
 	for _, value := range clients {
@@ -142,7 +166,7 @@ func NewUser(row Record) (Record, error) {
 		user["password"] = base64.RawURLEncoding.EncodeToString(random[36:60])
 	}
 	if protocol == "shadowsocks" {
-		settings, _ := object(row["settings"])
+		settings, _ := userSettings(row)
 		size := 32
 		if settings["method"] == "2022-blake3-aes-128-gcm" {
 			size = 16
@@ -155,7 +179,7 @@ func NewUser(row Record) (Record, error) {
 		}
 	}
 	if protocol == "hysteria" {
-		model, err := object(row["settings"])
+		model, err := userSettings(row)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +189,7 @@ func NewUser(row Record) (Record, error) {
 		user["auth"] = base64.RawURLEncoding.EncodeToString(random[36:60])
 	}
 	if protocol == "vless" {
-		model, err := object(row["settings"])
+		model, err := userSettings(row)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +239,7 @@ func CheckEmailNamespace(rows []Record, email string) error {
 	}
 	count := 0
 	for _, row := range rows {
-		model, err := object(row["settings"])
+		model, err := userSettings(row)
 		if err != nil {
 			return err
 		}
@@ -241,7 +265,7 @@ func CheckEmailTarget(rows []Record, inboundID, email string) error {
 		if value(row["id"]) == inboundID {
 			continue
 		}
-		model, err := object(row["settings"])
+		model, err := userSettings(row)
 		if err != nil {
 			return err
 		}
@@ -453,7 +477,7 @@ func ChangeUser(ctx context.Context, panel *Panel, row, binding Record, operatio
 		if proposed["email"] != binding["userEmail"] {
 			return nil, errors.New("待创建用户 email 不匹配")
 		}
-		model, err := object(row["settings"])
+		model, err := userSettings(row)
 		if err != nil {
 			return nil, err
 		}

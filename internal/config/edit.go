@@ -39,17 +39,20 @@ func buildRule(payload map[string]any) (string, error) {
 		return raw, nil
 	}
 	kind := strings.ToUpper(strings.TrimSpace(stringValue(payload["type"])))
-	if kind == "" {
+	if _, exists := payload["type"]; !exists {
 		kind = "DOMAIN-SUFFIX"
 	}
 	value := strings.TrimSpace(stringValue(payload["value"]))
 	action := strings.TrimSpace(stringValue(payload["action"]))
-	if action == "" {
+	if _, exists := payload["action"]; !exists {
 		action = "DIRECT"
 	}
 	options := strings.Trim(strings.TrimSpace(stringValue(payload["options"])), ",")
 	if strings.ContainsAny(kind+value+action+options, "\r\n\x00") {
 		return "", errors.New("规则不能包含换行")
+	}
+	if kind == "" || action == "" {
+		return "", errors.New("规则类型和动作不能为空")
 	}
 	if kind == "MATCH" {
 		return "MATCH," + action, nil
@@ -122,13 +125,22 @@ func MoveRule(doc Document, payload map[string]any) error {
 	if index < 0 {
 		return errors.New("规则不存在")
 	}
-	direction, err := integer(payload["direction"])
-	if err != nil || direction != 1 && direction != -1 {
-		return errors.New("移动方向无效")
+	direction := 0
+	var err error
+	if value, exists := payload["direction"]; exists {
+		direction, err = integer(value)
+		if err != nil {
+			return errors.New("移动方向无效")
+		}
 	}
-	at := index + direction
-	if at < 0 || at >= len(list) {
-		return nil
+	// Clamp before addition so even extreme integer offsets cannot overflow.
+	at := index
+	if direction < -index {
+		at = 0
+	} else if direction > len(list)-1-index {
+		at = len(list) - 1
+	} else {
+		at += direction
 	}
 	list[index], list[at] = list[at], list[index]
 	doc["rules"] = list
@@ -219,11 +231,17 @@ func EditGroup(doc Document, method string, payload map[string]any) error {
 func EditDNS(doc Document, method string, payload map[string]any) error {
 	dns, ok := doc["dns"].(map[string]any)
 	if !ok {
+		if _, exists := doc["dns"]; exists {
+			return errors.New("DNS 配置必须为对象，请先核对原配置")
+		}
 		dns = map[string]any{}
 		doc["dns"] = dns
 	}
 	policy, ok := dns["nameserver-policy"].(map[string]any)
 	if !ok {
+		if _, exists := dns["nameserver-policy"]; exists {
+			return errors.New("DNS 分流配置必须为对象，请先核对原配置")
+		}
 		policy = map[string]any{}
 		dns["nameserver-policy"] = policy
 	}

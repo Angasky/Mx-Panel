@@ -50,6 +50,8 @@ func usageNodes(info Record, now time.Time) []Record {
 	total, remaining := "不限量", "不限量"
 	if info["total"] != nil {
 		total = gib(info["total"])
+	}
+	if info["remaining"] != nil {
 		remaining = gib(info["remaining"])
 	}
 	duration := "长期有效"
@@ -69,6 +71,34 @@ func usageNodes(info Record, now time.Time) []Record {
 	}
 	return out
 }
+
+// usageLabel mirrors client_adapter.usage_label for configuration exports.
+func usageLabel(info Record) string {
+	if info["configured"] != true {
+		return ""
+	}
+	size := func(value any) string {
+		n, _ := number(value, 0)
+		amount := float64(n)
+		for _, unit := range []string{"B", "KiB", "MiB", "GiB", "TiB"} {
+			if amount < 1024 || unit == "TiB" {
+				return fmt.Sprintf("%.2f %s", amount, unit)
+			}
+			amount /= 1024
+		}
+		return ""
+	}
+	remaining, expiry := "不限量", "长期有效"
+	if info["remaining"] != nil {
+		remaining = size(info["remaining"])
+	}
+	if info["expire"] != nil {
+		expire, _ := number(info["expire"], 0)
+		expiry = time.Unix(expire, 0).UTC().Format("2006-01-02 15:04 UTC")
+	}
+	return "已用 " + size(info["used"]) + " · 剩余 " + remaining + " · 到期 " + expiry
+}
+
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
 	if format == "v2rayn-ha" || format == "v2rayng-ha" {
 		return convertXrayHA(source)

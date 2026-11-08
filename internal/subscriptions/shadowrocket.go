@@ -146,6 +146,9 @@ func convertRocketHA(source config.Subscription, configuration bool) (Export, er
 	}
 	if configuration {
 		lines := []string{"# Mxioc Shadowrocket: import the paired node subscription first.", "# Do not enable global fallback.", "[General]", "udp-policy-not-supported-behaviour = REJECT", "", "[Proxy Group]"}
+		if label := usageLabel(source.Traffic); label != "" {
+			lines = append(lines[:2], append([]string{"# " + label}, lines[2:]...)...)
+		}
 		labels := []string{}
 		for _, g := range groups {
 			labels = append(labels, shadowrocketName(text(g.item["name"]), source.Slug, true))

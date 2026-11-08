@@ -69,12 +69,24 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					}
 				}
 				row["tag"], row["listen"] = "fixture", "127.0.0.1"
+				if wsTemplate(template) {
+					row, err = prepareManagedCoreEdit(row, Record{"wsHost": "cdn.example.com", "alpn": "http/1.1"})
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 				if template != "vless-reality" {
 					row["goCreateKey"] = "fixture"
 					target := map[string]string{"vless": "trojan", "trojan": "vmess", "vmess": "vless"}[value(row["protocol"])]
 					row, err = prepareManagedCoreEdit(row, Record{"protocol": target})
 					if err != nil {
 						t.Fatal("protocol switch failed before native test", err)
+					}
+				}
+				if wsTemplate(template) {
+					row, err = prepareManagedCoreEdit(row, Record{"wsHost": "cdn.example.com", "alpn": "http/1.1"})
+					if err != nil {
+						t.Fatal("WS Host edit failed", err)
 					}
 				}
 				stream := row["streamSettings"].(Record)
@@ -167,6 +179,9 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					if wsTemplate(template) && node["ws-opts"].(Record)["headers"].(Record)["Host"] != "cdn.example.com" {
+						t.Fatal("WS Host lost before real handshake")
+					}
 					if scenario == "wrong-path" {
 						if grpcTemplate(template) {
 							node["grpc-opts"].(Record)["grpc-service-name"] = "wrong-service"
@@ -187,6 +202,9 @@ func TestTLSStreamTemplatesWithRealCores(t *testing.T) {
 					}
 					if scenario == "wrong-short-id" {
 						node["reality-opts"].(Record)["short-id"] = "ffffffffffffffff"
+					}
+					if node["type"] == "trojan" {
+						delete(node, "tls") // Exercise the legacy Python node shape.
 					}
 					out, err := NodeOutbound(node, "proxy")
 					if err != nil {

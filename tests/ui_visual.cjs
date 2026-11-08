@@ -26,12 +26,12 @@ try{
   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(html);
  });
  await new Promise((resolve,reject)=>{fixtureServer.once('error',reject);fixtureServer.listen(0,'127.0.0.1',resolve);});
- const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e)));page.on('dialog',async dialog=>{errors.push(dialog.message());await dialog.dismiss();});
  await page.setViewport({width:1440,height:1100,deviceScaleFactor:1});await page.goto('http://127.0.0.1:'+fixtureServer.address().port+'/admin/',{waitUntil:'domcontentloaded'});
  await page.evaluate((metrics)=>{
   S.profiles=[{id:'clash',name:'示例订阅',url:'/sub/demo'}];S.profile='clash';
   S.data={nodes:[{index:0,name:'Singapore Reality',type:'vless',server:'198.51.100.24',port:443,config:{name:'Singapore Reality',type:'vless',server:'198.51.100.24',port:443,uuid:'22453845-ff1a-471d-8214-25952a9348a6',tls:true,servername:'www.microsoft.com','reality-opts':{'public-key':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','short-id':'abcdef12'},'client-fingerprint':'chrome'}}],groups:[],rules:[],dnsPolicies:[],updated:'2026-10-22',profile:{name:'示例订阅',traffic:{configured:false,bindings:[]}}};
-  api=async(path,opt)=>{if(path==='/servers')return {servers:[{id:'demo',name:'Singapore Edge',host:'198.51.100.24',installType:'sing-box',sshPort:22,sshUser:'root',fingerprint:'SHA256:'+'a'.repeat(43)}]};if(path.startsWith('/servers/metrics'))return metrics;if(path==='/snapshot')return S.data;if(path==='/failovers')return {failovers:[]};if(path==='/server-chains')return {chains:[]};if(path==='/conversions')return {formats:[{name:'电脑 v2rayN · Xray 主备配置',supported:1,unit:'主备组',available:true,note:'独立 JSON 订阅，按优先顺序切换并恢复切回；本地 SOCKS 10808。',url:'/convert/demo/v2rayn-ha'},{name:'安卓 v2rayNG 节点订阅',supported:3,unit:'节点',available:true,note:'流量与有效期通过订阅响应头提供；普通节点列表不含主备策略。',url:'/convert/demo/v2rayng'},{name:'小火箭主备 · 第一步：节点订阅',supported:2,unit:'节点',available:true,note:'先添加节点，再启用第二步策略配置。',url:'/convert/demo/shadowrocket-ha'},{name:'小火箭主备 · 第二步：策略配置',supported:1,unit:'主备组',available:true,note:'在配置页添加并启用此配置，不启用全局回退。',url:'/convert/demo/shadowrocket-config'}]};if(path==='/account')return {username:'admin'};if(path==='/backups')return {backups:[]};if(path==='/updates')return {available:false,currentSha:'abc123',checkedAt:metrics.sampledAt};if(path==='/raw')return {yaml:'proxies: []\nproxy-groups: []\nrules: []'};if(path.startsWith('/servers/inbounds'))return {inbounds:[],server:{id:'demo',name:'Singapore Edge',host:'198.51.100.24',installType:'sing-box'}};if(path==='/nodes/validate')return {config:JSON.parse(opt.body).config,uri:'vless://example'};throw Error('Unmocked '+path);};
+  api=async(path,opt)=>{if(path==='/servers/users/targets')return {profiles:S.profiles.map(p=>({...p,importedInboundIds:[]}))};if(path==='/nodes/group-options')return {groups:[]};if(path==='/servers')return {servers:[{id:'demo',name:'Singapore Edge',host:'198.51.100.24',installType:'sing-box',sshPort:22,sshUser:'root',fingerprint:'SHA256:'+'a'.repeat(43)}]};if(path.startsWith('/servers/metrics'))return metrics;if(path==='/snapshot')return S.data;if(path==='/failovers')return {failovers:[]};if(path==='/server-chains')return {chains:[]};if(path==='/conversions')return {formats:[{name:'电脑 v2rayN · Xray 主备配置',supported:1,unit:'主备组',available:true,note:'独立 JSON 订阅，按优先顺序切换并恢复切回；本地 SOCKS 10808。',url:'/convert/demo/v2rayn-ha'},{name:'安卓 v2rayNG 节点订阅',supported:3,unit:'节点',available:true,note:'流量与有效期通过订阅响应头提供；普通节点列表不含主备策略。',url:'/convert/demo/v2rayng'},{name:'小火箭主备 · 第一步：节点订阅',supported:2,unit:'节点',available:true,note:'先添加节点，再启用第二步策略配置。',url:'/convert/demo/shadowrocket-ha'},{name:'小火箭主备 · 第二步：策略配置',supported:1,unit:'主备组',available:true,note:'在配置页添加并启用此配置，不启用全局回退。',url:'/convert/demo/shadowrocket-config'}]};if(path==='/account')return {username:'admin'};if(path==='/backups')return {backups:[]};if(path==='/updates')return {available:false,currentSha:'abc123',checkedAt:metrics.sampledAt};if(path==='/raw')return {yaml:'proxies: []\nproxy-groups: []\nrules: []'};if(path.startsWith('/servers/inbounds'))return {inbounds:[],server:{id:'demo',name:'Singapore Edge',host:'198.51.100.24',installType:'sing-box'}};if(path==='/nodes/validate')return {config:JSON.parse(opt.body).config,uri:'vless://example'};throw Error('Unmocked '+path);};
   document.getElementById('boot').classList.add('hidden');document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('currentProfileName').textContent='示例订阅';
   S.monitorId='demo';S.monitorHistory=new Map([['demo/auto',Array.from({length:30},(_,i)=>({time:metrics.sampledAt-150+i*5,rx:1200000+Math.sin(i/3)*700000+i*17000,tx:1800000+Math.cos(i/4)*900000+i*23000}))]]);
  },metrics);
@@ -122,17 +122,17 @@ try{
   await page.evaluate(async theme=>{setTheme(theme);await go('nodes');await chooseNodeServer('browse');},theme);
   await page.waitForSelector('#pickerOpen');await page.click('#pickerOpen');
   await page.waitForFunction(()=>S.page==='serverNodes' && document.getElementById('content').textContent.includes('返回总控节点'));
-  await page.evaluate(()=>{
+  await page.evaluate(async()=>{
    S.remoteRows=[{id:1,port:24443,remark:'订阅专属 Reality',protocol:'vless',enable:true,up:1024,down:2048,shareLinks:['vless://example#demo']},
     {id:2,port:443,remark:'共用入站',protocol:'vless',enable:true,shareLinks:['vless://a','vless://b']}];
-   renderRemoteNodes();remoteNodeLinks(1);
-   document.getElementById('remoteBindOnImport').checked=true;document.getElementById('remoteBindOnImport').onchange();
+   renderRemoteNodes();await remoteNodeLinks(1);
   });
-  assert(await page.$eval('#remoteDedicated',n=>n.required));
+  assert(await page.$('#sharedUserForm'));
+  assert.equal(await page.$$eval('.sharedProfileChoice:checked',nodes=>nodes.length),1);
   await page.screenshot({path:path.join(captureDir,theme+'-server-node-import.png'),fullPage:true});
   await page.evaluate(()=>closeModal());
  }
- console.log('PASS: choose server, browse inbounds and dedicated subscription import in all themes');
+ console.log('PASS: choose server, browse inbounds and independent subscription user import in all themes');
  for (const theme of ['high','low','pink']) {
   await page.evaluate(async theme=>{
    setTheme(theme);S.data.profile.traffic={configured:true,enforce:true,upload:1024,download:2048,total:10737418240,used:3072,remaining:10737415168,percent:0,multiplier:2,rawUsed:1536,bindings:[{serverId:'demo',inboundId:1,port:24443,name:'订阅专属节点',status:'active',bandwidth:{uploadKbps:1000,downloadKbps:2000}}]};

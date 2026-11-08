@@ -3,6 +3,8 @@ package subscriptions
 import (
 	"context"
 	"errors"
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/billing"
@@ -37,7 +39,7 @@ func editPolicy(record, payload Record, now time.Time) (Record, error) {
 		found := false
 		for _, b := range objects(record["remoteNodes"]) {
 			if b["status"] == "active" || b["status"] == "provisioning" {
-				if b["scope"] != "user" {
+				if !managedBinding(b) {
 					return nil, errors.New("旧版入站计量尚未迁移")
 				}
 				found = true
@@ -155,12 +157,36 @@ func (c *Controller) EditTraffic(ctx context.Context, profile string, payload Re
 	if err != nil {
 		return nil, err
 	}
+	c.wakeEnforcement()
 	return c.Info(profile)
 }
 func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Record, error) {
 	plan, err := c.Repository.Plan(planID)
 	if err != nil {
 		return nil, err
+	}
+	// Acquire server locks before the profile lock, matching binding/bandwidth operations.
+	initial, err := c.Repository.State(profile)
+	if err != nil {
+		return nil, err
+	}
+	servers := map[string]bool{}
+	for _, b := range objects(initial["remoteNodes"]) {
+		if b["status"] == "active" || b["status"] == "provisioning" {
+			servers[text(b["serverId"])] = true
+		}
+	}
+	ids := []string{}
+	for server := range servers {
+		ids = append(ids, server)
+	}
+	sort.Strings(ids)
+	for _, server := range ids {
+		release, err := c.lockServer(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 	}
 	unlock, err := c.lock(ctx, profile)
 	if err != nil {
@@ -176,11 +202,17 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 				return errors.New("请先恢复月额度暂停用户，再切换重置周期")
 			}
 			if b["status"] == "active" || b["status"] == "provisioning" {
-				if b["scope"] != "user" {
+				if !managedBinding(b) {
 					return errors.New("旧版入站限速和计量尚未迁移")
 				}
-				speed, _ := decimalSpeed(plan["speedMbps"])
-				if speed != 0 {
+				speed, err := planSpeedKbps(plan["speedMbps"])
+				if err != nil {
+					return err
+				}
+				if !servers[text(b["serverId"])] {
+					return errors.New("绑定已变化，请重新套用套餐")
+				}
+				if speed != 0 && (b["dedicated"] != true || b["scope"] != "inbound") {
 					return errors.New("共用用户不支持按用户限速，请选择不限速套餐")
 				}
 			}
@@ -196,6 +228,36 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 	}
 	if _, err = c.syncLocked(ctx, profile, false); err != nil {
 		return nil, err
+	}
+	p, err = c.Repository.State(profile)
+	if err != nil {
+		return nil, err
+	}
+	if err = check(p); err != nil {
+		return nil, err
+	}
+	if traffic(p)["enforce"] == true && traffic(p)["enabled"] == true && text(p["enforcementError"]) != "" {
+		return nil, errors.New("原用量结算失败，套餐未套用")
+	}
+	speed, err := planSpeedKbps(plan["speedMbps"])
+	if err != nil {
+		return nil, errors.New("套餐限速无效")
+	}
+	for _, b := range objects(p["remoteNodes"]) {
+		if b["status"] != "active" || b["dedicated"] != true || b["scope"] != "inbound" {
+			continue
+		}
+		bandwidth, _ := b["bandwidth"].(Record)
+		if speed == 0 && bandwidth == nil {
+			continue
+		}
+		id, err := strconv.Atoi(text(b["inboundId"]))
+		if err != nil {
+			return nil, err
+		}
+		if _, err = c.setBandwidthLocked(ctx, profile, text(b["serverId"]), id, speed, speed); err != nil {
+			return nil, err
+		}
 	}
 	total, err := config.PlanBytes(plan["monthlyGiB"])
 	if err != nil {
@@ -264,18 +326,11 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 	if err != nil {
 		return nil, err
 	}
+	c.wakeEnforcement()
 	return c.Info(profile)
 }
-func decimalSpeed(v any) (float64, error) {
-	switch n := v.(type) {
-	case int:
-		return float64(n), nil
-	case int64:
-		return float64(n), nil
-	case interface{ Float64() (float64, error) }:
-		return n.Float64()
-	case float64:
-		return n, nil
-	}
-	return 0, errors.New("带宽无效")
+
+// Use exact decimal arithmetic: plan rates support three decimal places.
+func planSpeedKbps(raw any) (int, error) {
+	return billing.BandwidthKbps(raw)
 }

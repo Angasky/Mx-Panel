@@ -2,10 +2,13 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
@@ -176,9 +179,46 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 		respond(w, 200, map[string]any{"groups": groups})
 		return true
 	}
+	if path == "/admin/api/nodes/bulk" {
+		if method != "DELETE" && method != "POST" {
+			w.Header().Set("Allow", "DELETE, POST")
+			problem(w, 405, "请求方法不支持")
+			return true
+		}
+		var payload config.Document
+		if readJSON(w, r, &payload) != nil || payload == nil {
+			problem(w, 400, "请求 JSON 必须为对象")
+			return true
+		}
+		deleted := []string{}
+		err := s.repository.Mutate(r.Header.Get("X-Profile"), func(doc config.Document) error {
+			before, _ := doc["proxies"].([]any)
+			if err := config.DeleteManyNodes(doc, payload); err != nil {
+				return err
+			}
+			remaining := map[string]bool{}
+			after, _ := doc["proxies"].([]any)
+			for _, item := range after {
+				remaining[item.(map[string]any)["name"].(string)] = true
+			}
+			for _, item := range before {
+				name := item.(map[string]any)["name"].(string)
+				if !remaining[name] {
+					deleted = append(deleted, name)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, map[string]any{"ok": true, "deleted": len(deleted), "names": deleted})
+		}
+		return true
+	}
 	allowed := map[string]bool{"/admin/api/groups": true, "/admin/api/rules": true, "/admin/api/dns": true}
 	standard := allowed[path] && (method == "POST" || method == "PUT" || method == "DELETE")
-	special := path == "/admin/api/chains" && (method == "POST" || method == "PUT") || path == "/admin/api/raw" && method == "PUT" || (path == "/admin/api/rules/move" || path == "/admin/api/nodes/groups" || path == "/admin/api/nodes/bulk") && method == "POST"
+	special := path == "/admin/api/chains" && (method == "POST" || method == "PUT") || path == "/admin/api/raw" && method == "PUT" || (path == "/admin/api/rules/move" || path == "/admin/api/nodes/groups") && method == "POST"
 	if !standard && !special {
 		return false
 	}
@@ -225,8 +265,6 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 			return config.ReplaceRaw(doc, payload)
 		case "/admin/api/nodes/groups":
 			return config.EditMembership(doc, payload, groups)
-		case "/admin/api/nodes/bulk":
-			return config.DeleteManyNodes(doc, payload)
 		default:
 			return config.MoveRule(doc, payload)
 		}
@@ -255,21 +293,25 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "当前账号或密码错误")
 		return
 	}
-	username := strings.TrimSpace(input.NewUsername)
+	username := input.NewUsername
 	if username == "" {
 		username = auth.Username
 	}
+	username = strings.TrimSpace(username)
 	password := input.NewPassword
 	if password == "" {
 		password = input.New
 	}
-	if len(username) > 64 || strings.ContainsAny(username, "\r\n\x00") || password != "" && (len(password) < 12 || len(password) > 256) {
+	if utf8.RuneCountInString(username) < 3 || utf8.RuneCountInString(username) > 64 || strings.ContainsAny(username, ":\x00") || strings.ContainsFunc(username, unicode.IsSpace) || password != "" && (utf8.RuneCountInString(password) < 12 || utf8.RuneCountInString(password) > 256) {
 		problem(w, 400, "账号无效，或新密码长度不在 12–256 之间")
 		return
 	}
 	next := auth
 	next.Username = username
-	if password != "" {
+	if password != "" || auth.Iterations < 600000 {
+		if password == "" {
+			password = input.Current
+		}
 		salt, digest, err := legacycrypto.NewPassword(password)
 		if err != nil {
 			problem(w, 500, "密码更新失败")
@@ -281,12 +323,23 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if auth.Hash != s.account.Hash || auth.Username != s.account.Username {
+	if auth != s.account {
 		problem(w, 409, "账号已被其他请求修改，请重新登录")
 		return
 	}
 	err := storage.New(s.options.AuthFile).Update(func(doc map[string]any) error {
-		if doc["hash"] != auth.Hash || doc["username"] != auth.Username {
+		raw, err := json.Marshal(doc)
+		if err != nil {
+			return err
+		}
+		var disk account
+		if err := json.Unmarshal(raw, &disk); err != nil {
+			return err
+		}
+		if disk.Iterations == 0 {
+			disk.Iterations = 240000
+		}
+		if disk != auth {
 			return errors.New("账号文件已变化")
 		}
 		doc["username"] = next.Username
@@ -294,6 +347,7 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 		doc["hash"] = next.Hash
 		doc["iterations"] = next.Iterations
 		doc["goSessions"] = encodeSessions(next, map[[32]byte]session{})
+		doc["goLoginFailures"] = savedLoginFailures{Version: 1, Credential: credentialID(next), Entries: map[string]failure{}}
 		return nil
 	})
 	if err != nil {
@@ -302,6 +356,7 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	s.account = next
 	s.sessions = make(map[[32]byte]session)
+	s.failures = make(map[string]failure)
 	http.SetCookie(w, &http.Cookie{Name: "mxioc_session", Path: "/admin", MaxAge: -1, HttpOnly: true, Secure: r.TLS != nil || !s.options.LocalDevelopment, SameSite: http.SameSiteStrictMode})
 	respond(w, 200, map[string]any{"ok": true})
 }

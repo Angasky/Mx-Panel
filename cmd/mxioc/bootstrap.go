@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
 )
@@ -15,16 +16,16 @@ import (
 // bootstrap creates only new files. Legacy state is always opened in place by
 // normal startup and is never initialized or overwritten by this command.
 func bootstrap(root, auth, username string, input io.Reader) error {
-	if len(username) < 3 || len(username) > 64 || strings.ContainsAny(username, ":\x00") || strings.IndexFunc(username, unicode.IsSpace) >= 0 {
-		return errors.New("administrator username must be 3 to 64 bytes without spaces or colons")
+	if !utf8.ValidString(username) || utf8.RuneCountInString(username) < 3 || utf8.RuneCountInString(username) > 64 || strings.ContainsAny(username, ":\x00") || strings.IndexFunc(username, unicode.IsSpace) >= 0 {
+		return errors.New("administrator username must be 3 to 64 characters without spaces or colons")
 	}
 	password, err := io.ReadAll(io.LimitReader(input, 1026))
 	if err != nil {
 		return err
 	}
 	secret := strings.TrimSuffix(string(password), "\n")
-	if len(secret) < 12 || len(secret) > 1024 || strings.ContainsAny(secret, "\r\n\x00") {
-		return errors.New("administrator password must be a single line of 12 to 1024 bytes")
+	if !utf8.ValidString(secret) || utf8.RuneCountInString(secret) < 12 || len(secret) > 1024 || strings.ContainsAny(secret, "\r\n\x00") {
+		return errors.New("administrator password must be a single line of at least 12 characters and at most 1024 bytes")
 	}
 	profiles := filepath.Join(root, "profiles.json")
 	for _, path := range []string{auth, profiles} {

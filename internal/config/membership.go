@@ -1,6 +1,9 @@
 package config
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var excludedNodeGroups = map[string]bool{"🛑 广告拦截": true, "🛡️ 基础广告拦截": true, "🔥 强力广告拦截": true}
 
@@ -105,7 +108,13 @@ func DeleteManyNodes(doc Document, payload map[string]any) error {
 		if !ok {
 			return errors.New("节点名称无效")
 		}
-		names[name] = true
+		name = strings.TrimSpace(name)
+		if name != "" {
+			names[name] = true
+		}
+	}
+	if len(names) == 0 {
+		return errors.New("请至少选择一个节点")
 	}
 	for name := range names {
 		// References from another node being deleted can be removed in this batch;

@@ -1,0 +1,52 @@
+{
+  "source": "Angasky/mxioc-vpn-manager@0869964:server.py parse_node_link",
+  "cases": [
+    {
+      "uri": "http://user:p%40ss@example.net?host=proxy.example&ua=Agent%20One#Plain",
+      "node": {
+        "name": "Plain",
+        "type": "http",
+        "server": "example.net",
+        "port": 80,
+        "udp": false,
+        "username": "user",
+        "password": "p@ss",
+        "headers": {
+          "Host": "proxy.example",
+          "User-Agent": "Agent One"
+        }
+      }
+    },
+    {
+      "uri": "https://example.net?sni=tls.example&name-cert-verify=cert.example&fingerprint=AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB&skip-cert-verify=true#TLS",
+      "node": {
+        "name": "TLS",
+        "type": "http",
+        "server": "example.net",
+        "port": 443,
+        "udp": false,
+        "tls": true,
+        "skip-cert-verify": true,
+        "sni": "tls.example",
+        "fingerprint": "AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB",
+        "name-cert-verify": "cert.example"
+      }
+    },
+    {
+      "uri": "https://u%2Bname:p%3Ass@[2001:db8::1]:8443?user-agent=Custom%2F1#IPv6",
+      "node": {
+        "name": "IPv6",
+        "type": "http",
+        "server": "2001:db8::1",
+        "port": 8443,
+        "udp": false,
+        "tls": true,
+        "username": "u+name",
+        "password": "p:ss",
+        "headers": {
+          "User-Agent": "Custom/1"
+        }
+      }
+    }
+  ]
+}

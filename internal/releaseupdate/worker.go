@@ -39,7 +39,7 @@ func (m *Manager) claim(current, target, id string) (*Job, error) {
 	}
 	defer unlock()
 	job, err := m.Status()
-	if err != nil || job == nil || job.Status != "queued" || job.ID != id || job.Version != target || !Newer(target, current) {
+	if err != nil || job == nil || job.Status != "queued" || job.ID != id || job.Version != target || job.Operation != "" || !Newer(target, current) {
 		return nil, errors.New("更新任务不存在、已过期或与当前版本不匹配")
 	}
 	job.Status, job.Stage = "running", "download"

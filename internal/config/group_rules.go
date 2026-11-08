@@ -30,6 +30,9 @@ func scopedGroupRule(raw any, name string) (string, error) {
 	if !groupRuleKind.MatchString(kind) || kind == "MATCH" || kind == "RAW" {
 		return "", errors.New("规则类型无效，MATCH 请在分流规则页编辑")
 	}
+	if strings.Trim(value, ", ") == "" {
+		return "", errors.New("规则匹配值不能为空")
+	}
 	var options string
 	for _, option := range []string{"no-resolve", "src"} {
 		if trimmed, ok := strings.CutSuffix(value, ","+option); ok {

@@ -18,6 +18,9 @@ const coreInboundEdit = "core-inbound-edit"
 func managedCoreFields(row Record) Record {
 	fields := Record{"remark": value(row["remark"]), "port": row["port"]}
 	stream, _ := object(row["streamSettings"])
+	if alpn, ok := managedALPN(row); ok {
+		fields["alpn"] = alpn
+	}
 	if editableCoreTransport(row) {
 		fields["network"] = stream["network"]
 	}
@@ -32,12 +35,15 @@ func managedCoreFields(row Record) Record {
 			path = "/"
 		}
 		fields["wsPath"] = path
+		if host, ok := editableWSHost(ws); ok {
+			fields["wsHost"] = host
+		}
 	case "grpc":
 		grpc, _ := object(stream["grpcSettings"])
 		fields["grpcService"] = value(grpc["serviceName"])
 	case "xhttp":
 		if opts, err := links.XHTTPOptions(stream["xhttpSettings"]); err == nil {
-			fields["xhttpPath"], fields["xhttpMode"] = opts["path"], opts["mode"]
+			fields["xhttpPath"], fields["xhttpMode"], fields["xhttpHost"] = opts["path"], opts["mode"], value(opts["host"])
 		}
 	}
 	return fields
@@ -77,6 +83,12 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 		if !ok || strings.ContainsFunc(text, unicode.IsControl) {
 			return nil, errors.New("入站名称或传输参数无效")
 		}
+		if key == "alpn" {
+			if err := editManagedALPN(next, text); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if key == "remark" {
 			text = strings.TrimSpace(text)
 			if text == "" || len([]rune(text)) > 100 {
@@ -101,11 +113,16 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 			}
 			group, field = "wsSettings", "path"
 		}
+		if key == "wsHost" {
+			group = "wsSettings"
+		}
 		switch key {
 		case "xhttpPath":
 			group, field = "xhttpSettings", "path"
 		case "xhttpMode":
 			group, field = "xhttpSettings", "mode"
+		case "xhttpHost":
+			group, field = "xhttpSettings", "host"
 		}
 		stream, err := object(next["streamSettings"])
 		if err != nil {
@@ -116,7 +133,34 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 			return nil, err
 		}
 		stream, options = maps.Clone(stream), maps.Clone(options)
-		options[field] = text
+		if key == "wsHost" {
+			if strings.ContainsAny(text, "/?#@") {
+				return nil, errors.New("WebSocket Host 不能包含路径、查询或用户信息")
+			}
+			headers, err := object(options["headers"])
+			if err != nil {
+				return nil, err
+			}
+			headers = maps.Clone(headers)
+			if headers == nil {
+				headers = Record{}
+			}
+			for name := range headers {
+				if strings.EqualFold(name, "Host") {
+					delete(headers, name)
+				}
+			}
+			if text != "" {
+				headers["Host"] = text
+			}
+			if len(headers) == 0 {
+				delete(options, "headers")
+			} else {
+				options["headers"] = headers
+			}
+		} else {
+			options[field] = text
+		}
 		if group == "xhttpSettings" {
 			if _, err := links.XHTTPOptions(options); err != nil {
 				return nil, errors.New("XHTTP 路径或传输模式无效")
@@ -126,6 +170,28 @@ func prepareManagedCoreEdit(old, payload Record) (Record, error) {
 		next["streamSettings"] = stream
 	}
 	return next, nil
+}
+
+// Do not flatten an ambiguous or newer native Host representation into headers.
+func editableWSHost(ws Record) (string, bool) {
+	if _, exists := ws["host"]; exists {
+		return "", false
+	}
+	headers, err := object(ws["headers"])
+	if err != nil {
+		return "", false
+	}
+	host, found := "", false
+	for key, raw := range headers {
+		if strings.EqualFold(key, "Host") {
+			value, ok := raw.(string)
+			if found || !ok {
+				return "", false
+			}
+			host, found = value, true
+		}
+	}
+	return host, true
 }
 
 func (m *Manager) editManagedCoreInbound(ctx context.Context, server, kind string, record, stateDoc Record, rows []Record, index int, status, expected string, payload Record, raw []byte, doc Record, guard func(Record, Record) error, run coreRunner) (Record, error) {

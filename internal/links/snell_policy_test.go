@@ -17,3 +17,36 @@ func TestSnellPolicyCredentialsIPv6AndAmbiguousURIs(t *testing.T) {
 		}
 	}
 }
+
+func TestSnellURIRejectsConflictingOrLossyParameters(t *testing.T) {
+	for _, uri := range []string{
+		"snell://secret@host:443?psk=other", "snell://user:password@host:443",
+		"snell://secret@host:443?version=", "snell://secret@host:443?version=01",
+		"snell://secret@host:443?udp=true", "snell://secret@host:443?version=3&reuse=1",
+		"snell://secret@host:443?obfs-host=example.com", "snell://secret@host:443?obfs=",
+		"snell://secret@host:443?security=tls", "snell://secret@host:443?type=ws",
+		"snell://secret@host:443?obfs=http&obfs-host=", "snell://%00@host:443",
+	} {
+		if _, err := Parse(uri); err == nil {
+			t.Fatal("accepted incompatible Snell URI", uri)
+		}
+	}
+	for _, uri := range []string{
+		"snell://secret@host:443?version=5&udp=TRUE&reuse=FALSE&tfo=TRUE",
+		"snell://host:443?%70sk=secret&version=5",
+		"snell://secret@host:443?obfs=http",
+	} {
+		if _, err := Parse(uri); err != nil {
+			t.Fatal(uri, err)
+		}
+	}
+	// A question mark inside the fragment belongs to the name, not to the query.
+	uri, err := Export(map[string]any{"name": "name?psk=label", "type": "snell", "server": "host", "port": 443, "psk": "secret", "version": 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := Parse(uri)
+	if err != nil || node["name"] != "name?psk=label" || node["psk"] != "secret" {
+		t.Fatal(node, err)
+	}
+}

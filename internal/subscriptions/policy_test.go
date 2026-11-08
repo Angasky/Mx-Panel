@@ -156,3 +156,74 @@ func TestNodeMultiplierSettlesOnlyTargetAndKeepsPeerRate(t *testing.T) {
 		t.Fatal("historical or peer usage used new node rate", info, err)
 	}
 }
+
+func TestStringPlanSpeedCannotBypassSharedUserGuard(t *testing.T) {
+	for _, speed := range []any{"0.125", "2.5", json.Number("0.125"), 0.125} {
+		c, b, _ := controllerFixture(t)
+		ctx := context.Background()
+		if _, err := c.Batch(ctx, "clash", "s", []int{1}); err != nil {
+			t.Fatal(err)
+		}
+		plan, err := c.Repository.SavePlan(Record{"name": "limited", "monthlyGiB": 10, "durationMonths": 12, "resetPeriod": "monthly", "speedMbps": speed, "multiplier": 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		calls := len(b.ops)
+		if _, err = c.ApplyPlan(ctx, "clash", text(plan["id"])); err == nil {
+			t.Fatal("shared user accepted port rate", speed)
+		}
+		state, err := c.Repository.State("clash")
+		if err != nil || traffic(state)["planId"] != nil || len(b.ops) != calls {
+			t.Fatal("rejected plan changed state or contacted server", err)
+		}
+	}
+}
+
+func TestMonthlyResetWithoutEnforcementAndExpiredGuard(t *testing.T) {
+	for _, expired := range []bool{false, true} {
+		c, b, _ := controllerFixture(t)
+		now := time.Date(2027, 3, 1, 12, 0, 0, 0, time.UTC)
+		c.Now = func() time.Time { return now }
+		err := c.Repository.UpdateState("clash", func(p Record) error {
+			expire := now.Add(365 * 24 * time.Hour).Unix()
+			if expired {
+				expire = now.Unix()
+			}
+			p["traffic"] = Record{"enabled": true, "enforce": false, "upload": 12, "download": 34, "rawUpload": 20, "rawDownload": 40, "resetPeriod": "monthly", "cycleAnchor": time.Date(2027, 1, 31, 12, 0, 0, 0, time.UTC).Unix(), "nextResetAt": time.Date(2027, 2, 28, 12, 0, 0, 0, time.UTC).Unix(), "expire": expire}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := c.Sync(context.Background(), "clash")
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := int64(0)
+		if expired {
+			want = 46
+		}
+		if info["used"] != want || len(b.ops) != 0 {
+			t.Fatal("monthly reset depends on enforcement or contacted server", info, b.ops)
+		}
+		if !expired && (info["rawUsed"] != int64(0) || text(info["nextResetAt"]) != text(time.Date(2027, 3, 31, 12, 0, 0, 0, time.UTC).Unix())) {
+			t.Fatal("calendar drift or raw usage not reset", info)
+		}
+	}
+}
+
+func TestLegacyZeroDecimalSpeedAllowsSharedProvisioning(t *testing.T) {
+	for _, speed := range []any{json.Number("0.0"), "0.000", " 0e2 "} {
+		c, _, _ := controllerFixture(t)
+		if err := c.Repository.UpdateState("clash", func(p Record) error {
+			p["traffic"] = Record{"enabled": true, "enforce": false, "speedMbps": speed}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		result, err := c.Batch(context.Background(), "clash", "s", []int{1})
+		if err != nil || result["succeeded"] != 1 {
+			t.Fatal("legacy zero rate blocked shared user", speed, result, err)
+		}
+	}
+}

@@ -1,14 +1,18 @@
 package config
 
 import (
+	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -22,24 +26,79 @@ func randomToken(size int) (string, error) {
 	}
 	return hex.EncodeToString(data), nil
 }
+
+// index returns an owned document; cache contents never escape to mutations.
 func (r *Repository) index() (map[string]any, error) {
+	entry, _, err := r.indexEntry()
+	if err != nil {
+		return nil, err
+	}
+	return cloneConfig(entry.document).(Document), nil
+}
+
+func (r *Repository) indexEntry() (*profileIndexEntry, []byte, error) {
 	data, err := os.ReadFile(filepath.Join(r.Root, "profiles.json"))
 	if err != nil {
-		return nil, errors.New("订阅索引读取失败")
+		r.profileCache = nil
+		return nil, nil, errors.New("订阅索引读取失败")
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	digest := sha256.Sum256(data)
+	if r.profileCache != nil && r.profileCache.digest == digest {
+		return r.profileCache, data, nil
+	}
+	r.profileCache = nil
+	index, err := parseProfileIndex(data)
+	if err != nil {
+		return nil, nil, err
+	}
+	entry := &profileIndexEntry{digest: digest, document: index}
+	// Oversized indexes remain supported but are not retained in memory.
+	if len(data) <= 1<<20 {
+		r.profileCache = entry
+	}
+	return entry, data, nil
+}
+
+func parseProfileIndex(data []byte) (Document, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var index map[string]any
-	if decoder.Decode(&index) != nil || index == nil {
+	if decoder.Decode(&index) != nil || index == nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("订阅索引格式无效")
 	}
 	if _, ok := index["profiles"].([]any); !ok {
 		return nil, errors.New("订阅索引格式无效")
 	}
+	if value := index["policyTemplates"]; value != nil {
+		templates, ok := value.([]any)
+		if !ok {
+			return nil, errors.New("策略模板列表格式无效")
+		}
+		seen := map[string]bool{}
+		for _, item := range templates {
+			record, ok := item.(map[string]any)
+			if !ok {
+				return nil, errors.New("策略模板记录格式无效")
+			}
+			id := stringValue(record["id"])
+			if strings.TrimSpace(id) == "" || seen[id] {
+				return nil, errors.New("策略模板 ID 无效或重复")
+			}
+			seen[id] = true
+		}
+	}
+	identities := map[string]bool{}
 	for _, value := range index["profiles"].([]any) {
 		record, ok := value.(map[string]any)
 		if !ok {
 			return nil, errors.New("订阅索引记录格式无效")
+		}
+		id := stringValue(record["id"])
+		if id != "" {
+			if identities[id] {
+				return nil, errors.New("订阅 ID 重复，请先修复索引")
+			}
+			identities[id] = true
 		}
 		if value, present := record["remoteNodes"]; present && value != nil {
 			bindings, ok := value.([]any)
@@ -54,6 +113,58 @@ func (r *Repository) index() (map[string]any, error) {
 		}
 	}
 	return index, nil
+}
+
+// MigrateLegacyProfiles runs before serving requests, never as a side effect of
+// a rejected mutation. The caller must not have started background workers.
+func (r *Repository) MigrateLegacyProfiles() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	index, err := r.index()
+	if err != nil {
+		return err
+	}
+	changed := false
+	used := map[string]bool{}
+	for _, value := range index["profiles"].([]any) {
+		record := value.(map[string]any)
+		used[stringValue(record["slug"])] = true
+	}
+	for _, value := range index["profiles"].([]any) {
+		record := value.(map[string]any)
+		slug := stringValue(record["slug"])
+		if slug == "" || record["customSlug"] == true && len(slug) < 32 {
+			for {
+				candidate, err := randomToken(25)
+				if err != nil {
+					return err
+				}
+				if !used[candidate] {
+					record["slug"], record["customSlug"] = candidate, false
+					used[candidate] = true
+					changed = true
+					break
+				}
+			}
+		}
+		bindings, _ := record["remoteNodes"].([]any)
+		for _, value := range bindings {
+			binding := value.(map[string]any)
+			if binding["status"] == "active" && strings.HasPrefix(stringValue(binding["error"]), "远端入站身份已变化，已停止自动删除") {
+				binding["status"] = "identity_changed"
+				if _, exists := binding["invalidatedAt"]; !exists {
+					binding["invalidatedAt"] = time.Now().Unix()
+				}
+				changed = true
+			}
+		}
+	}
+	if changed {
+		if err := r.writeIndex(index); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (r *Repository) writeIndex(index map[string]any) error {
 	data, err := json.MarshalIndent(index, "", "  ")
@@ -76,7 +187,7 @@ func profileFrom(record map[string]any) (Profile, error) {
 	if err != nil {
 		return Profile{}, err
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var p Profile
 	err = decoder.Decode(&p)
@@ -252,11 +363,11 @@ func (r *Repository) UpdateProfile(payload map[string]any) (map[string]any, erro
 	record["name"] = name
 	record["slug"] = slug
 	record["customSlug"] = custom
-	if err = r.writeIndex(index); err != nil {
-		return nil, err
-	}
 	p, err := profileFrom(record)
 	if err != nil {
+		return nil, err
+	}
+	if err = r.writeIndex(index); err != nil {
 		return nil, err
 	}
 	return public(p), nil
@@ -289,14 +400,14 @@ func (r *Repository) DeleteProfile(id string) error {
 	if hasActiveBindings(record) {
 		return errors.New("订阅仍拥有服务器节点，不能丢弃计费关联")
 	}
+	p, err := profileFrom(record)
+	if err != nil {
+		return err
+	}
 	// Remove the public index entry first; a file cleanup failure must not leave
 	// a publicly addressable subscription with partially deleted configuration.
 	index["profiles"] = next
 	if err = r.writeIndex(index); err != nil {
-		return err
-	}
-	p, err := profileFrom(record)
-	if err != nil {
 		return err
 	}
 	for _, path := range p.Files {

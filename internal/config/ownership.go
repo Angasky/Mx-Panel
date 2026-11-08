@@ -73,6 +73,9 @@ func (r *Repository) BeginOwnership(id string, binding Document) (Document, erro
 				return nil, errors.New("订阅绑定格式无效")
 			}
 			if b["serverId"] == binding["serverId"] && fmt.Sprint(b["inboundId"]) == fmt.Sprint(binding["inboundId"]) && (b["status"] == "active" || b["status"] == "provisioning") {
+				if b["dedicated"] == true {
+					return nil, errors.New("入站已被专属绑定，请使用原专属绑定入口")
+				}
 				if b["scope"] != "user" {
 					return nil, errors.New("入站仍有旧版专属绑定，请先迁移")
 				}
