@@ -51,7 +51,26 @@
 
 ## 快速开始
 
-### 1. 下载对应架构的安装包
+### 一键安装（推荐）
+
+在 root 的 SSH 终端执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Angasky/Mx-Panel/main/deploy/quick-install.sh | bash
+```
+
+非 root 用户把最后的 `bash` 改为 `sudo bash`。自动识别 amd64 / arm64，下载 Releases 预编译程序并核验 SHA256；无需 Go、Python 或 Nginx。设置管理员账号后进入管理菜单。
+
+以后输入：
+
+```bash
+mx-p
+```
+
+菜单提供 IP HTTPS、域名 HTTPS 自动证书、极速部署、升级修复、重置账号、备份、状态、日志、重启及两种卸载方式。IP/极速模式使用自签名证书（浏览器会提示不受信任）；域名模式使用 Let’s Encrypt，需要 DNS 指向本机并放行 80/443。IP 模式默认端口为 5656。
+
+### 手动下载安装
+
 
 **无需安装 Go 或 Python。** 准备一台使用 systemd 的 Linux 服务器，并具备 root / sudo 权限。
 
@@ -64,14 +83,14 @@
 
 ### 2. 校验并安装
 
-以下以 `preview-20261108-ca34466` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.0` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-preview-20261108-ca34466-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.0-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -79,15 +98,11 @@ sudo bash install-go.sh fresh
 
 按提示设置管理员账号与至少 **12 个字符**的密码，没有默认账号密码。`fresh` 用于首次安装；已有数据请使用下方对应操作。
 
-### 3. 打开管理界面
+### 打开管理界面
 
-默认监听 **`127.0.0.1:62578`**。可在自己电脑上建立 SSH 隧道：
+安装后运行 `mx-p`，选择 IP、域名或极速模式配置访问地址，使用菜单显示的 **HTTPS 地址**登录。Go 后端仍仅监听 `127.0.0.1:62578`，HTTPS 网关由独立的 `mx-p-gateway` 服务提供。
 
-```bash
-ssh -L 62578:127.0.0.1:62578 用户@服务器IP
-```
-
-保持连接，在浏览器打开 **http://127.0.0.1:62578/admin/**。使用正式域名时，配置 HTTPS 反代到该端口，参考 [Nginx 配置](deploy/nginx.conf.example)。
+若已有 Nginx，可沿用自己的 HTTPS 反代，参考 [配置示例](deploy/nginx.conf.example)。**直接 HTTP 或仅 SSH 转发后端端口不能完成管理登录**。
 
 <details>
 <summary><strong>已有部署：迁移、更新与卸载</strong></summary>

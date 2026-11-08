@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Repository = "Angasky/dingzhi-ban"
+	Repository = "Angasky/Mx-Panel"
 	base       = "/opt/mxioc-go"
 	executable = base + "/current/mxioc"
 )

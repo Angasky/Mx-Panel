@@ -28,7 +28,45 @@ func main() {
 	applyRelease := flag.String("apply-release", "", "run the queued systemd release update")
 	removeService := flag.Bool("remove-service", false, "run the queued service removal with persisted data policy")
 	updateJob := flag.String("update-job", "", "queued release update identifier")
+	menu := flag.Bool("menu", false, "open mx-p management menu")
+	resetUser := flag.String("reset-auth-user", "", "reset credentials from stdin; stop service first")
+	gateway := flag.String("gateway", "", "run HTTPS gateway from access config")
+	checkAccess := flag.String("check-access", "", "validate HTTPS gateway configuration")
+	checkPorts := flag.String("check-access-ports", "", "validate HTTPS gateway ports are available")
 	flag.Parse()
+	if *checkAccess != "" {
+		if _, err := gatewayConfig(*checkAccess); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *checkPorts != "" {
+		if err := checkAccessPorts(*checkPorts); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *menu {
+		if err := managementMenu(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *gateway != "" {
+		if err := runGateway(*gateway); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *resetUser != "" {
+		if os.Geteuid() != 0 {
+			log.Fatal("root required")
+		}
+		if err := resetCredentials(*root, *auth, *resetUser); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	var updater *releaseupdate.Manager
 	if !*local && *root == "/opt/mxioc-rule-manager" && *auth == "/etc/mxioc-rule-manager.auth.json" && releaseupdate.ValidVersion(releaseVersion) {
 		updater = releaseupdate.Managed()

@@ -7,6 +7,8 @@ data=/opt/mxioc-rule-manager
 auth=/etc/mxioc-rule-manager.auth.json
 unit=/etc/systemd/system/mxioc-go.service
 service=mxioc-go.service
+shortcut=/usr/local/bin/mx-p
+gateway_unit=/etc/systemd/system/mx-p-gateway.service
 legacy=mxioc-rule-manager.service
 bundle=$(cd -- "$(dirname -- "$0")" && pwd -P)
 action=${1:-}
@@ -104,6 +106,12 @@ if [[ "$action" == uninstall ]]; then
     else
         printf 'Go service removed. Subscription data, credentials and cached releases are preserved.\n'
     fi
+    if [[ -f "$gateway_unit" ]] && grep -Fqx '# Managed by mx-p' "$gateway_unit"; then
+        systemctl disable --now mx-p-gateway.service
+        rm -f -- "$gateway_unit"
+        systemctl daemon-reload
+    fi
+    if [[ -f "$shortcut" ]] && grep -Fqx '# Managed by Mx-Panel' "$shortcut"; then rm -f -- "$shortcut"; fi
     exit 0
 fi
 
@@ -142,6 +150,9 @@ else
     cmp -s mxioc-go-release.service "$unit" || die "Installed systemd unit differs from this release."
 fi
 
+if [[ -e "$shortcut" || -L "$shortcut" ]]; then
+    [[ -f "$shortcut" && ! -L "$shortcut" ]] && grep -Fqx '# Managed by Mx-Panel' "$shortcut" || die "Existing mx-p command is not managed by Mx-Panel."
+fi
 install -d -m 0755 "$base" "$base/releases"
 stage=$(mktemp -d "$base/releases/.stage.XXXXXXXX")
 old=$(readlink -- "$base/current" || true)
@@ -151,6 +162,8 @@ if [[ "$action" == update && -n "${MXIOC_GO_EXPECT_CURRENT:-}" && "$old" != "$MX
 fi
 switched=0
 unit_created=0
+gateway_active=0
+if [[ -f "$gateway_unit" ]] && grep -Fqx '# Managed by mx-p' "$gateway_unit" && systemctl is-active --quiet mx-p-gateway.service; then gateway_active=1; fi
 wait_healthy() {
     local expected="${1:-}" health attempt
     for ((attempt=0; attempt<20; attempt++)); do
@@ -174,6 +187,7 @@ rollback() {
         if [[ -n "$old" ]]; then
             if ln -s -- "$old" "$base/.current-new" && mv -Tf -- "$base/.current-new" "$base/current" &&
                 systemctl restart "$service" && wait_healthy; then
+                if (( gateway_active )); then systemctl restart mx-p-gateway.service || printf 'HTTPS gateway restoration failed.\n' >&2; fi
                 printf 'Previous Go release restored.\n' >&2
             else
                 printf 'Previous Go release could not be restarted. Check systemctl status.\n' >&2
@@ -209,6 +223,8 @@ fi
 release=$(mktemp -d "$base/releases/$version.XXXXXXXX")
 install -m 0755 "$stage/mxioc" "$release/mxioc"
 install -m 0644 "$stage/index.html" "$release/index.html"
+install -m 0700 install-go.sh "$release/install-go.sh"
+install -m 0644 mxioc-go-release.service VERSION ARCH "$release/"
 if [[ "$action" != update ]]; then
     unit_created=1
     install -m 0644 mxioc-go-release.service "$unit"
@@ -219,7 +235,23 @@ switched=1
 mv -Tf -- "$base/.current-new" "$base/current"
 systemctl restart "$service"
 wait_healthy "${MXIOC_GO_EXPECT_CURRENT:+$version}" || die "Go service did not pass HTTP checks."
+if (( gateway_active )); then
+    systemctl restart mx-p-gateway.service
+    systemctl is-active --quiet mx-p-gateway.service || die "HTTPS gateway restart failed."
+fi
 if [[ "$action" != update ]]; then
     systemctl enable "$service"
 fi
+install -d -m 0755 /usr/local/bin
+shortcut_stage=$(mktemp /usr/local/bin/.mx-p.XXXXXXXX)
+cat > "$shortcut_stage" <<'MENU'
+#!/usr/bin/env bash
+# Managed by Mx-Panel
+set -euo pipefail
+if [[ $EUID != 0 ]]; then exec sudo /usr/local/bin/mx-p "$@"; fi
+exec /opt/mxioc-go/current/mxioc --menu
+MENU
+chmod 0755 "$shortcut_stage"
+mv -f -- "$shortcut_stage" "$shortcut"
+printf '快捷命令已安装：输入 mx-p 打开管理菜单。\n'
 printf 'Go release %s is running on 127.0.0.1:62578.\n' "$version"
