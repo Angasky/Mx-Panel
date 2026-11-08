@@ -1,5 +1,0 @@
-PyYAML==6.0.3
-qrcode==7.4.2; python_version < "3.9"
-qrcode==8.2; python_version >= "3.9"
-paramiko==5.1.0; python_version >= "3.9"
-cryptography==48.0.1; python_version >= "3.9"

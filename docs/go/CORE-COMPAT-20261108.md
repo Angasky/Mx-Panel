@@ -18,7 +18,7 @@ Mihomo Snell 服务端进入 tunnel 后会触发用于 peek 的读超时；它�
 
 这些修复需要使用兼容内核：Reality 修在 sing-box 客户端；Snell 修在 Mihomo 服务端。仅替换管理器程序无效。未声称所有 Snell 第三方服务端存在相同问题，也未承诺所有 TLS 指纹都支持当前 Reality。官方版本本身没有被修复，未来升级需重新验证。
 
-产物：`artifacts/core-compat-20261108/`，附逐架构 manifest、许可证及源码补丁；amd64 实测，arm64 仅交叉构建。可用 `tools/core-compat/build.py` 从固定上游模块重新生成。
+产物：`artifacts/core-compat-20261108/`，附逐架构 manifest、许可证及源码补丁；amd64 实测，arm64 仅交叉构建。可用 `tools/core-compat/build.go` 从固定上游模块重新生成。
 
 日志相对 `artifacts/`：
 - `nov08-reality-compat.log`：第一次密钥选择实验失败（保留）。

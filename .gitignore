@@ -33,3 +33,16 @@ Thumbs.db
 
 
 /dist/
+
+# Development validation remains local, outside the published Go source tree.
+/tests/
+/scripts/
+/tools/bench/
+/tools/migration/
+/work/
+*.py
+*_test.go
+**/testdata/
+/requirements.txt
+/deploy/mxioc-rule-manager.service
+/deploy/test-go-systemd.sh

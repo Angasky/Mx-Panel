@@ -7,10 +7,10 @@
 
 ## 重建
 
-需要 Go、Python 3、patch、网络或完整模块缓存。模块经 Go checksum 校验，补丁前后文件 SHA256 均严格核对；输出附模块/源码/二进制摘要与许可证。
+需要 Go、cp、patch、网络或完整模块缓存。模块经 Go checksum 校验，补丁前后文件 SHA256 均严格核对；输出附模块/源码/二进制摘要与许可证。
 
 ```sh
-python3 tools/core-compat/build.py --go /absolute/path/to/go --output /absolute/path/to/output --arch amd64
+go run ./tools/core-compat --go /absolute/path/to/go --output /absolute/path/to/output --arch amd64
 ```
 
 可选 `--arch arm64` 仅交叉构建，不等于在 arm64 实机执行通过。
