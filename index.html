@@ -1373,6 +1373,18 @@ html:not([data-theme="high"]) .error::before { content: none; }
 /* Keep code alignment without using programming fonts for interface labels. */
 code, pre, textarea.raw, .server-log { font-family: var(--font-mono); line-height: 1.7; }
 html[data-theme] :is(input, button, select, label, .nav, th) { letter-spacing: normal; }
+
+.go-maintenance-danger { border-color: rgb(var(--danger-rgb) / .3); }
+.go-maintenance-form { width: 100%; max-width: 520px; display: grid; gap: 18px; margin-top: 22px; }
+.go-maintenance-form .go-maintenance-field > label { display: block; margin: 0 0 8px; }
+.go-maintenance-form label::before { content: none !important; }
+.go-maintenance-form input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; }
+.go-maintenance-form .hint { margin: 7px 0 0; line-height: 1.65; }
+.go-maintenance-purge { padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
+.go-maintenance-form .go-maintenance-check { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin: 0; cursor: pointer; }
+.go-maintenance-check input[type="checkbox"] { width: 16px; height: 16px; min-height: 16px; padding: 0; flex: 0 0 16px; }
+.go-maintenance-check span { min-width: 0; line-height: 1.6; }
+.go-maintenance-form [hidden] { display: none !important; }
 </style>
 </head>
 <body>
@@ -4473,8 +4485,17 @@ async function maintenance() {
       ${job ? `<p role="status">${job.operation==='uninstall' ? '卸载服务' : esc(job.version)} · ${esc(jobStatus[job.status] || job.status)} · ${esc(phases[job.stage] || job.stage)}</p>${job.error ? `<p class="error">${esc(job.error)}</p>` : ''}` : ''}
       <p>${update.applySupported ? '更新会先校验发布包，再短暂重启后台。页面将自动查询任务结果。' : '下载对应架构的发布包并校验 SHA-256，解压后执行 <code>sudo bash install-go.sh update</code>。'}</p>
       <p>卸载服务使用 <code>sudo bash install-go.sh uninstall</code>，订阅和账号数据会保留。</p>
-      ${update.uninstallSupported && !busy ? `<form id="goUninstallForm"><h4>卸载 Go 服务</h4><p>停止并移除 Go 后台服务，默认保留本地数据；勾选清空后会删除本地订阅、账号和备份。远端节点保留。后台停止后本页面将无法继续访问。</p><label>当前用户名<input id="goUninstallUser" required autocomplete="username" value="${esc(account.username)}"></label><label>当前密码<input id="goUninstallPassword" required type="password" autocomplete="current-password"></label><label>确认文字<input id="goUninstallConfirmation" required placeholder="UNINSTALL"></label><label><input id="goUninstallPurge" type="checkbox">同时清空本地订阅、账号和备份（不可恢复）</label><p class="hint">数据可能与旧 Python 后台共用，旧服务运行或启用时会拒绝清空。远端节点不会被删除。</p><label>清空数据确认（仅勾选时填写）<input id="goUninstallPurgeConfirmation" autocomplete="off" placeholder="DELETE ALL DATA"></label><button class="btn danger">卸载服务</button></form>` : ''}
-      <a class="btn" href="${esc(update.releaseUrl || 'https://github.com/Angasky/dingzhi-ban/releases')}" target="_blank" rel="noopener noreferrer">查看发布包</a>
+      ${update.uninstallSupported && !busy ? `</section><section class="panel go-maintenance-danger"><div class="panel-head"><h3>卸载 Go 服务</h3><span class="pill reject">谨慎操作</span></div>
+      <p class="hint">默认保留订阅、账号和备份。卸载后无法继续访问本面板，远端节点不受影响。</p>
+      <form id="goUninstallForm" class="go-maintenance-form">
+        <div class="go-maintenance-field"><label for="goUninstallUser">管理员用户名</label><input id="goUninstallUser" required autocomplete="username" value="${esc(account.username)}"></div>
+        <div class="go-maintenance-field"><label for="goUninstallPassword">当前密码</label><input id="goUninstallPassword" required type="password" autocomplete="current-password"></div>
+        <div class="go-maintenance-field"><label for="goUninstallConfirmation">卸载确认</label><input id="goUninstallConfirmation" required autocomplete="off" placeholder="输入 UNINSTALL"><p class="hint">输入大写 UNINSTALL 确认卸载服务。</p></div>
+        <div class="go-maintenance-purge"><label class="go-maintenance-check" for="goUninstallPurge"><input id="goUninstallPurge" type="checkbox" aria-controls="goUninstallPurgeFields" aria-expanded="false"><span>同时永久清空本地数据</span></label><p class="hint">删除本地订阅、账号和备份，不可恢复。旧 Python 服务仍运行或启用时会拒绝清空。</p></div>
+        <div id="goUninstallPurgeFields" class="go-maintenance-field" hidden><label for="goUninstallPurgeConfirmation">清空数据确认</label><input id="goUninstallPurgeConfirmation" disabled autocomplete="off" placeholder="输入 DELETE ALL DATA"></div>
+        <div class="toolbar"><button type="submit" class="btn danger">卸载服务</button></div>
+      </form>` : ''}
+      <a class="btn" href="${esc(update.releaseUrl || 'https://github.com/Angasky/Mx-Panel/releases')}" target="_blank" rel="noopener noreferrer">查看发布包</a>
     </section>`;
     const check = $('goUpdateCheck'), dismiss = $('goUpdateDismiss'), apply = $('goUpdateApply'), status = $('goUpdateStatus');
     const poll = () => {
@@ -4500,6 +4521,14 @@ async function maintenance() {
     if (dismiss) dismiss.onclick = () => run(dismiss, '/updates/dismiss', {version:update.latestVersion});
     if (apply) apply.onclick = () => {
       if (confirm(`应用 ${update.latestVersion} 并重启 Go 管理后台？`)) run(apply, '/updates/apply', {version:update.latestVersion, confirmed:true});
+    };
+    if ($('goUninstallPurge')) $('goUninstallPurge').onchange = event => {
+      const enabled = event.target.checked, input = $('goUninstallPurgeConfirmation');
+      $('goUninstallPurgeFields').hidden = !enabled;
+      input.disabled = !enabled;
+      input.required = enabled;
+      event.target.setAttribute('aria-expanded', String(enabled));
+      if (!enabled) input.value = '';
     };
     if($('goUninstallForm'))$('goUninstallForm').onsubmit=async event=>{
       event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');
