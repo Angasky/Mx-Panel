@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MXIOC // Terminal Control Center</title>
 <script>
-try { document.documentElement.dataset.theme = ['high', 'low', 'pink'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'high'; } catch (_) {}
+try { document.documentElement.dataset.theme = ['high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'high'; } catch (_) {}
 </script>
 <style>
 :root {
@@ -1408,6 +1408,39 @@ label:has(> input:is([type="checkbox"], [type="radio"]))::before { content: none
 .node-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 16px 0 12px; }
 .node-selection-bar > label { display: inline-flex; align-items: center; gap: 8px; margin: 0; font: 500 13px/1.5 var(--font-sans); color: var(--text); cursor: pointer; }
 .node-selection-count { font: 400 13px/1.5 var(--font-sans); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+/* Original Mx-Panel theme inspired by the publicly documented warm palette. */
+html[data-theme="amber"] {
+ color-scheme: light;
+ --bg:#f8f5f0; --bg-card:#fffefa; --bg-card-hover:#fff3e9; --bg-sidebar:#fffcf7;
+ --bg-input:#ffffff; --surface-inset:#f6eee5; --surface-header:#fcf6ee;
+ --border:#dccfc1; --border-focus:#b54c25; --border-glow:rgb(181 76 37 / .15);
+ --blue:#b54c25; --blue-bright:#983b19; --blue-dim:#a64420; --blue-soft:#fae6d8;
+ --cyan:#a84d2b; --accent-rgb:181 76 37; --shadow-rgb:70 48 33; --overlay-rgb:45 35 29;
+ --primary-bg:#b54c25; --primary-hover:#943b19; --primary-border:#b54c25;
+ --text:#332c26; --text-muted:#746458; --text-dim:#655348; --placeholder:#7e6b5b;
+ --green:#277349; --green-soft:#e6f2e9; --success-text:#22633e; --success-rgb:39 115 73;
+ --amber:#8d600e; --amber-soft:#fff0d2; --warning-rgb:141 96 14;
+ --danger:#b52d38; --danger-text:#a4222e; --danger-strong:#84202a; --danger-soft:#fce9e9; --danger-rgb:181 45 56;
+ --radius-sm:7px; --radius-md:12px; --radius-lg:16px;
+}
+html[data-theme="amber"] body { background-image:none; letter-spacing:0; font-size:14px; }
+html[data-theme="amber"] :is(.panel,.profile-card,.card,.modalbox,.loginbox) { box-shadow:3px 3px 0 rgb(var(--shadow-rgb) / .10); }
+html[data-theme="amber"] :is(.side-logo,.nav.active,.btn,.card b,.panel h3,.modalhead h3) { text-shadow:none; }
+html[data-theme="amber"] .nav.active { background:var(--blue-soft); color:var(--blue-bright); border-color:var(--border-focus); box-shadow:none; }
+html[data-theme="amber"] .btn { background:var(--bg-card); color:var(--text-dim); box-shadow:2px 2px 0 rgb(var(--shadow-rgb) / .12); }
+html[data-theme="amber"] .btn.primary { background:var(--primary-bg); color:#fff; }
+html[data-theme="amber"] .btn.danger { background:var(--danger-soft); color:var(--danger-text); }
+html[data-theme="amber"] :is(.top h2,.panel h3,.modalhead h3,label) { font-family:var(--font-sans); }
+html[data-theme="amber"] label::before { content:none; }
+html[data-theme="amber"] .card::before { background:var(--blue); }
+html[data-theme="amber"] .modal { background:rgb(var(--overlay-rgb) / .35); backdrop-filter:blur(3px); }
+html[data-theme="amber"] .modalhead { background:var(--surface-header); }
+.theme-preview.amber { background:#f8f5f0; border-color:#dccfc1; }
+.theme-preview.amber::before { background:#fae6d8; }
+.theme-preview.amber::after { background:#fffefa; border-color:#b54c25; box-shadow:3px 3px 0 #46302120; }
+.theme-options { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); }
+.node-protocol-filter { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+.node-protocol-filter .btn[aria-pressed="true"] { background:var(--primary-bg); color:#fff; border-color:var(--primary-border); }
 </style>
 </head>
 <body>
@@ -1610,7 +1643,7 @@ SOFTWARE.
         <span class="window-dot dot-yellow"></span>
         <span class="window-dot dot-green"></span>
       </div>
-      <span>MXIOC / 管理员登录</span>
+      <span>MXIOC / 账号登录</span>
     </div>
     <div class="login-body">
       <div class="login-identity">MXIOC<span>订阅管理控制台</span></div>
@@ -1620,10 +1653,10 @@ SOFTWARE.
 | |  | |/  \ | | |_| | |___
 |_|  |_/_/\_\___\___/ \____|</div>
       <div class="login-meta">
-        <div>使用管理员账号管理节点与订阅</div>
+        <div>管理员管理面板，普通用户查看已授权订阅</div>
         <div>会话有效期 <b>12 小时</b></div>
       </div>
-      <label for="user">管理员账号</label>
+      <label for="user">登录账号</label>
       <input id="user" autocomplete="username" placeholder="输入用户名" required>
       <label for="pass">登录密码</label>
       <input id="pass" type="password" autocomplete="current-password" placeholder="输入密码" required>
@@ -1733,6 +1766,9 @@ function showLogin() {
   sessionStorage.removeItem('mxioc_token');
   localStorage.removeItem('mxioc_token');
   S.token = null;
+  S.role = null;
+  document.querySelector("#app .nav-group").classList.remove("hidden");
+  $("manageProfiles").classList.remove("hidden");
   S.data = null;
   S.profiles = [];
   S.servers = [];
@@ -1757,6 +1793,16 @@ function showLogin() {
 }
 
 async function showAuthenticatedApp() {
+  const account = await api('/account');
+  S.role = account.role;
+  if (S.role === 'user') {
+    document.querySelector('#app .nav-group').classList.add('hidden');
+    ['manageProfiles','add','importNode','sectionTabs'].forEach(id => $(id).classList.add('hidden'));
+    await memberPortal();
+    $('boot').classList.add('hidden'); $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+    return;
+  }
+  $('sectionTabs').classList.remove('hidden');
   await loadProfiles();
   if (S.profiles.length) await reload(false);
   await go(S.profiles.length ? 'overview' : 'profiles');
@@ -1964,6 +2010,7 @@ const pageSections = {
 const sectionFor = page => Object.keys(pageSections).find(key => pageSections[key].includes(page)) || 'overview';
 
 async function go(page) {
+  if (S.role === "user") return memberPortal();
   if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring'].includes(page)) {
     page = 'profiles';
     notice('请先创建一份订阅，再管理节点和规则');
@@ -2065,7 +2112,7 @@ function formatBytes(value) {
 }
 
 function setTheme(theme) {
-  if (!['high', 'low', 'pink'].includes(theme)) return;
+  if (!['high', 'low', 'pink', 'amber'].includes(theme)) return;
   const root = document.documentElement;
   root.classList.add('theme-switching');
   root.dataset.theme = theme;
@@ -2075,12 +2122,51 @@ function setTheme(theme) {
   let persisted = true;
   try { localStorage.setItem('mxioc_theme', theme); } catch (_) { persisted = false; }
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
-  notice(persisted ? `已切换为${({high:'科技', low:'简洁', pink:'猛男'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
+  notice(persisted ? `已切换为${({high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
+}
+
+
+const accessNotice = '授权控制面板内的订阅访问。禁用用户或撤销授权不会使已复制的订阅链接失效；如需彻底撤销，请同时轮换订阅地址。普通用户不能修改节点、服务器或系统设置。';
+async function userManager() {
+  const [data, profiles] = await Promise.all([api('/users'), api('/profiles')]);
+  openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button></div><div id="panelUserList"></div>`);
+  $('panelUserList').innerHTML = data.users.map((u,i)=>`<article class="panel" style="margin-top:12px"><div class="panel-head"><h3>${esc(u.username)}</h3><span class="pill">${u.enabled?'启用':'已禁用'}</span></div><p class="muted">普通用户 · 已授权 ${(u.profiles||[]).length} 份订阅</p><div class="toolbar"><button class="btn" data-edit-user="${i}">编辑 / 授权 / 重置密码</button><button class="btn danger" data-delete-user="${i}">删除</button></div></article>`).join('') || '<p class="empty">暂无普通用户，请先新建用户并分配订阅。</p>';
+  $('newPanelUser').onclick = ()=>editPanelUser(null, profiles.profiles);
+  document.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>editPanelUser(data.users[Number(b.dataset.editUser)], profiles.profiles));
+  document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=async()=>{
+    const u=data.users[Number(b.dataset.deleteUser)];
+    if (!confirm(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`)) return;
+    try { await api('/users',jsonOpt('DELETE',{id:u.id})); await userManager(); notice('用户已删除'); } catch(e) { notice(e.message); }
+  });
+}
+function editPanelUser(u, profiles) {
+  openModal(u?'编辑用户与授权':'新建普通用户', `<form id="panelUserForm"><label for="panelUserName">用户名</label><input id="panelUserName" required minlength="3" maxlength="64" autocomplete="off" value="${esc(u?.username||'')}"><label for="panelUserPassword">${u?'新密码（留空保留原密码）':'初始密码'}</label><input id="panelUserPassword" type="password" minlength="12" maxlength="256" ${u?'':'required'} autocomplete="new-password"><p class="muted">至少 12 个字符。普通用户需要重置密码时，请联系管理员。</p><label style="display:flex;align-items:center;gap:8px"><input id="panelUserEnabled" type="checkbox" ${!u||u.enabled?'checked':''}>启用账号</label><h4>允许访问的订阅</h4><div style="display:grid;gap:10px;max-height:260px;overflow:auto">${profiles.map((p,i)=>`<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-user-profile="${i}" ${(u?.profiles||[]).includes(p.id)?'checked':''}>${esc(p.name)}</label>`).join('')||'<p class="muted">暂无订阅，可先保存用户，再创建订阅并授权。</p>'}</div><p class="note">${esc(accessNotice)} 保存变更后，该用户需要重新登录。</p><p id="panelUserError" class="error" role="alert"></p><div class="toolbar"><button class="btn primary" type="submit">保存用户</button><button class="btn" type="button" id="panelUserBack">返回</button></div></form>`);
+  $('panelUserBack').onclick = ()=>userManager().catch(e=>notice(e.message));
+  $('panelUserForm').onsubmit = async e=>{
+    e.preventDefault(); const button=e.submitter; button.disabled=true;
+    try {
+      await api('/users',jsonOpt(u?'PUT':'POST',{id:u?.id,username:$('panelUserName').value,password:$('panelUserPassword').value,enabled:$('panelUserEnabled').checked,profiles:[...document.querySelectorAll('[data-user-profile]:checked')].map(c=>profiles[Number(c.dataset.userProfile)].id)}));
+      await userManager(); notice('用户权限已保存');
+    } catch(error) { $('panelUserError').textContent=error.message; button.disabled=false; }
+  };
+}
+async function memberPortal() {
+  const data=await api('/portal'); S.page='portal';
+  $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
+  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
+    const t=p.traffic||{};
+    return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制订阅链接</button><a class="btn" href="${esc(p.url)}" download>下载 Clash / Mihomo</a></div><details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(f.url)}" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
+  }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
+  $('memberTheme').value=document.documentElement.dataset.theme;
+  $('memberTheme').onchange=e=>setTheme(e.target.value);
+  document.querySelectorAll('[data-member-copy]').forEach(b=>b.onclick=async()=>{
+    try { await navigator.clipboard.writeText(location.origin+data.profiles[Number(b.dataset.memberCopy)].url); notice('订阅链接已复制'); } catch(e) { notice('复制失败，请使用下载按钮或允许剪贴板访问'); }
+  });
 }
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><span class="pill">当前设备</span></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div>
     <p class="muted">首次使用默认科技主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
@@ -2092,7 +2178,10 @@ function settings() {
       <button type="button" class="theme-option" data-theme-choice="pink" aria-pressed="${theme === 'pink'}" onclick="setTheme('pink')">
         <span class="theme-preview pink" aria-hidden="true"></span><strong>猛男主题 · 温柔粉色</strong><p>暖粉底色、柔和边框与舒展留白，搭配衬线标题和圆角组件，让复杂配置也从容清晰。</p>
       </button>
-    </div><div class="note">三套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
+      <button type="button" class="theme-option" data-theme-choice="amber" aria-pressed="${theme === 'amber'}" onclick="setTheme('amber')">
+        <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白底色、珊瑚橙操作按钮与细描边，搭配轻量硬边阴影，清晰区分内容与操作。</p>
+      </button>
+    </div><div class="note">四套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
 }
 
@@ -3711,7 +3800,10 @@ async function nodeSubscriptionImport(index) {
 function nodes() {
   let q = S.filters.nodes || '';
   if (window.cancelNodeDrag) window.cancelNodeDrag();
-  let rows = S.data.nodes.filter(x => (x.name + ' ' + x.type + ' ' + nodeProtocol(x) + ' ' + x.server).toLowerCase().includes(q.toLowerCase()));
+  const protocol = S.filters.nodeProtocol || '';
+  const protocolCounts = new Map();
+  for (const node of S.data.nodes) protocolCounts.set(node.type, (protocolCounts.get(node.type) || 0) + 1);
+  let rows = S.data.nodes.filter(x => (!protocol || x.type === protocol) && (x.name + ' ' + x.type + ' ' + nodeProtocol(x) + ' ' + x.server).toLowerCase().includes(q.toLowerCase()));
   $('content').innerHTML = cards() + `
   <section class="panel">
     <div class="panel-head"><div><h3>我的节点</h3><p class="hint">服务器绑定节点可直接“批量加入订阅”，为每份订阅生成独立凭据；点击“策略组”设置用途。</p></div><button type="button" class="btn primary" onclick="importNodeModal()">${uiIcon('circle-plus')}导入链接</button></div>
@@ -3721,6 +3813,10 @@ function nodes() {
       <button type="button" class="btn small primary" onclick="batchServerImport()">从服务器批量导入节点</button>
       <button type="button" class="btn small primary" onclick="chooseNodeServer('subscriptions')">单个节点批量加入订阅</button><button type="button" class="btn small" onclick="chooseNodeServer('browse')">查看服务器节点</button>
       <button type="button" class="btn small" onclick="go('traffic')">订阅流量与有效期</button>
+    </div>
+    <div class="node-protocol-filter" role="group" aria-label="按节点协议筛选">
+      <button type="button" class="btn small" data-node-protocol="" aria-pressed="${!protocol}">全部 · ${S.data.nodes.length}</button>
+      ${[...protocolCounts].sort(([a],[b]) => a.localeCompare(b)).map(([type,count]) => `<button type="button" class="btn small" data-node-protocol="${esc(type)}" aria-pressed="${type === protocol}">${esc(type.toUpperCase())} · ${count}</button>`).join('')}
     </div>
     <details class="node-secondary"><summary>批量操作 · 节点选择与名称整理</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
@@ -3759,6 +3855,7 @@ function nodes() {
             </article>`).join('') || '<div class="empty">未找到匹配的节点</div>'}
     </div>
   </section>`;
+  document.querySelectorAll('[data-node-protocol]').forEach(button => button.onclick = () => { S.filters.nodeProtocol = button.dataset.nodeProtocol; nodes(); });
   bindSearch('nodes', nodes);
   setupNodeDrag();
   updateNodeSelectionUi();
@@ -5908,7 +6005,9 @@ $('logout').onclick = () => logout(true);
 $('manageProfiles').onclick = profileManager;
 $('refresh').onclick = async () => {
   try {
-    if (S.page === 'monitoring') {
+    if (S.role === 'user') {
+      await memberPortal();
+    } else if (S.page === 'monitoring') {
       await refreshHostMetrics();
     } else if (S.page === 'servers') {
       await servers();

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// SingBoxOutbound converts a node without silently discarding unsupported options.
+func SingBoxOutbound(node Record, tag string) (Record, error) {
+	return singRelayOutbound(node, tag)
+}
+
 func singRelayOutbound(node Record, tag string) (Record, error) {
 	if node["network"] == "xhttp" {
 		return nil, errors.New("当前 sing-box 中转不支持 XHTTP 落地")

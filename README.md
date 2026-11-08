@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.5` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.6` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.5-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.6-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -155,3 +155,18 @@ bash install.sh local-build
 [下载版本](https://github.com/Angasky/Mx-Panel/releases) · [反馈问题](https://github.com/Angasky/Mx-Panel/issues)
 
 </div>
+
+### 功能对照与新主题
+
+新增暖橙主题、节点协议筛选及 sing-box 客户端配置导出。完整差异和待办见 [妙妙屋X 功能对照](docs/go/MMWX-COMPARISON.md)。这不表示对方全部功能已实现。
+
+### 多用户与订阅授权
+
+管理员登录后，在 **设置 → 用户与权限** 中新建普通用户、分配订阅、禁用账号或重置密码。普通用户使用同一个登录页面，只能查看已授权订阅的用量、复制地址和下载客户端配置，无法修改节点、服务器或系统设置。
+
+- 新密码至少 12 个字符；普通用户需要重置密码时联系管理员。
+- 保存账号或授权变更后，该用户的登录会话立即失效，重新登录后使用新权限。
+- 禁用或删除账号不会作废已复制的公共订阅链接。需要彻底撤销订阅访问时，请同时轮换订阅地址。
+- 用户记录保存在数据目录 `panel-users.json`，文件权限为 `0600`。完整迁移/备份时应保留该文件；单份订阅 YAML 备份不包含账号。
+
+设置中还提供原创 **暖橙主题**；节点页支持协议筛选；客户端导出新增 **sing-box**。详细适配边界见[功能对照记录](docs/go/MMWX-COMPARISON.md)。

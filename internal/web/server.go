@@ -50,6 +50,8 @@ type Server struct {
 	updates           goUpdates
 	account           account
 	mu                sync.Mutex
+	userAdminMu       sync.Mutex
+	userMu            sync.Mutex
 	sessions          map[[32]byte]session
 	failures          map[string]failure
 	hashSlots         chan struct{}
@@ -225,8 +227,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.login(w, r)
 		return
 	}
+	if member, ok := s.member(r); ok {
+		s.memberRoutes(w, r, member)
+		return
+	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.userAdminRoute(w, r) {
 		return
 	}
 	if r.URL.Path == "/admin/api/conversions" && s.publicRoutes(w, r) {
@@ -258,7 +267,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		username := s.account.Username
 		s.mu.Unlock()
-		respond(w, 200, map[string]any{"username": username})
+		respond(w, 200, map[string]any{"username": username, "role": "admin"})
 		return
 	}
 	if r.Method == "GET" {
@@ -397,6 +406,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	auth := s.account
 	s.mu.Unlock()
+	if input.Username != auth.Username {
+		s.memberLogin(w, r, input.Username, input.Password, keys)
+		return
+	}
 	valid := legacycrypto.VerifyPassword(input.Password, auth.Salt, auth.Hash, auth.Iterations)
 	valid = valid && subtle.ConstantTimeCompare([]byte(input.Username), []byte(auth.Username)) == 1
 	nextAuth := auth

@@ -18,6 +18,7 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"sing-box", "sing-box 完整客户端配置", "本地 mixed 端口 2080，手动选择节点；不包含 Mihomo 策略组、规则及远端主备关系。", false, true},
 	{"v2rayn-ha", "电脑 v2rayN · Xray 主备配置", "每个主备组一份完整 JSON，固定优先顺序。", false, false},
 	{"v2rayng-ha", "安卓 v2rayNG · Xray 主备配置", "本地 SOCKS / HTTP 端口为 10808 / 10809。", false, false},
 	{"shadowrocket-ha", "小火箭主备 · 第一步：节点订阅", "先导入节点，再启用配套策略配置。", true, true},
@@ -100,6 +101,9 @@ func usageLabel(info Record) string {
 }
 
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "sing-box" {
+		return convertSingBox(source)
+	}
 	if format == "v2rayn-ha" || format == "v2rayng-ha" {
 		return convertXrayHA(source)
 	}

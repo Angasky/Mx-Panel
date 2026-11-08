@@ -68,7 +68,7 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if parts[2] == "shadowrocket-config" {
 			extension = "-shadowrocket.conf"
 		}
-		if parts[2] == "v2rayn-ha" || parts[2] == "v2rayng-ha" {
+		if parts[2] == "v2rayn-ha" || parts[2] == "v2rayng-ha" || parts[2] == "sing-box" {
 			extension = "-" + parts[2] + ".json"
 			contentType = "application/json; charset=utf-8"
 		}

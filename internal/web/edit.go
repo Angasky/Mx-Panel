@@ -278,6 +278,8 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
+	s.userAdminMu.Lock()
+	defer s.userAdminMu.Unlock()
 	var input struct{ Username, Current, NewUsername, NewPassword, New string }
 	if err := readJSON(w, r, &input); err != nil {
 		problem(w, 400, err.Error())
@@ -305,6 +307,17 @@ func (s *Server) changeAccount(w http.ResponseWriter, r *http.Request) {
 	if utf8.RuneCountInString(username) < 3 || utf8.RuneCountInString(username) > 64 || strings.ContainsAny(username, ":\x00") || strings.ContainsFunc(username, unicode.IsSpace) || password != "" && (utf8.RuneCountInString(password) < 12 || utf8.RuneCountInString(password) > 256) {
 		problem(w, 400, "账号无效，或新密码长度不在 12–256 之间")
 		return
+	}
+	users, userErr := s.users()
+	if userErr != nil {
+		problem(w, 500, "用户数据读取失败")
+		return
+	}
+	for _, u := range users {
+		if strings.EqualFold(u.Username, username) {
+			problem(w, 400, "用户名与普通用户重复")
+			return
+		}
 	}
 	next := auth
 	next.Username = username
