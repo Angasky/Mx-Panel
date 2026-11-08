@@ -65,6 +65,9 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		body = result.Body
 		extension = "-" + parts[2] + ".txt"
 		contentType = "text/plain; charset=utf-8"
+		if parts[2] == "surge" {
+			extension = "-surge.conf"
+		}
 		if parts[2] == "shadowrocket-config" {
 			extension = "-shadowrocket.conf"
 		}

@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.8` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.9` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.8-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.9-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -191,3 +191,13 @@ bash install.sh local-build
 - 只读接口为 `GET /sub/status-api`，使用请求头 `Authorization: Bearer <令牌>`；不支持查询参数传令牌。
 - 分享页面每 60 秒刷新；数据超过 120 秒未更新时显示过期。状态表示采样结果，不代表代理连接可用性。
 - 分享配置位于数据目录 `monitor-sharing.json`，权限 `0600`。现有 `/sub/` HTTPS 反向代理即可转发，无需新增监听端口。
+
+### Surge 客户端配置
+
+订阅总览的客户端区域新增 **Surge 客户端配置**，支持下载、复制链接与二维码；普通用户可从自己获授权的订阅卡片下载。
+
+当前适配 Shadowsocks AEAD / 部分 SS2022、Trojan TCP/TLS、HTTP/HTTPS、SOCKS5/SOCKS5-TLS 和 Snell v1–v5 的兼容参数。输出独立的手动选择组，最终规则为 `FINAL,MX-PROXY`；**不转换原 Mihomo 分流规则、DNS、策略组、主备或链式代理**。
+
+不兼容协议、复杂传输、TLS 客户端指纹、无法无损映射的 UDP 设置及含配置分隔符的参数会被跳过，管理员可以展开“不兼容项目”查看原因。面板默认新建的 Trojan 可能带 `client-fingerprint`，此类节点不会静默删掉指纹后导出；需要另建兼容节点或使用原始 Mihomo 配置。
+
+实现依据 [Surge 官方配置格式](https://manual.nssurge.com/profile/format.html)及[协议文档](https://manual.nssurge.com/policies/overview.html)。已验证配置生成、注入防护、下载与权限；当前 Linux 环境没有 Surge 客户端，尚未完成 iOS/macOS 实机导入及连接验收。
