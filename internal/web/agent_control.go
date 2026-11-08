@@ -8,12 +8,15 @@ import (
 	"encoding/json"
 	"github.com/Angasky/dingzhi-ban/internal/agentcontrol"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 type agentTask struct {
@@ -219,6 +222,25 @@ func (s *Server) agentAcknowledgement(id, digest string, report agentcontrol.Rep
 		for _, name := range report.Capabilities {
 			if len(name) <= 64 {
 				view.Capabilities = append(view.Capabilities, name)
+			}
+		}
+	}
+	if report.Sample != "" {
+		view.Probes = nil
+		if len(report.Probes) <= 6 {
+			seen := map[string]bool{}
+			for _, p := range report.Probes {
+				if p.Name == "" || !utf8.ValidString(p.Name) || strings.ContainsFunc(p.Name, unicode.IsControl) || len([]rune(p.Name)) > 40 || seen[p.Name] || p.Time > s.now().Unix()+5 || p.Time < s.now().Add(-2*time.Minute).Unix() {
+					continue
+				}
+				seen[p.Name] = true
+				if p.OK && (p.Milliseconds == nil || math.IsNaN(*p.Milliseconds) || math.IsInf(*p.Milliseconds, 0) || *p.Milliseconds < 0 || *p.Milliseconds > 3000) {
+					continue
+				}
+				if !p.OK {
+					p.Milliseconds = nil
+				}
+				view.Probes = append(view.Probes, p)
 			}
 		}
 	}

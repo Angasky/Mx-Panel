@@ -154,6 +154,7 @@ func (s *Server) sampleMonitorHistory(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
+			s.recordProbes(id)
 			now := s.now()
 			point := monitorhistory.Point{Time: now.Unix()}
 			var counter *monitorhistory.Counter

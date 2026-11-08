@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/Angasky/dingzhi-ban/internal/netprobe"
 	"io"
 	"os"
 	"os/exec"
@@ -46,9 +47,10 @@ type Target struct {
 	Writable bool   `json:"writable"`
 }
 type Report struct {
-	Sample       string   `json:"sample"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	Result       *Result  `json:"result,omitempty"`
+	Probes       []netprobe.Result `json:"probes,omitempty"`
+	Sample       string            `json:"sample"`
+	Capabilities []string          `json:"capabilities,omitempty"`
+	Result       *Result           `json:"result,omitempty"`
 }
 type Ack struct {
 	OK      bool     `json:"ok"`

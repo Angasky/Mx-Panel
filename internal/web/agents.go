@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/agentcontrol"
+	"github.com/Angasky/dingzhi-ban/internal/netprobe"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"golang.org/x/net/websocket"
 )
@@ -32,6 +33,7 @@ type agentRegistration struct {
 	Digest   string `json:"digest"`
 }
 type agentObservation struct {
+	Probes       []netprobe.Result
 	Capabilities []string
 	View         remote.Record
 	At           time.Time

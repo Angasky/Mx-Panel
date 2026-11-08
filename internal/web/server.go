@@ -47,6 +47,7 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	probeMu           sync.Mutex
 	agentMu           sync.Mutex
 	agentViews        map[string]agentObservation
 	agentSlots        chan struct{}
@@ -253,6 +254,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.probeHistoryAdmin(w, r) {
 		return
 	}
 	if s.agentControlAdmin(w, r) {

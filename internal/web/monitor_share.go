@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Angasky/dingzhi-ban/internal/monitorhistory"
+	"github.com/Angasky/dingzhi-ban/internal/netprobe"
 	"golang.org/x/net/websocket"
 	"html/template"
 	"net/http"
@@ -35,6 +36,7 @@ type monitorShare struct {
 	Updated int64           `json:"updated"`
 }
 type sharedMetric struct {
+	Probes    []netprobe.Result      `json:"tcpProbes,omitempty"`
 	History   []monitorhistory.Point `json:"-"`
 	Index     int                    `json:"index"`
 	Label     string                 `json:"label"`
@@ -206,6 +208,13 @@ func (s *Server) sharedMetrics(c monitorShare) sharedReport {
 			continue
 		}
 		metric := sharedMetric{Index: index, Label: item.Label, Status: "unavailable"}
+		s.agentMu.Lock()
+		for _, p := range s.agentViews[item.ID].Probes {
+			if p.Time >= s.now().Unix()-120 {
+				metric.Probes = append(metric.Probes, p)
+			}
+		}
+		s.agentMu.Unlock()
 		state, e := s.history.Read(item.ID, s.now())
 		if e == nil {
 			switch {
@@ -368,6 +377,12 @@ func (s *Server) monitorSharePublic(w http.ResponseWriter, r *http.Request) bool
 }
 
 var monitorShareTemplate = template.Must(template.New("monitor-sharing").Funcs(template.FuncMap{
+	"latency": func(p *float64) string {
+		if p == nil {
+			return "失败"
+		}
+		return fmt.Sprintf("%.1f ms", *p)
+	},
 	"chart": historyChart,
 	"status": func(s string) string {
 		return map[string]string{"fresh": "采样正常", "paused": "采样已暂停", "pending": "等待首次采样", "stale": "数据已过期", "failed": "采样失败", "unavailable": "暂不可用"}[s]
@@ -391,7 +406,7 @@ var monitorShareTemplate = template.Must(template.New("monitor-sharing").Funcs(t
 		return time.Unix(t, 0).UTC().Format("2006-01-02 15:04:05 UTC")
 	},
 }).Parse(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="refresh" content="60"><title>MXIOC · 服务器状态</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f7f3ed;color:#302b26;font:16px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}main{max-width:1120px;margin:auto;padding:32px 20px}header{border-bottom:1px solid #d7c9bb;margin-bottom:24px}h1{font-size:28px;margin:0}header p,.hint{color:#77685a;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}article{background:#fffdf8;border:1px solid #d7c9bb;border-radius:16px;box-shadow:3px 4px 0 #e6ded4;padding:22px;min-width:0}h2{font-size:20px;overflow-wrap:anywhere;margin:0 0 10px}.status{display:inline-block;padding:2px 9px;border:1px solid #dcc9b9;border-radius:20px;background:#f5ede4;font-size:13px}.fresh{color:#196b40;background:#edf8ef;border-color:#b8dbc1}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}dt{font-size:13px;color:#77685a}dd{margin:0;font-size:24px;font-weight:650;overflow-wrap:anywhere}footer{margin-top:28px;font-size:13px;color:#77685a}.time{font-size:12px;color:#77685a;overflow-wrap:anywhere}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}</style></head><body><main><header><h1>MXIOC · 服务器状态</h1><p>管理员选择分享的资源指标 · 每 60 秒刷新</p></header><section class="grid" aria-label="服务器状态">{{range .Servers}}<article><h2>{{.Label}}</h2><span class="status {{.Status}}">{{status .Status}}</span><dl><div><dt>CPU 使用率</dt><dd>{{percent .CPU}}</dd></div><div><dt>内存使用率</dt><dd>{{percent .Memory}}</dd></div><div><dt>接收速率</dt><dd>{{rate .RXRate}}</dd></div><div><dt>发送速率</dt><dd>{{rate .TXRate}}</dd></div></dl><div class="time">采样：{{stamp .SampledAt}}</div><details><summary>查看 24 小时 CPU / 内存趋势</summary>{{chart .History}}</details></article>{{else}}<article><h2>暂无可展示的服务器</h2><p class="hint">请联系管理员检查分享设置。</p></article>{{end}}</section><footer>更新时间：{{stamp .GeneratedAt}}<br>状态表示资源采样结果；采样失败或数据过期不等同于服务器或代理服务离线。</footer></main></body></html>`))
+*{box-sizing:border-box}body{margin:0;background:#f7f3ed;color:#302b26;font:16px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}main{max-width:1120px;margin:auto;padding:32px 20px}header{border-bottom:1px solid #d7c9bb;margin-bottom:24px}h1{font-size:28px;margin:0}header p,.hint{color:#77685a;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}article{background:#fffdf8;border:1px solid #d7c9bb;border-radius:16px;box-shadow:3px 4px 0 #e6ded4;padding:22px;min-width:0}h2{font-size:20px;overflow-wrap:anywhere;margin:0 0 10px}.status{display:inline-block;padding:2px 9px;border:1px solid #dcc9b9;border-radius:20px;background:#f5ede4;font-size:13px}.fresh{color:#196b40;background:#edf8ef;border-color:#b8dbc1}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}dt{font-size:13px;color:#77685a}dd{margin:0;font-size:24px;font-weight:650;overflow-wrap:anywhere}footer{margin-top:28px;font-size:13px;color:#77685a}.time{font-size:12px;color:#77685a;overflow-wrap:anywhere}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}</style></head><body><main><header><h1>MXIOC · 服务器状态</h1><p>管理员选择分享的资源指标 · 每 60 秒刷新</p></header><section class="grid" aria-label="服务器状态">{{range .Servers}}<article><h2>{{.Label}}</h2><span class="status {{.Status}}">{{status .Status}}</span><dl><div><dt>CPU 使用率</dt><dd>{{percent .CPU}}</dd></div><div><dt>内存使用率</dt><dd>{{percent .Memory}}</dd></div><div><dt>接收速率</dt><dd>{{rate .RXRate}}</dd></div><div><dt>发送速率</dt><dd>{{rate .TXRate}}</dd></div></dl><div class="time">采样：{{stamp .SampledAt}}</div>{{if .Probes}}<details><summary>Agent TCP 连通延迟</summary>{{range .Probes}}<p>{{.Name}}：{{latency .Milliseconds}}</p>{{end}}<p class="hint">TCP 建连测试，不代表 ICMP 丢包或代理连通性。</p></details>{{end}}<details><summary>查看 24 小时 CPU / 内存趋势</summary>{{chart .History}}</details></article>{{else}}<article><h2>暂无可展示的服务器</h2><p class="hint">请联系管理员检查分享设置。</p></article>{{end}}</section><footer>更新时间：{{stamp .GeneratedAt}}<br>状态表示资源采样结果；采样失败或数据过期不等同于服务器或代理服务离线。</footer></main></body></html>`))
 
 func fmtPercent(v float64) string { return fmt.Sprintf("%.1f%%", v) }
 func fmtRate(v float64) string {
@@ -418,6 +433,24 @@ func (s *Server) sharedSeries(w http.ResponseWriter, r *http.Request, c monitorS
 	}
 	if _, e = manager.Record(c.Servers[index].ID); e != nil {
 		problem(w, 404, "服务器已移除")
+		return
+	}
+	if r.URL.Query().Get("metric") == "tcp" {
+		s.probeMu.Lock()
+		history, err := s.readProbes(c.Servers[index].ID)
+		s.probeMu.Unlock()
+		if err != nil {
+			problem(w, 503, "历史记录暂不可用")
+			return
+		}
+		points := []netprobe.Result{}
+		cutoff := s.now().Add(-time.Duration(hours) * time.Hour).Unix()
+		for _, p := range history.Points {
+			if p.Time >= cutoff {
+				points = append(points, p)
+			}
+		}
+		respond(w, 200, map[string]any{"label": c.Servers[index].Label, "method": "tcp", "source": "agent", "points": points, "generatedAt": s.now().Unix()})
 		return
 	}
 	state, e := s.history.Read(c.Servers[index].ID, s.now())

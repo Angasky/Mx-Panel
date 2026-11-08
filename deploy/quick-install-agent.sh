@@ -3,7 +3,7 @@ set -euo pipefail
 [[ $EUID == 0 ]] || { echo '请使用 root 执行'; exit 1; }
 [[ -f /etc/mxioc-agent.json && ! -L /etc/mxioc-agent.json ]] || { echo '请先将面板生成的配置保存为 /etc/mxioc-agent.json（权限 0600）'; exit 1; }
 for dependency in curl tar sha256sum systemctl; do command -v "$dependency" >/dev/null || { echo "缺少 $dependency"; exit 1; }; done
-version=${MX_PANEL_VERSION:-v0.1.12}
+version=${MX_PANEL_VERSION:-v0.1.13}
 [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { echo '版本号无效'; exit 1; }
 case "$(uname -m)" in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; *) echo '仅支持 Linux amd64 / arm64'; exit 1;; esac
 [[ $(uname -s) == Linux ]] || { echo '仅支持 Linux'; exit 1; }

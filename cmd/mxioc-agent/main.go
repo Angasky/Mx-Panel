@@ -24,11 +24,13 @@ import (
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/agentcontrol"
+	"github.com/Angasky/dingzhi-ban/internal/netprobe"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"golang.org/x/net/websocket"
 )
 
 type configuration struct {
+	Probes      []netprobe.Target              `json:"probes,omitempty"`
 	Targets     map[string]agentcontrol.Target `json:"targets,omitempty"`
 	StateDir    string                         `json:"stateDir,omitempty"`
 	URL         string                         `json:"url"`
@@ -93,6 +95,9 @@ func run(path string, local, check bool) error {
 	if c.StateDir == "" {
 		c.StateDir = "/var/lib/mxioc-agent"
 	}
+	if err := netprobe.Validate(c.Probes); err != nil {
+		return err
+	}
 	controller := &agentcontrol.Controller{Targets: c.Targets, StateDir: c.StateDir}
 	if err := controller.Check(); err != nil {
 		return err
@@ -143,13 +148,19 @@ func run(path string, local, check bool) error {
 	}()
 	nextWS := time.Time{}
 	var previous *agentcontrol.Result
+	var probes []netprobe.Result
+	lastProbe := time.Time{}
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
 		sample, e := remote.CollectAgentSample(ctx)
 		if e == nil {
-			payload := agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities(), Result: previous}
+			if time.Since(lastProbe) >= 30*time.Second {
+				probes = netprobe.Measure(ctx, c.Probes)
+				lastProbe = time.Now()
+			}
+			payload := agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities(), Result: previous, Probes: probes}
 			var response agentcontrol.Ack
 			sent := false
 			if c.Mode != "http" && (ws != nil || time.Now().After(nextWS)) {
@@ -283,7 +294,7 @@ func servePull(ctx context.Context, c configuration, local bool) error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities()})
+		json.NewEncoder(w).Encode(agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities(), Probes: netprobe.Measure(r.Context(), c.Probes)})
 	})
 	server := &http.Server{Addr: c.Listen, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	done := make(chan struct{})
