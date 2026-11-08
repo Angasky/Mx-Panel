@@ -11,7 +11,8 @@
 | 节点按协议分类 | 新增协议筛选按钮及数量，与文本搜索叠加，全选仅作用于当前可见节点 |
 | sing-box 客户端导出 | 新增 mixed 本地代理与手动节点选择配置，复用经过验证的转换器；不转换 Mihomo 规则/策略组/链路；不兼容节点明确跳过 |
 | Surge | 新增独立 .conf 导出：兼容 SS、Trojan TCP/TLS、HTTP、SOCKS5、Snell v1–v5；手动选择组，不转换原分流规则/链路；未完成 Surge 实机连接验收 |
-| Loon / Quantumult X / Stash / Surfboard / Egern | 尚未增加独立适配器，不能把通用链接当完整支持 |
+| Loon | 新增独立 .conf 导出：基础 SS、Trojan、VMess、VLESS、HTTP/HTTPS、Hysteria2，以及基础 WebSocket；不转换原分流/链路；未完成 Loon 实机验收 |
+| Quantumult X / Stash / Surfboard / Egern | 尚未增加独立适配器，不能把通用链接当完整支持 |
 | 管理员/普通用户和权限隔离 | 已实现单管理员 + 多普通用户；按订阅授权、禁用、密码重置、删除及会话撤销；普通用户只有订阅门户读权限 |
 | Agent WebSocket / HTTP / Pull | 待实现；当前使用 SSH 与面板接口管理，不能等同 Agent |
 | 30 天历史流量、24 小时探针历史 | 新增按服务器启用的后台 SSH 采样：24 小时 CPU/内存/网速曲线、30 个 UTC 自然日的网卡流量观测；缺口不补算，不等同完整订阅计费或公网探针 |

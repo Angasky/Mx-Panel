@@ -18,6 +18,7 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"loon", "Loon 客户端配置", "手动选择兼容节点；不包含原 Mihomo 分流、DNS、策略组及主备链路。", false, false},
 	{"surge", "Surge 客户端配置", "手动选择节点；仅导出兼容协议，不包含原 Mihomo 策略组、规则或主备关系。", true, false},
 	{"sing-box", "sing-box 完整客户端配置", "本地 mixed 端口 2080，手动选择节点；不包含 Mihomo 策略组、规则及远端主备关系。", false, true},
 	{"v2rayn-ha", "电脑 v2rayN · Xray 主备配置", "每个主备组一份完整 JSON，固定优先顺序。", false, false},
@@ -102,6 +103,9 @@ func usageLabel(info Record) string {
 }
 
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "loon" {
+		return convertLoon(source)
+	}
 	if format == "surge" {
 		return convertSurge(source)
 	}
