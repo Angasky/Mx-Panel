@@ -18,22 +18,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Angasky/dingzhi-ban/internal/agentcontrol"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"golang.org/x/net/websocket"
 )
 
 type agentRegistration struct {
-	Mode    string `json:"mode,omitempty"`
-	URL     string `json:"url,omitempty"`
-	Secret  string `json:"secret,omitempty"`
-	Enabled bool   `json:"enabled"`
-	Digest  string `json:"digest"`
+	Revision string `json:"revision,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Secret   string `json:"secret,omitempty"`
+	Enabled  bool   `json:"enabled"`
+	Digest   string `json:"digest"`
 }
 type agentObservation struct {
-	View   remote.Record
-	At     time.Time
-	Digest string
-	Mode   string
+	Capabilities []string
+	View         remote.Record
+	At           time.Time
+	Digest       string
+	Mode         string
 }
 
 func (s *Server) readAgents() (map[string]agentRegistration, error) {
@@ -139,7 +142,8 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 		}
 		token = base64.RawURLEncoding.EncodeToString(b)
 		sum := sha256.Sum256([]byte(token))
-		entry := agentRegistration{Enabled: true, Digest: hex.EncodeToString(sum[:]), Mode: input.Mode}
+		record, _ := m.Record(id)
+		entry := agentRegistration{Enabled: true, Digest: hex.EncodeToString(sum[:]), Mode: input.Mode, Revision: agentServerRevision(record)}
 		if input.Mode == "pull" {
 			entry.URL = input.URL
 			entry.Secret, e = m.SealUser(remote.Record{"token": token})
@@ -159,6 +163,7 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		delete(s.agentViews, id)
+		os.Remove(s.taskPath(id))
 	}
 	observation := s.agentViews[id]
 	result := map[string]any{"configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
@@ -205,6 +210,13 @@ func (s *Server) acceptAgent(ctx context.Context, id, digest, raw, mode string) 
 	if e != nil {
 		return e
 	}
+	record, e := m.Record(id)
+	if e != nil {
+		return e
+	}
+	if entries[id].Revision != "" && entries[id].Revision != agentServerRevision(record) {
+		return errors.New("服务器连接信息已变化，请重新生成 Agent 配置")
+	}
 	view, e := m.AgentMetrics(ctx, id, digest, raw)
 	if e != nil {
 		return e
@@ -241,10 +253,8 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 			problem(w, 429, "Agent 请求过多")
 			return true
 		}
-		var input struct {
-			Sample string `json:"sample"`
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, 600<<10)
+		var input agentcontrol.Report
+		r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&input) != nil || decoder.Decode(new(any)) != io.EOF || len(input.Sample) > 512<<10 {
@@ -255,7 +265,7 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 			problem(w, 400, "采样被拒绝")
 			return true
 		}
-		respond(w, 200, map[string]bool{"ok": true})
+		respond(w, 200, s.agentAcknowledgement(id, digest, input))
 		return true
 	}
 	if r.Method == "GET" && strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
@@ -268,19 +278,17 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 		}
 		websocket.Server{Handshake: func(*websocket.Config, *http.Request) error { return nil }, Handler: func(ws *websocket.Conn) {
 			defer ws.Close()
-			ws.MaxPayloadBytes = 600 << 10
+			ws.MaxPayloadBytes = 2 << 20
 			for {
-				ws.SetDeadline(time.Now().Add(45 * time.Second))
-				var input struct {
-					Sample string `json:"sample"`
-				}
+				ws.SetDeadline(time.Now().Add(120 * time.Second))
+				var input agentcontrol.Report
 				if websocket.JSON.Receive(ws, &input) != nil {
 					return
 				}
 				if len(input.Sample) > 512<<10 || s.acceptAgent(r.Context(), id, digest, input.Sample, "websocket") != nil {
 					return
 				}
-				if websocket.JSON.Send(ws, map[string]bool{"ok": true}) != nil {
+				if websocket.JSON.Send(ws, s.agentAcknowledgement(id, digest, input)) != nil {
 					return
 				}
 			}
@@ -317,25 +325,8 @@ func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, e
 			if e != nil {
 				return nil, errors.New("Pull 凭据无法解密")
 			}
-			transport := &http.Transport{DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-				host, port, e := net.SplitHostPort(address)
-				if e != nil {
-					return nil, e
-				}
-				ips, e := net.DefaultResolver.LookupIPAddr(ctx, host)
-				if e != nil {
-					return nil, e
-				}
-				for _, ip := range ips {
-					if ip.IP.IsUnspecified() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsMulticast() {
-						continue
-					}
-					return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ip.IP.String(), port))
-				}
-				return nil, errors.New("Pull 地址不可用")
-			}, TLSHandshakeTimeout: 10 * time.Second}
+			client, transport := agentPullClient()
 			defer transport.CloseIdleConnections()
-			client := &http.Client{Transport: transport, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("Pull 不允许重定向") }}
 			req, e := http.NewRequestWithContext(ctx, "GET", entry.URL, nil)
 			if e != nil {
 				return nil, e
@@ -349,15 +340,14 @@ func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, e
 			if res.StatusCode != 200 {
 				return nil, errors.New("Pull 采样失败")
 			}
-			var payload struct {
-				Sample string `json:"sample"`
-			}
+			var payload agentcontrol.Report
 			if json.NewDecoder(io.LimitReader(res.Body, 600<<10)).Decode(&payload) != nil {
 				return nil, errors.New("Pull 数据无效")
 			}
 			if e = s.acceptAgent(ctx, id, entry.Digest, payload.Sample, "pull"); e != nil {
 				return nil, e
 			}
+			s.agentAcknowledgement(id, entry.Digest, payload)
 			s.agentMu.Lock()
 			v = s.agentViews[id]
 			s.agentMu.Unlock()
@@ -372,4 +362,32 @@ func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, e
 		return nil, e
 	}
 	return m.Metrics(ctx, id)
+}
+
+func agentPullClient() (*http.Client, *http.Transport) {
+	transport := &http.Transport{DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, e := net.SplitHostPort(address)
+		if e != nil {
+			return nil, e
+		}
+		ips, e := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if e != nil {
+			return nil, e
+		}
+		for _, ip := range ips {
+			if ip.IP.IsUnspecified() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsMulticast() {
+				continue
+			}
+			return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ip.IP.String(), port))
+		}
+		return nil, errors.New("Pull 地址不可用")
+	}, TLSHandshakeTimeout: 10 * time.Second}
+	client := &http.Client{Transport: transport, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("Pull 不允许重定向") }}
+	return client, transport
+}
+
+func agentServerRevision(record remote.Record) string {
+	raw, _ := json.Marshal([]any{record["host"], record["sshPort"], record["sshUser"], record["fingerprint"], record["installType"]})
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }

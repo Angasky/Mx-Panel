@@ -255,6 +255,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "请重新登录")
 		return
 	}
+	if s.agentControlAdmin(w, r) {
+		return
+	}
 	if s.agentAdmin(w, r) {
 		return
 	}

@@ -8,6 +8,8 @@ sha256sum --check --ignore-missing SHA256SUMS
 [[ -f /etc/mxioc-agent.json && ! -L /etc/mxioc-agent.json ]] || { echo '请先将面板下载的 Agent 配置保存到 /etc/mxioc-agent.json'; exit 1; }
 chmod 600 /etc/mxioc-agent.json
 ./mxioc-agent --config /etc/mxioc-agent.json --check
+mapfile -t writable_dirs < <(./mxioc-agent --config /etc/mxioc-agent.json --systemd-paths)
+[[ ${#writable_dirs[@]} -gt 0 ]] || { echo "无法读取 Agent 管理目录"; exit 1; }
 backup=$(mktemp -d)
 trap 'rm -rf -- "$backup"' EXIT
 was_active=false
@@ -45,6 +47,12 @@ ReadWritePaths=/run
 [Install]
 WantedBy=multi-user.target
 UNIT
+# Directories originate only from the root-owned local configuration, validated by the Agent.
+{
+ printf '\n[Service]\nReadWritePaths='
+ printf '%s ' "${writable_dirs[@]}"
+ printf '\n'
+} >> /etc/systemd/system/mxioc-agent.service
 systemctl daemon-reload
 systemctl restart mxioc-agent.service
 sleep 2
