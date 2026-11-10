@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.15` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.16` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.15-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.16-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -213,3 +213,5 @@ bash install.sh local-build
 依据 [Loon 官方节点文档](https://github.com/Loon0x00/LoonManual/blob/master/docs/cn/node.md)实现。已验证协议映射、配置注入防护、下载权限与浏览器入口；当前 Linux 环境没有 Loon iOS 客户端，尚未完成实机导入与连接验收。
 
 Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南](docs/go/AGENT-AND-PROBE.md)。
+
+服务器位置地球：在“地域与续费”填写经纬度后，从“服务器监控 → 3D 地球”查看。默认私密，公开规则与数据来源见 [地球视图说明](docs/go/GLOBE.md)。

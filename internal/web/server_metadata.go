@@ -17,6 +17,8 @@ import (
 )
 
 type serverMetadata struct {
+	Latitude    *float64 `json:"latitude,omitempty"`
+	Longitude   *float64 `json:"longitude,omitempty"`
 	Region      string   `json:"region"`
 	Provider    string   `json:"provider"`
 	ProviderURL string   `json:"providerURL"`
@@ -28,6 +30,13 @@ type serverMetadata struct {
 }
 
 func validateMetadata(m serverMetadata) error {
+	if (m.Latitude == nil) != (m.Longitude == nil) {
+		return errors.New("经纬度需要同时填写或同时留空")
+	}
+	if m.Latitude != nil && (math.IsNaN(*m.Latitude) || math.IsInf(*m.Latitude, 0) || math.Abs(*m.Latitude) > 90 || math.IsNaN(*m.Longitude) || math.IsInf(*m.Longitude, 0) || math.Abs(*m.Longitude) > 180) {
+		return errors.New("纬度范围为 -90 到 90，经度范围为 -180 到 180")
+	}
+
 	for _, s := range []string{m.Region, m.Provider} {
 		if !utf8.ValidString(s) || len([]rune(s)) > 80 || strings.TrimSpace(s) != s || strings.ContainsFunc(s, unicode.IsControl) {
 			return errors.New("地域和服务商最多 80 个字符，不能含控制字符或首尾空格")

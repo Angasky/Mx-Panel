@@ -140,3 +140,7 @@ ICMP 不使用端口。每轮向解析得到的第一个公网地址发送一个
 状态 API 新增 `icmpProbes`；原 `tcpProbes` 仅含 TCP。历史使用 `metric=icmp`，原 `metric=tcp` 保持仅返回 TCP。每个结果包括 method、sent、error、ok、milliseconds；没有成功回包时 milliseconds 为 null。目标地址仍不公开。
 
 v0.1.15 的自动部署已固定为新 Agent v0.1.15 及对应 SHA256。所有归档规范化时间和所有者，使同一源码重建的 Agent 包保持稳定校验值。
+
+### 发布构建元数据（v0.1.16）
+
+发布构建禁用 Go 自动嵌入的工作区 VCS 信息，避免与 Agent 无关的主控提交或工作区脏状态改变 Agent 二进制及包校验值。归档已规范化时间、顺序及 UID/GID。同源码、工具链和构建参数下可重建；不承诺跨 Go 版本得到相同哈希。v0.1.16 面板自动部署仍固定使用 v0.1.15 Agent；新包的 Agent 功能保持不变，已有 Agent 无需升级。

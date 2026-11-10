@@ -1729,6 +1729,7 @@ SOFTWARE.
 <!-- TOAST ALERT -->
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
+<script src="/sub/status-globe.js" defer></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1759,6 +1760,8 @@ function notice(text) {
 }
 
 function showLogin() {
+  S.modalEpoch=(S.modalEpoch||0)+1;
+  if(S.globeCleanup){S.globeCleanup();S.globeCleanup=null}
   window.cancelNodeDrag?.();
   stopMonitoring();
   S.monitorHistory = new Map(); S.monitorData = null; S.monitorId = '';
@@ -2994,11 +2997,19 @@ function serverMetadataBadge(meta){
  if(meta.expires){const today=new Date().toISOString().slice(0,10),days=Math.round((Date.parse(meta.expires+'T00:00:00Z')-Date.parse(today+'T00:00:00Z'))/86400000);urgent=days<=30;parts.push(days<0?'已到期 '+Math.abs(days)+' 天':days===0?'今日到期（UTC）':days+' 天后到期')}
  return parts.length?`<span class="pill" style="${urgent?'color:var(--danger);font-weight:700':''}">${esc(parts.join(' · '))}</span>`:'';
 }
+async function serverGlobe(){
+ const epoch=S.modalEpoch||0,data=await api('/servers');
+ if(S.role!=='admin'||epoch!==(S.modalEpoch||0))return;
+ const servers=data.servers||[];
+ openModal('服务器位置 · 3D 地球','<p class="note">使用手动填写的经纬度，不会自动定位 IP。到服务器详情的“地域与续费”中填写坐标；未填写的服务器不会显示。点选位置可定位，支持拖动和方向键旋转。</p><div id="serverGlobe"></div>');
+ if(!window.MxGlobe){$('serverGlobe').textContent='地球组件加载失败，请刷新页面重试。';return}
+ S.globeCleanup=MxGlobe.mount($('serverGlobe'),servers.filter(s=>s.metadata?.latitude!=null&&s.metadata?.longitude!=null).map(s=>({label:s.name,latitude:s.metadata.latitude,longitude:s.metadata.longitude})));
+}
 async function serverMetadataManager(id){
  const path='/servers/metadata?id='+encodeURIComponent(id),data=await api(path);
- openModal('服务器地域与续费',`<p class="note">手动记录服务器的地域、服务商、到期日和续费价格。不会自动扣费或续费；不同币种不自动换算。</p><form id="serverMetadataForm"><div class="grid"><div><label for="smRegion">地域</label><input id="smRegion" maxlength="80" value="${esc(data.region||'')}" placeholder="香港 / 日本东京"></div><div><label for="smProvider">服务商</label><input id="smProvider" maxlength="80" value="${esc(data.provider||'')}"></div></div><label for="smURL">服务商网站（可选 HTTPS）</label><input id="smURL" type="url" value="${esc(data.providerURL||'')}"><div class="grid"><div><label for="smExpires">到期日期（UTC）</label><input id="smExpires" type="date" value="${esc(data.expires||'')}"></div><div><label for="smPrice">续费价格（可留空）</label><input id="smPrice" type="number" min="0" max="100000000" step="0.01" value="${data.price==null?'':esc(data.price)}"></div><div><label for="smCurrency">币种</label><select id="smCurrency">${['','CNY','USD','EUR','GBP','JPY','HKD','TWD','SGD','CAD','AUD'].map(v=>`<option value="${v}">${v||'未选择'}</option>`).join('')}</select></div><div><label for="smCycle">计费周期</label><select id="smCycle"><option value="">未选择</option><option value="month">每月</option><option value="quarter">每季度</option><option value="half-year">每半年</option><option value="year">每年</option><option value="one-time">一次性</option></select></div></div><label><input id="smPublic" type="checkbox" ${data.public?'checked':''}>在已启用的监控分享页/API 中公开这些信息</label><p class="hint">默认仅管理员可见；此开关不自动启用监控分享。</p><p id="smError" class="error"></p><div class="toolbar"><button class="btn primary" type="submit">保存</button><button class="btn danger" type="button" id="smClear">清空</button></div></form>`);
+ openModal('服务器地域与续费',`<p class="note">手动记录服务器的地域、服务商、到期日和续费价格。不会自动扣费或续费；不同币种不自动换算。</p><form id="serverMetadataForm"><div class="grid"><div><label for="smRegion">地域</label><input id="smRegion" maxlength="80" value="${esc(data.region||'')}" placeholder="香港 / 日本东京"></div><div><label for="smProvider">服务商</label><input id="smProvider" maxlength="80" value="${esc(data.provider||'')}"></div></div><div class="grid"><div><label for="smLatitude">纬度（可选 -90～90）</label><input id="smLatitude" type="number" min="-90" max="90" step="any" value="${data.latitude==null?'':esc(data.latitude)}"></div><div><label for="smLongitude">经度（可选 -180～180）</label><input id="smLongitude" type="number" min="-180" max="180" step="any" value="${data.longitude==null?'':esc(data.longitude)}"></div></div><p class="hint">用于地球视图；两项同时填写或同时留空，不会自动查询 IP 位置。</p><label for="smURL">服务商网站（可选 HTTPS）</label><input id="smURL" type="url" value="${esc(data.providerURL||'')}"><div class="grid"><div><label for="smExpires">到期日期（UTC）</label><input id="smExpires" type="date" value="${esc(data.expires||'')}"></div><div><label for="smPrice">续费价格（可留空）</label><input id="smPrice" type="number" min="0" max="100000000" step="0.01" value="${data.price==null?'':esc(data.price)}"></div><div><label for="smCurrency">币种</label><select id="smCurrency">${['','CNY','USD','EUR','GBP','JPY','HKD','TWD','SGD','CAD','AUD'].map(v=>`<option value="${v}">${v||'未选择'}</option>`).join('')}</select></div><div><label for="smCycle">计费周期</label><select id="smCycle"><option value="">未选择</option><option value="month">每月</option><option value="quarter">每季度</option><option value="half-year">每半年</option><option value="year">每年</option><option value="one-time">一次性</option></select></div></div><label><input id="smPublic" type="checkbox" ${data.public?'checked':''}>在已启用的监控分享页/API 中公开这些信息</label><p class="hint">默认仅管理员可见；开启后经纬度也会公开。此开关不自动启用监控分享。</p><p id="smError" class="error"></p><div class="toolbar"><button class="btn primary" type="submit">保存</button><button class="btn danger" type="button" id="smClear">清空</button></div></form>`);
  $('smCurrency').value=data.currency||'';$('smCycle').value=data.cycle||'';
- $('serverMetadataForm').onsubmit=async event=>{event.preventDefault();const payload={region:$('smRegion').value.trim(),provider:$('smProvider').value.trim(),providerURL:$('smURL').value.trim(),expires:$('smExpires').value,price:$('smPrice').value===''?null:Number($('smPrice').value),currency:$('smCurrency').value,cycle:$('smCycle').value,public:$('smPublic').checked};if(payload.public&&!data.public&&!confirm('确认在监控分享中公开地域、服务商、到期日期及价格？'))return;try{await api(path,jsonOpt('PUT',payload));if(S.servers){const server=S.servers.find(s=>s.id===id);if(server)server.metadata=payload}closeModal();notice('地域与续费信息已保存')}catch(e){$('smError').textContent=e.message}};
+ $('serverMetadataForm').onsubmit=async event=>{event.preventDefault();const payload={latitude:$('smLatitude').value===''?null:Number($('smLatitude').value),longitude:$('smLongitude').value===''?null:Number($('smLongitude').value),region:$('smRegion').value.trim(),provider:$('smProvider').value.trim(),providerURL:$('smURL').value.trim(),expires:$('smExpires').value,price:$('smPrice').value===''?null:Number($('smPrice').value),currency:$('smCurrency').value,cycle:$('smCycle').value,public:$('smPublic').checked};if(payload.public&&(!data.public||payload.latitude!==(data.latitude??null)||payload.longitude!==(data.longitude??null))&&!confirm('确认在监控分享中公开地域、经纬度、服务商、到期日期及价格？'))return;try{await api(path,jsonOpt('PUT',payload));if(S.servers){const server=S.servers.find(s=>s.id===id);if(server)server.metadata=payload}closeModal();notice('地域与续费信息已保存')}catch(e){$('smError').textContent=e.message}};
  $('smClear').onclick=async()=>{if(!confirm('清空这台服务器的地域与续费信息？'))return;try{await api(path,jsonOpt('DELETE',{}));await serverMetadataManager(id)}catch(e){$('smError').textContent=e.message}};
 }
 
@@ -3035,8 +3046,11 @@ async function agentControlManager(id){
 }
 
 async function monitorShareManager() {
+  const epoch=S.modalEpoch||0;
   const [cfg,data]=await Promise.all([api('/servers/sharing'),api('/servers')]);
+  if(epoch!==(S.modalEpoch||0)||S.role!=='admin')return;
   openModal('监控分享与只读 API', `<p class="note">持有分享链接或 API 令牌的人，无需登录即可查看选定服务器的公开名称、CPU、内存、收发速率和采样时间。不会公开 IP、SSH 信息或订阅；会展示选中服务器的 24 小时资源历史及已配置的 TCP / ICMP 探测名称与延迟。请为服务器填写适合对外展示的名称。</p><p class="muted">指标来自已启用的历史监控，分享请求不会触发 SSH 连接。请先在服务器“历史记录”中启用后台采样；采样失败不等同于服务器离线。</p><form id="monitorShareForm"><label style="display:flex;align-items:center;gap:8px"><input id="sharePublic" type="checkbox" ${cfg.public?'checked':''}>允许无凭据公开访问</label><p class="hint">开启并保存后，任何人都可以访问 /sub/status-public、状态 API、/sub/status-ws 实时推送和 /sub/status-series 历史 API；仅展示选中服务器的允许字段。</p><label style="display:flex;align-items:center;gap:8px"><input id="shareEnabled" type="checkbox" ${cfg.enabled?'checked':''} ${cfg.hasLink||cfg.public?'':'disabled'}>启用分享页面 / API</label><p class="hint">${cfg.hasLink?'暂停后可重新启用原链接；如需永久作废，请撤销或生成新链接。':'尚未生成访问凭据，请选择服务器后点击“生成并启用”。'}</p><div style="display:grid;gap:12px;max-height:300px;overflow:auto">${data.servers.map((server,i)=>{const selected=(cfg.servers||[]).find(v=>v.id===server.id);return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-share-server="${i}" ${selected?'checked':''}>${esc(server.name)}</label><label for="shareLabel${i}">公开名称</label><input id="shareLabel${i}" maxlength="60" value="${esc(selected?.label||'') }" placeholder="例如：香港节点 A（不自动使用内部名称）"></div>`}).join('')||'<p class="empty">请先添加服务器。</p>'}</div><p id="shareError" class="error" role="alert"></p><div class="toolbar"><button class="btn" type="submit">保存设置</button><button class="btn primary" type="button" id="shareGenerate">${cfg.hasLink?'更换链接与令牌':'生成并启用'}</button><button class="btn danger" type="button" id="shareRevoke" ${cfg.hasLink||cfg.public?'':'disabled'}>关闭并撤销分享</button></div></form>`);
+  const shareForm=$('monitorShareForm'),active=()=>shareForm.isConnected&&!$('modal').classList.contains('hidden');
   $('sharePublic').onchange=()=>{ $('shareEnabled').disabled=!cfg.hasLink&&!$('sharePublic').checked; };
   const payload=()=>({public:$('sharePublic').checked,enabled:$('shareEnabled').checked,servers:[...document.querySelectorAll('[data-share-server]:checked')].map(el=>{const i=Number(el.dataset.shareServer);return {id:data.servers[i].id,label:$('shareLabel'+i).value.trim()};})});
   const save=async(method)=>{
@@ -3044,8 +3058,8 @@ async function monitorShareManager() {
     if(method!=='DELETE'&&body.public&&!cfg.public&&!confirm('确认公开这些服务器的名称、资源指标、TCP / ICMP 探测名称与延迟以及 24 小时历史？无需访问凭据即可读取。'))return;
     if(method!=='DELETE'&&body.servers.some(s=>!s.label)){$('shareError').textContent='请为每台选中的服务器填写公开名称';return;}
     document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=true);
-    try{const result=await api('/servers/sharing',jsonOpt(method,body));if(result.token)showMonitorShareSecret(result);else{await monitorShareManager();notice(method==='DELETE'?'原链接与令牌已撤销':'监控分享设置已保存');}}
-    catch(e){if($('shareError')){$('shareError').textContent=e.message;document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=false);}}
+    try{const result=await api('/servers/sharing',jsonOpt(method,body));if(!active())return;if(result.token)showMonitorShareSecret(result);else{await monitorShareManager();notice(method==='DELETE'?'原链接与令牌已撤销':'监控分享设置已保存');}}
+    catch(e){if(active()){$('shareError').textContent=e.message;document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=false);}}
   };
   $('monitorShareForm').onsubmit=e=>{e.preventDefault();void save('PUT');};
   $('shareGenerate').onclick=()=>{if(!cfg.hasLink||confirm('生成新链接和 API 令牌后，旧凭据立即失效。继续？'))void save('POST');};
@@ -3103,7 +3117,7 @@ function renderMonitorOverview() {
   S.monitorCards ||= new Map();
   const query = (S.filters.monitoring || '').toLowerCase();
   const page = tableSlice(S.servers.filter(s => `${s.name} ${s.host} ${s.installType || ''}`.toLowerCase().includes(query)), 'monitoring');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>服务器资源概览</h3><p class="muted">${S.servers.length} 台服务器 · 点击卡片查看详情 · 仅采集当前页，最多 3 个并发</p></div><button class="btn primary" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn" id="monitorOverviewRefresh">${uiIcon('refresh-cw')}刷新当前页</button></div><input id="search" type="search" aria-label="搜索监控服务器" placeholder="搜索名称、IP 或内核…" value="${esc(S.filters.monitoring || '')}"></section><div class="host-overview-grid">${page.rows.map(s=>`<button type="button" class="host-card" data-host="${esc(s.id)}" aria-label="查看 ${esc(s.name)} 的监控详情"><span class="host-card-heading">${uiIcon('server')}<strong>${esc(s.name)}</strong>${uiIcon('chevron-right')}</span><span class="host-address">${esc(s.host)} · ${esc(s.installType || '3x-ui')}</span>${serverMetadataBadge(s.metadata)}<span class="host-summary" data-summary>等待采样</span></button>`).join('') || '<p class="empty">没有匹配的服务器</p>'}</div>${pagination(page)}`;
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>服务器资源概览</h3><p class="muted">${S.servers.length} 台服务器 · 点击卡片查看详情 · 仅采集当前页，最多 3 个并发</p></div><button class="btn" onclick="serverGlobe().catch(e=>notice(e.message))">3D 地球</button><button class="btn primary" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn" id="monitorOverviewRefresh">${uiIcon('refresh-cw')}刷新当前页</button></div><input id="search" type="search" aria-label="搜索监控服务器" placeholder="搜索名称、IP 或内核…" value="${esc(S.filters.monitoring || '')}"></section><div class="host-overview-grid">${page.rows.map(s=>`<button type="button" class="host-card" data-host="${esc(s.id)}" aria-label="查看 ${esc(s.name)} 的监控详情"><span class="host-card-heading">${uiIcon('server')}<strong>${esc(s.name)}</strong>${uiIcon('chevron-right')}</span><span class="host-address">${esc(s.host)} · ${esc(s.installType || '3x-ui')}</span>${serverMetadataBadge(s.metadata)}<span class="host-summary" data-summary>等待采样</span></button>`).join('') || '<p class="empty">没有匹配的服务器</p>'}</div>${pagination(page)}`;
   const cards = new Map([...document.querySelectorAll('[data-host]')].map(el=>[el.dataset.host, el]));
   cards.forEach((el,id)=>{ el.onclick=()=>openHostMonitor(encodeURIComponent(id)); renderMonitorCard(el,S.monitorCards.get(id)); });
   bindSearch('monitoring', renderMonitorOverview);
@@ -4855,6 +4869,8 @@ async function uninstallManager(e) {
 }
 
 function openModal(title, html) {
+  S.modalEpoch=(S.modalEpoch||0)+1;
+  if(S.globeCleanup){S.globeCleanup();S.globeCleanup=null}
   closeSniScanner();
   if ($('modal').classList.contains('hidden')) S.modalFocus = document.activeElement;
   $('modalTitle').textContent = title.replace(/^[A-Z_0-9 ]+\s*\/\/\s*/, '');
@@ -4865,6 +4881,8 @@ function openModal(title, html) {
 }
 
 function closeModal() {
+  S.modalEpoch=(S.modalEpoch||0)+1;
+  if(S.globeCleanup){S.globeCleanup();S.globeCleanup=null}
   closeSniScanner();
   if ($('modal').classList.contains('hidden')) return;
   $('modal').querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });

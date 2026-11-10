@@ -224,6 +224,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, path)
 		return
 	}
+	if globeAsset(w, r) {
+		return
+	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
 		if s.agentPublic(w, r) {
 			return
