@@ -47,6 +47,7 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	metadataMu        sync.Mutex
 	probeMu           sync.Mutex
 	agentMu           sync.Mutex
 	agentViews        map[string]agentObservation
@@ -257,6 +258,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.probeHistoryAdmin(w, r) {
+		return
+	}
+	if s.metadataRoute(w, r) {
+		return
+	}
+	if s.agentDeploy(w, r) {
 		return
 	}
 	if s.agentControlAdmin(w, r) {

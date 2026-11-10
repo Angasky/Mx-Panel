@@ -128,6 +128,13 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if err != nil {
 			problem(w, 400, err.Error())
 		} else {
+			s.metadataMu.Lock()
+			for _, server := range servers {
+				if meta, e := s.readMetadata(stringField(server, "id")); e == nil {
+					server["metadata"] = meta
+				}
+			}
+			s.metadataMu.Unlock()
 			respond(w, 200, map[string]any{"servers": servers})
 		}
 		return true

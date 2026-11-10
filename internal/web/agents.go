@@ -25,12 +25,14 @@ import (
 )
 
 type agentRegistration struct {
-	Revision string `json:"revision,omitempty"`
-	Mode     string `json:"mode,omitempty"`
-	URL      string `json:"url,omitempty"`
-	Secret   string `json:"secret,omitempty"`
-	Enabled  bool   `json:"enabled"`
-	Digest   string `json:"digest"`
+	DeployHash string `json:"deployHash,omitempty"`
+	DeployJob  string `json:"deployJob,omitempty"`
+	Revision   string `json:"revision,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	URL        string `json:"url,omitempty"`
+	Secret     string `json:"secret,omitempty"`
+	Enabled    bool   `json:"enabled"`
+	Digest     string `json:"digest"`
 }
 type agentObservation struct {
 	Probes       []netprobe.Result
@@ -106,6 +108,12 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 500, "Agent 配置读取失败")
 		return true
 	}
+	if r.Method != "GET" && entries[id].DeployJob != "" {
+		if job, e := m.InstallJob(entries[id].DeployJob); e == nil && (job["status"] == "running" || job["status"] == "queued") {
+			problem(w, 409, "Agent 正在部署，请等待任务结束再轮换或撤销")
+			return true
+		}
+	}
 	token := ""
 	if r.Method == "POST" {
 		var input struct {
@@ -168,7 +176,7 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 		os.Remove(s.taskPath(id))
 	}
 	observation := s.agentViews[id]
-	result := map[string]any{"configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
+	result := map[string]any{"deployJob": entries[id].DeployJob, "configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
 	if !observation.At.IsZero() {
 		result["lastSeen"] = observation.At.Unix()
 	}
