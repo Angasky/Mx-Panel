@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/agentcontrol"
+	"github.com/Angasky/dingzhi-ban/internal/hostsample"
 	"github.com/Angasky/dingzhi-ban/internal/netprobe"
-	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"golang.org/x/net/websocket"
 )
 
@@ -154,7 +154,7 @@ func run(path string, local, check bool) error {
 		if ctx.Err() != nil {
 			return nil
 		}
-		sample, e := remote.CollectAgentSample(ctx)
+		sample, e := hostsample.Collect(ctx)
 		if e == nil {
 			if time.Since(lastProbe) >= 30*time.Second {
 				probes = netprobe.Measure(ctx, c.Probes)
@@ -288,7 +288,7 @@ func servePull(ctx context.Context, c configuration, local bool) error {
 			json.NewEncoder(w).Encode(result)
 			return
 		}
-		sample, e := remote.CollectAgentSample(r.Context())
+		sample, e := hostsample.Collect(r.Context())
 		if e != nil {
 			http.Error(w, "unavailable", 503)
 			return

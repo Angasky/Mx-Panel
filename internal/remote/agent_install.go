@@ -87,7 +87,7 @@ func (m *Manager) StartAgentInstall(id string, config []byte, revision string) (
 		return nil, e
 	}
 	jobID := hex.EncodeToString(raw)
-	job := Record{"id": jobID, "serverId": id, "installType": "mxioc-agent", "agentVersion": "v0.1.13", "status": "running", "startedAt": time.Now().Unix(), "log": "正在通过已核对指纹的 SSH 部署 Agent。", "error": ""}
+	job := Record{"id": jobID, "serverId": id, "installType": "mxioc-agent", "agentVersion": "v0.1.15", "status": "running", "startedAt": time.Now().Unix(), "log": "正在通过已核对指纹的 SSH 部署 Agent。", "error": ""}
 	appendInstallStage(job, "connecting")
 	if len(keep) > 47-len(active) {
 		keep = keep[len(keep)-(47-len(active)):]

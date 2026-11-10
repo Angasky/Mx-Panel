@@ -234,6 +234,26 @@ func (s *Server) agentAcknowledgement(id, digest string, report agentcontrol.Rep
 					continue
 				}
 				seen[p.Name] = true
+				if p.Method == "" {
+					p.Method = "tcp"
+				}
+				if p.Method != "tcp" && p.Method != "icmp" {
+					continue
+				}
+				switch p.Error {
+				case "", "socket-unavailable", "local-error", "send-failed", "cancelled", "timeout", "dns-failed", "blocked-address", "connect-failed":
+				default:
+					continue
+				}
+				if p.Method == "icmp" && !p.OK && p.Error != "timeout" && p.Error != "cancelled" {
+					p.Sent = false
+				}
+				if p.OK {
+					p.Error = ""
+				}
+				if p.Method == "icmp" && p.OK && !p.Sent {
+					continue
+				}
 				if p.OK && (p.Milliseconds == nil || math.IsNaN(*p.Milliseconds) || math.IsInf(*p.Milliseconds, 0) || *p.Milliseconds < 0 || *p.Milliseconds > 3000) {
 					continue
 				}

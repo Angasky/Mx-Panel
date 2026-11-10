@@ -21,10 +21,10 @@ for arch in amd64 arm64; do
         cd "$stage"
         sha256sum mxioc index.html mxioc-go-release.service VERSION ARCH > SHA256SUMS
     )
-    tar -czf "$out/$name.tar.gz" -C "$stage" mxioc index.html mxioc-go-release.service install-go.sh VERSION ARCH SHA256SUMS
+    tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -czf "$out/$name.tar.gz" -C "$stage" mxioc index.html mxioc-go-release.service install-go.sh VERSION ARCH SHA256SUMS
     cp deploy/install-agent.sh "$stage/"
     (cd "$stage" && sha256sum mxioc-agent install-agent.sh > SHA256SUMS)
-    tar -czf "$out/mxioc-agent-$version-linux-$arch.tar.gz" -C "$stage" mxioc-agent install-agent.sh SHA256SUMS
+    tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -czf "$out/mxioc-agent-$version-linux-$arch.tar.gz" -C "$stage" mxioc-agent install-agent.sh SHA256SUMS
     rm -rf -- "$stage"
     trap - EXIT
 done

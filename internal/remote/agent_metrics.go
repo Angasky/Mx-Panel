@@ -4,29 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"os/exec"
-	"strings"
+	"github.com/Angasky/dingzhi-ban/internal/hostsample"
 	"time"
 )
 
 // CollectAgentSample runs only the built-in read-only Linux resource script.
-func CollectAgentSample(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-s")
-	cmd.Stdin = strings.NewReader(hostSampleScript)
-	output := &capture{limit: 512 << 10}
-	cmd.Stdout = output
-	cmd.Stderr = output
-	if err := cmd.Run(); err != nil {
-		return "", errors.New("本机资源采样失败")
-	}
-	result, truncated := output.result()
-	if truncated {
-		return "", errors.New("采样超出大小限制")
-	}
-	return result, nil
-}
+func CollectAgentSample(ctx context.Context) (string, error) { return hostsample.Collect(ctx) }
+
 func (m *Manager) AgentMetrics(ctx context.Context, id, registration, rawText string) (Record, error) {
 	record, err := m.Record(id)
 	if err != nil {

@@ -36,6 +36,9 @@ func (s *Server) readProbes(id string) (probeHistory, error) {
 	}
 	filtered := []netprobe.Result{}
 	for _, p := range state.Points {
+		if p.Method == "" {
+			p.Method = "tcp"
+		}
 		if p.Time >= s.now().Unix()-86400 && p.Time <= s.now().Unix()+5 {
 			filtered = append(filtered, p)
 		}
@@ -56,13 +59,13 @@ func (s *Server) recordProbes(id string) {
 	}
 	latest := map[string]int64{}
 	for _, p := range state.Points {
-		if p.Time > latest[p.Name] {
-			latest[p.Name] = p.Time
+		if p.Time > latest[p.Name+"/"+p.Method] {
+			latest[p.Name+"/"+p.Method] = p.Time
 		}
 	}
 	changed := false
 	for _, p := range points {
-		if p.Time > latest[p.Name] {
+		if p.Time > latest[p.Name+"/"+p.Method] {
 			state.Points = append(state.Points, p)
 			changed = true
 		}
@@ -133,6 +136,6 @@ func (s *Server) probeHistoryAdmin(w http.ResponseWriter, r *http.Request) bool 
 	s.agentMu.Lock()
 	current := append([]netprobe.Result{}, s.agentViews[id].Probes...)
 	s.agentMu.Unlock()
-	respond(w, 200, map[string]any{"points": history.Points, "current": current, "method": "tcp", "source": "agent", "retentionHours": 24})
+	respond(w, 200, map[string]any{"points": history.Points, "current": current, "method": "mixed", "source": "agent", "retentionHours": 24})
 	return true
 }

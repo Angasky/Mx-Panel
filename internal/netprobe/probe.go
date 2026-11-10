@@ -1,4 +1,4 @@
-// Package netprobe measures TCP connection establishment, never application traffic.
+// Package netprobe measures TCP establishment and ICMP echo without application traffic.
 package netprobe
 
 import (
@@ -14,11 +14,15 @@ import (
 )
 
 type Target struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Method string `json:"method,omitempty"`
+	Name   string `json:"name"`
+	Host   string `json:"host"`
+	Port   int    `json:"port"`
 }
 type Result struct {
+	Method       string   `json:"method,omitempty"`
+	Sent         bool     `json:"sent,omitempty"`
+	Error        string   `json:"error,omitempty"`
 	Name         string   `json:"name"`
 	Time         int64    `json:"time"`
 	OK           bool     `json:"ok"`
@@ -27,7 +31,7 @@ type Result struct {
 
 func Validate(targets []Target) error {
 	if len(targets) > 6 {
-		return errors.New("最多设置 6 个 TCP 探测目标")
+		return errors.New("最多设置 6 个探测目标")
 	}
 	seen := map[string]bool{}
 	for _, t := range targets {
@@ -35,7 +39,10 @@ func Validate(targets []Target) error {
 			return errors.New("探测名称需为不重复的 1–40 个字符")
 		}
 		seen[t.Name] = true
-		if t.Port < 1 || t.Port > 65535 || len(t.Host) == 0 || len(t.Host) > 253 || strings.TrimSpace(t.Host) != t.Host || strings.ContainsAny(t.Host, "/\\@% \t\r\n") {
+		if t.Method != "" && t.Method != "tcp" && t.Method != "icmp" {
+			return errors.New("探测方式必须为 TCP 或 ICMP")
+		}
+		if (t.Method != "icmp" && (t.Port < 1 || t.Port > 65535)) || len(t.Host) == 0 || len(t.Host) > 253 || strings.TrimSpace(t.Host) != t.Host || strings.ContainsAny(t.Host, "/\\@% \t\r\n") {
 			return errors.New("探测地址或端口无效")
 		}
 		if ip := net.ParseIP(strings.Trim(t.Host, "[]")); ip != nil && !publicIP(ip) {
@@ -72,19 +79,35 @@ func Measure(parent context.Context, targets []Target) []Result {
 			defer func() { done <- i }()
 			ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 			defer cancel()
-			r := Result{Name: t.Name, Time: time.Now().Unix()}
+			method := t.Method
+			if method == "" {
+				method = "tcp"
+			}
+			r := Result{Name: t.Name, Time: time.Now().Unix(), Method: method}
 			defer func() { results[i] = r }()
 			addresses, e := net.DefaultResolver.LookupIPAddr(ctx, strings.Trim(t.Host, "[]"))
 			if e != nil {
+				r.Error = "dns-failed"
 				return
 			}
 			for _, a := range addresses {
 				if !publicIP(a.IP) {
+					r.Error = "blocked-address"
 					return
 				}
 			}
+			if method == "icmp" {
+				if len(addresses) == 0 {
+					r.Error = "dns-failed"
+					return
+				}
+				r.Milliseconds, r.Sent, r.Error = echo(ctx, addresses[0].IP)
+				r.OK = r.Milliseconds != nil
+				return
+			}
 			for _, a := range addresses {
 				start := time.Now()
+				r.Sent = true
 				conn, e := (&net.Dialer{}).DialContext(ctx, "tcp", net.JoinHostPort(a.IP.String(), strconv.Itoa(t.Port)))
 				if e == nil {
 					conn.Close()
@@ -94,6 +117,7 @@ func Measure(parent context.Context, targets []Target) []Result {
 					return
 				}
 			}
+			r.Error = "connect-failed"
 		}(i, target)
 	}
 	for range targets {

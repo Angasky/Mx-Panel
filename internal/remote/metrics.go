@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Angasky/dingzhi-ban/internal/hostsample"
 	"math"
 	"sort"
 	"strconv"
@@ -16,26 +17,7 @@ import (
 
 // Fixed read-only commands. No remote Python, installation, persistent agent,
 // eval, or sourcing of /etc/os-release is required.
-const hostSampleScript = `set -eu
-export LC_ALL=C
-part() { printf '\n__MXIOC_METRIC_%s__\n' "$1"; }
-part stat; cat /proc/stat
-part mem; cat /proc/meminfo
-part net; cat /proc/net/dev
-part route; cat /proc/net/route 2>/dev/null || true
-part route6; cat /proc/net/ipv6_route 2>/dev/null || true
-part cpu; cat /proc/cpuinfo
-part uptime; cat /proc/uptime
-part boot; cat /proc/sys/kernel/random/boot_id
-part load; cat /proc/loadavg
-part hostname; hostname
-part kernel; uname -r
-part arch; uname -m
-part os; cat /etc/os-release 2>/dev/null || true
-part disks; df -P -T -B1 -l 2>/dev/null || true
-part addresses; ip -j address show 2>/dev/null || true
-part end
-`
+const hostSampleScript = hostsample.Script
 
 type cpuTicks struct{ total, idle uint64 }
 type hostSample struct {
