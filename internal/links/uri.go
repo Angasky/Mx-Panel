@@ -129,6 +129,15 @@ func Parse(value string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Xray exporters commonly include the default SpiderX path. Mihomo has
+	// no SpiderX option; accepting only the empty/default path avoids silently
+	// discarding a custom crawling configuration.
+	if values, exists := q["spx"]; exists {
+		if scheme != "vless" || q.Get("security") != "reality" || len(values) != 1 || (values[0] != "" && values[0] != "/") {
+			return nil, errors.New("仅支持 VLESS Reality 的默认 SpiderX 路径（spx=/），暂不支持自定义路径")
+		}
+		q.Del("spx")
+	}
 	allowed := map[string]bool{}
 	for _, key := range []string{"tls_certificate", "tls-certificate", "pinSHA256", "pinned_certchain_sha256", "support-x25519mlkem768", "encryption", "security", "sni", "alpn", "fp", "flow", "pbk", "sid", "type", "path", "host", "serviceName", "insecure", "allowInsecure", "udp", "reuse", "tfo", "version", "psk", "obfs", "obfs-host", "obfs-password", "upmbps", "downmbps"} {
 		allowed[key] = true
