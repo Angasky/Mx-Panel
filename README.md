@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.17` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.18` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.17-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.18-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -215,3 +215,5 @@ bash install.sh local-build
 Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南](docs/go/AGENT-AND-PROBE.md)。
 
 服务器位置地球：在“地域与续费”填写经纬度后，从“服务器监控 → 3D 地球”查看。默认私密，公开规则与数据来源见 [地球视图说明](docs/go/GLOBE.md)。
+
+订阅连接：管理员可查看已托管独立 Xray 用户的在线 IP，并按需查询大致城市。[支持范围与开启方式](docs/go/SUBSCRIPTION-ONLINE.md)。

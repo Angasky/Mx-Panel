@@ -260,6 +260,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "请重新登录")
 		return
 	}
+	if s.onlineRoute(w, r) {
+		return
+	}
 	if s.probeHistoryAdmin(w, r) {
 		return
 	}
