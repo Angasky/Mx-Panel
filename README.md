@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.20` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.21` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.20-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.21-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -221,3 +221,7 @@ Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南]
 界面：订阅总览采用双列紧凑卡片，支持客户端跳转；设置中提供云白等五套主题。[设计与字体来源](docs/go/UI-DESIGN.md) · [妙妙屋功能差异](docs/go/MMWX-COMPARISON.md)。
 
 我的世界主题：复用 Craft Monitor 的像素主图和原创方块材质，设置中切换。[主题说明](docs/go/CRAFT-THEME.md)。
+
+### Telegram 通知
+
+管理员进入 **设置 → 通知中心**，配置 Bot Token 与 Chat ID 后开启监控异常/恢复、订阅额度与到期、服务器续费提醒。默认关闭，支持阈值配置、去重和自动重试。详见 [通知中心](docs/go/NOTIFICATIONS.md) 与 [功能差异](docs/go/MMWX-COMPARISON.md)。

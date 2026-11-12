@@ -105,6 +105,7 @@ func (s *Server) startMonitorHistory(ctx context.Context) {
 					return
 				case <-ticker.C:
 					s.sampleMonitorHistory(ctx)
+					s.pollNotifications(ctx)
 				}
 			}
 		}()

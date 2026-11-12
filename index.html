@@ -2286,7 +2286,7 @@ async function memberPortal() {
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="notificationManager().catch(e=>notice(e.message))">通知中心</button><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
       <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>原版物品栏与立体按钮，草地绿和石灰配色，像素英文搭配清晰中文。</p></button>
@@ -2305,6 +2305,21 @@ function settings() {
       </button>
     </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
+}
+
+async function notificationManager() {
+ const data=await api('/notifications'),c=data.config;
+ openModal('通知中心',`<form id="notificationForm"><p class="note">启用后向指定 Telegram 会话发送提醒。先与机器人私聊或将它加入目标群聊。监控异常仅依据已开启的历史采样，不代表代理服务一定离线。</p>
+ <label class="check"><input type="checkbox" id="ntEnabled" ${c.enabled?'checked':''}>启用 Telegram 通知</label>
+ <div class="grid"><div><label for="ntToken">Bot Token</label><input type="password" id="ntToken" autocomplete="new-password" placeholder="${data.tokenConfigured?'已保存，留空保持不变':'填写机器人 Token'}"></div><div><label for="ntChat">Chat ID</label><input id="ntChat" value="${esc(c.chatId)}" placeholder="数字用户 ID 或负数群 ID"></div>
+ <div><label for="ntDays">提前提醒天数</label><input type="number" id="ntDays" min="1" max="30" value="${c.days}"></div><div><label for="ntPercent">流量使用阈值（%）</label><input type="number" id="ntPercent" min="1" max="100" value="${c.percent}"></div><div><label for="ntFailures">连续采样失败次数</label><input type="number" id="ntFailures" min="2" max="20" value="${c.failures}"></div></div>
+ <div class="toolbar"><label class="check"><input type="checkbox" id="ntMonitor" ${c.monitor?'checked':''}>监控异常 / 恢复</label><label class="check"><input type="checkbox" id="ntTraffic" ${c.traffic?'checked':''}>流量阈值</label><label class="check"><input type="checkbox" id="ntExpiry" ${c.expiry?'checked':''}>订阅到期 / 服务器续费</label></div>
+ <p class="hint">按后台采样周期检查，相同告警持续期间只提醒一次；日期按 UTC。失败自动重试，最多 8 次。记录保留最近 200 条。首次启用会提醒已达到阈值的项目。</p>
+ <label class="check"><input type="checkbox" id="ntClear">清除已保存的 Token（需同时关闭通知）</label>
+ <div class="toolbar"><button class="btn primary" type="submit">保存通知设置</button><button class="btn" type="button" id="ntRefresh">刷新记录</button></div></form>
+ <h4>最近通知</h4><div class="table-wrap"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${(data.events||[]).slice().reverse().map(e=>`<tr><td>${esc(new Date(e.time*1000).toLocaleString())}</td><td>${esc(e.text)}${e.error?'<br><span class="muted">'+esc(e.error)+'</span>':''}</td><td>${esc(({pending:'等待发送',sent:'已发送',failed:'发送失败',cancelled:'已取消'})[e.status]||e.status)} · ${e.attempts} 次</td></tr>`).join('')||'<tr><td colspan="3">暂无通知</td></tr>'}</tbody></table></div>`);
+ $('ntRefresh').onclick=()=>notificationManager().catch(e=>notice(e.message));
+ $('notificationForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('/notifications',jsonOpt('PUT',{enabled:$('ntEnabled').checked,token:$('ntToken').value,chatId:$('ntChat').value,clearToken:$('ntClear').checked,monitor:$('ntMonitor').checked,traffic:$('ntTraffic').checked,expiry:$('ntExpiry').checked,days:Number($('ntDays').value),percent:Number($('ntPercent').value),failures:Number($('ntFailures').value)}));$('ntToken').value='';notice('通知设置已保存');await notificationManager();}catch(err){notice(err.message);}finally{button.disabled=false;}};
 }
 
 function profiles() {

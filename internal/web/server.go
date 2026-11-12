@@ -47,6 +47,7 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	notificationMu    sync.Mutex
 	metadataMu        sync.Mutex
 	probeMu           sync.Mutex
 	agentMu           sync.Mutex
@@ -264,6 +265,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.notificationRoute(w, r) {
 		return
 	}
 	if s.onlineRoute(w, r) {
