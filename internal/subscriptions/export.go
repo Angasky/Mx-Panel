@@ -18,6 +18,7 @@ type Format struct {
 }
 
 var formats = []Format{
+	{"xray", "Xray 客户端配置（实验性）", "每个节点一份 JSON；本地 SOCKS/HTTP 10808/10809，不继承 Mihomo 分流、DNS 或防泄露设置。", false, false},
 	{"quantumult-x", "Quantumult X 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
 	{"stash", "Stash 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
 	{"surfboard", "Surfboard 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
@@ -25,7 +26,7 @@ var formats = []Format{
 
 	{"loon", "Loon 客户端配置", "手动选择兼容节点；不包含原 Mihomo 分流、DNS、策略组及主备链路。", false, false},
 	{"surge", "Surge 客户端配置", "手动选择节点；仅导出兼容协议，不包含原 Mihomo 策略组、规则或主备关系。", true, false},
-	{"sing-box", "sing-box 完整客户端配置", "本地 mixed 端口 2080，手动选择节点；不包含 Mihomo 策略组、规则及远端主备关系。", false, true},
+	{"sing-box", "sing-box 客户端配置（实验性）", "本地 mixed 端口 2080，手动选择节点；不继承 Mihomo 分流、DNS、防泄露设置及远端主备关系。", false, true},
 	{"v2rayn-ha", "电脑 v2rayN · Xray 主备配置", "每个主备组一份完整 JSON，固定优先顺序。", false, false},
 	{"v2rayng-ha", "安卓 v2rayNG · Xray 主备配置", "本地 SOCKS / HTTP 端口为 10808 / 10809。", false, false},
 	{"shadowrocket-ha", "小火箭主备 · 第一步：节点订阅", "先导入节点，再启用配套策略配置。", true, true},
@@ -108,6 +109,16 @@ func usageLabel(info Record) string {
 }
 
 func Convert(source config.Subscription, format string, now time.Time) (Export, error) {
+	if format == "xray" {
+		if source.ClientOptions == nil || !source.ClientOptions.XrayExport {
+			return Export{}, errors.New("请在设置 → 订阅安全与兼容中启用实验性 Xray 导出")
+		}
+		return convertXrayClient(source)
+	}
+	if format == "sing-box" && source.ClientOptions != nil && !source.ClientOptions.SingBoxExport {
+		return Export{}, errors.New("当前订阅已关闭实验性 sing-box 导出")
+	}
+
 	if format == "quantumult-x" || format == "stash" || format == "surfboard" || format == "egern" {
 		return convertOtherClient(source, format)
 	}

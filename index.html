@@ -2293,7 +2293,7 @@ async function memberPortal() {
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="notificationManager().catch(e=>notice(e.message))">通知中心</button><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="clientOptionsManager().catch(e=>notice(e.message))">订阅安全与兼容</button><button class="btn" onclick="notificationManager().catch(e=>notice(e.message))">通知中心</button><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
       <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>原版物品栏与立体按钮，草地绿和石灰配色，像素英文搭配清晰中文。</p></button>
@@ -2312,6 +2312,21 @@ function settings() {
       </button>
     </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
+}
+
+async function clientOptionsManager() {
+ const profile=S.profile;if(!profile){notice('请先创建或选择订阅');return;}
+ const epoch=S.modalEpoch||0,data=await api('/client-options',{headers:{'X-Profile':profile}});if(S.profile!==profile||epoch!==(S.modalEpoch||0)||S.role!=='admin')return;
+ const o=data.options,name=S.profiles.find(p=>p.id===profile)?.name||profile;
+ openModal('订阅安全与兼容',`<p class="note">仅作用于订阅「${esc(name)}」。保存后需要手机更新订阅并重连。配置作为导出覆盖保存，可恢复原配置；不会重启节点。</p><form id="clientOptionsForm"><h4>Clash / Mihomo 安全与联网</h4>
+ ${[['webRTC','STUN / WebRTC 防泄露','拦截 STUN 域名关键词和常用 UDP 端口，可能影响语音、视频通话及游戏联机；不是完整的浏览器 WebRTC 防泄露保证。'],['dnsProtection','DNS 防泄露（代理加密解析）','将客户端 DNS 查询通过 ✈️ Proxy 的加密 DNS 发送，去掉直连回退。代理不可用时解析也会失败；代理服务器域名与 DNS 引导解析仍直连。TUN 开启时接管 53 端口，应用自带 DoH/DoT 不在此保证范围内。'],['domesticRealIP','国内域名使用真实 IP','避免国内 App 因 fake-IP 异常；不等于自动增加国内直连规则。'],['ipv6','允许 IPv6','关闭时关闭配置 IPv6 与 DNS AAAA 解析；无法代替操作系统或客户端对绕过代理的 IPv6 流量控制。'],['basicAds','基础广告拦截','将对应默认广告策略设为 REJECT，可能误拦截登录、验证或业务接口。'],['strongAds','强力广告拦截','更激进的过滤规则，遇到应用联网问题可先关闭。']].map(([k,label,hint])=>`<div style="margin:14px 0"><label class="check"><input id="co-${k}" type="checkbox" ${o[k]?'checked':''}>${label}</label><p class="hint">${hint}</p></div>`).join('')}
+ <h4>客户端兼容 · 实验性</h4><label class="check"><input id="co-xrayExport" type="checkbox" ${o.xrayExport?'checked':''}>Xray 完整 JSON 导出（实验性）</label><p class="hint">兼容节点各生成一份完整配置，适用于支持 Xray 自定义 JSON 的客户端。不支持的节点会列出原因；不改变服务器内核或现有 Xray 主备导出。</p><label class="check"><input id="co-singBoxExport" type="checkbox" ${o.singBoxExport?'checked':''}>sing-box 客户端配置导出（实验性）</label><p class="hint">保留兼容节点、手动选择组及本地 mixed 入口。老订阅保留原有导出入口，允许自行关闭。</p>
+ <p class="note">上述安全开关仅作用于完整 Clash/Mihomo YAML。Xray、sing-box 与其他客户端导出，以及 vless/vmess 等裸节点链接，不继承这些防泄露设置或完整分流规则，需在客户端单独配置。实验性导出不是服务器内核替换。</p>
+ <p class="hint">广告开关控制订阅的默认策略顺序；客户端可能保留旧选择，需自行切换 DIRECT / REJECT。没有对应广告组的自定义订阅不会自动安装广告规则。DNS 防泄露关闭时恢复原 YAML 的解析策略，不强制删除原有自定义 DNS。</p>
+ <p id="clientOptionsError" class="error" role="alert"></p><div class="toolbar"><button class="btn primary" type="submit">保存当前订阅设置</button><button class="btn" type="button" id="clientOptionsReset" ${data.configured?'':'disabled'}>恢复原配置</button></div></form>`);
+ const form=$('clientOptionsForm'),active=()=>form.isConnected&&!$('modal').classList.contains('hidden');
+ const save=async reset=>{const payload={};for(const key of ['webRTC','dnsProtection','domesticRealIP','ipv6','basicAds','strongAds','xrayExport','singBoxExport'])payload[key]=$('co-'+key).checked;form.querySelectorAll('button').forEach(b=>b.disabled=true);try{await api('/client-options',{...jsonOpt(reset?'DELETE':'PUT',payload),headers:{'Content-Type':'application/json','X-Profile':profile}});if(active()){closeModal();notice(reset?'已恢复原配置，请更新手机订阅':'设置已保存，请更新手机订阅并重连');}}catch(e){if(active()){$('clientOptionsError').textContent=e.message;form.querySelectorAll('button').forEach(b=>b.disabled=false);}}};
+ form.onsubmit=e=>{e.preventDefault();void save(false)};$('clientOptionsReset').onclick=()=>{if(confirm('清除当前订阅的安全与兼容覆盖，恢复原 YAML 配置？'))void save(true)};
 }
 
 async function notificationManager() {

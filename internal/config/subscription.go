@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/subtle"
 	"errors"
+	"go.yaml.in/yaml/v3"
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/billing"
@@ -12,12 +13,13 @@ var ErrSubscriptionMissing = errors.New("订阅不存在")
 var ErrSubscriptionBlocked = errors.New("订阅已过期或流量已用尽")
 
 type Subscription struct {
-	Name, Slug string
-	Document   Document
-	Raw        []byte
-	Traffic    Document
-	Userinfo   string
-	Managed    Document `json:"-"`
+	ClientOptions *ClientOptions `json:"-"`
+	Name, Slug    string
+	Document      Document
+	Raw           []byte
+	Traffic       Document
+	Userinfo      string
+	Managed       Document `json:"-"`
 }
 
 // PublicSubscription resolves capability tokens only. Profile IDs, old index
@@ -78,6 +80,20 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 	if err != nil {
 		return Subscription{}, err
 	}
+	options, err := readClientOptions(record)
+	if err != nil {
+		return Subscription{}, err
+	}
+	if options != nil {
+		doc, err = applyClientOptions(doc, *options)
+		if err != nil {
+			return Subscription{}, err
+		}
+		raw, err = yaml.Marshal(doc)
+		if err != nil {
+			return Subscription{}, err
+		}
+	}
 	u := billing.Usage{Enabled: info["configured"] == true, Upload: info["upload"].(int64), Download: info["download"].(int64)}
 	if value, ok := info["total"].(int64); ok {
 		u.Total = &value
@@ -111,7 +127,7 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 	if includeDocument {
 		document = cloneConfig(doc).(Document)
 	}
-	return Subscription{Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
+	return Subscription{ClientOptions: options, Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available

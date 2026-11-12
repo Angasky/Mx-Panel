@@ -267,6 +267,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "请重新登录")
 		return
 	}
+	if s.clientOptionsRoute(w, r) {
+		return
+	}
 	if s.notificationRoute(w, r) {
 		return
 	}
