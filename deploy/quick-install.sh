@@ -5,7 +5,7 @@ umask 077
 main() {
     [[ $EUID == 0 ]] || { echo '请以 root 运行，或使用 curl ... | sudo bash' >&2; exit 1; }
     [[ $(uname -s) == Linux && -d /run/systemd/system ]] || { echo '需要使用 systemd 的 Linux 服务器' >&2; exit 1; }
-    local action=${1:-auto} version=${MX_PANEL_VERSION:-v0.1.21} arch package base stage
+    local action=${1:-auto} version=${MX_PANEL_VERSION:-v0.1.22} arch package base stage
     [[ $action =~ ^(auto|fresh|install|update)$ ]] || { echo '用法：quick-install.sh [fresh|install|update]' >&2; exit 1; }
     [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo '版本号无效' >&2; exit 1; }
     case $(uname -m) in x86_64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) echo '不支持当前 CPU 架构' >&2; exit 1 ;; esac

@@ -28,6 +28,11 @@ type notificationConfig struct {
 	Days        int    `json:"days"`
 	Percent     int    `json:"percent"`
 	Failures    int    `json:"failures"`
+	Daily       bool   `json:"daily"`
+	DailyHour   int    `json:"dailyHour"`
+	Probes      bool   `json:"probes"`
+	LatencyMS   int    `json:"latencyMs"`
+	LossPercent int    `json:"lossPercent"`
 }
 type notificationEvent struct {
 	Time     int64  `json:"time"`
@@ -38,13 +43,14 @@ type notificationEvent struct {
 	Error    string `json:"error,omitempty"`
 }
 type notificationState struct {
-	Config notificationConfig  `json:"config"`
-	Active map[string]string   `json:"active"`
-	Events []notificationEvent `json:"events"`
+	LastDaily string              `json:"lastDaily,omitempty"`
+	Config    notificationConfig  `json:"config"`
+	Active    map[string]string   `json:"active"`
+	Events    []notificationEvent `json:"events"`
 }
 
 func (s *Server) readNotifications() (notificationState, error) {
-	n := notificationState{Config: notificationConfig{Monitor: true, Traffic: true, Expiry: true, Days: 7, Percent: 90, Failures: 3}, Active: map[string]string{}, Events: []notificationEvent{}}
+	n := notificationState{Config: notificationConfig{Monitor: true, Traffic: true, Expiry: true, Days: 7, Percent: 90, Failures: 3, DailyHour: 1, LatencyMS: 300, LossPercent: 20}, Active: map[string]string{}, Events: []notificationEvent{}}
 	b, e := os.ReadFile(filepath.Join(s.options.Root, "notifications.json"))
 	if os.IsNotExist(e) {
 		return n, nil
@@ -86,6 +92,19 @@ var notificationTokenPattern = regexp.MustCompile(`^[0-9]{5,20}:[A-Za-z0-9_-]{20
 var notificationChatPattern = regexp.MustCompile(`^-?[0-9]{1,20}$`)
 
 func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/admin/api/notifications/daily-preview" {
+		if r.Method != "GET" {
+			problem(w, 405, "请求方法不支持")
+			return true
+		}
+		message, e := s.notificationDailyReport(s.now())
+		if e != nil {
+			problem(w, 500, "日报数据读取失败")
+		} else {
+			respond(w, 200, map[string]string{"text": message})
+		}
+		return true
+	}
 	if r.URL.Path != "/admin/api/notifications" {
 		return false
 	}
@@ -100,16 +119,21 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 	case "GET":
 	case "PUT":
 		var input struct {
-			Enabled    bool   `json:"enabled"`
-			ChatID     string `json:"chatId"`
-			Token      string `json:"token"`
-			ClearToken bool   `json:"clearToken"`
-			Monitor    bool   `json:"monitor"`
-			Traffic    bool   `json:"traffic"`
-			Expiry     bool   `json:"expiry"`
-			Days       int    `json:"days"`
-			Percent    int    `json:"percent"`
-			Failures   int    `json:"failures"`
+			Enabled     bool   `json:"enabled"`
+			ChatID      string `json:"chatId"`
+			Token       string `json:"token"`
+			ClearToken  bool   `json:"clearToken"`
+			Monitor     bool   `json:"monitor"`
+			Traffic     bool   `json:"traffic"`
+			Expiry      bool   `json:"expiry"`
+			Days        int    `json:"days"`
+			Percent     int    `json:"percent"`
+			Failures    int    `json:"failures"`
+			Daily       *bool  `json:"daily"`
+			DailyHour   *int   `json:"dailyHour"`
+			Probes      *bool  `json:"probes"`
+			LatencyMS   *int   `json:"latencyMs"`
+			LossPercent *int   `json:"lossPercent"`
 		}
 		if readJSON(w, r, &input) != nil {
 			return true
@@ -140,15 +164,35 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 			problem(w, 400, "启用通知需要 Bot Token 和 Chat ID")
 			return true
 		}
-		// Pending events must never leak to a newly configured recipient.
-		if input.ChatID != n.Config.ChatID || sealed != n.Config.SealedToken || !input.Enabled || input.Monitor != n.Config.Monitor || input.Traffic != n.Config.Traffic || input.Expiry != n.Config.Expiry {
+		next := notificationConfig{Enabled: input.Enabled, ChatID: input.ChatID, SealedToken: sealed, Monitor: input.Monitor, Traffic: input.Traffic, Expiry: input.Expiry, Days: input.Days, Percent: input.Percent, Failures: input.Failures, Daily: n.Config.Daily, DailyHour: n.Config.DailyHour, Probes: n.Config.Probes, LatencyMS: n.Config.LatencyMS, LossPercent: n.Config.LossPercent}
+		if input.Daily != nil {
+			next.Daily = *input.Daily
+		}
+		if input.DailyHour != nil {
+			next.DailyHour = *input.DailyHour
+		}
+		if input.Probes != nil {
+			next.Probes = *input.Probes
+		}
+		if input.LatencyMS != nil {
+			next.LatencyMS = *input.LatencyMS
+		}
+		if input.LossPercent != nil {
+			next.LossPercent = *input.LossPercent
+		}
+		if next.DailyHour < 0 || next.DailyHour > 23 || next.LatencyMS < 1 || next.LatencyMS > 60000 || next.LossPercent < 1 || next.LossPercent > 100 {
+			problem(w, 400, "日报小时须为 UTC 0–23，延迟阈值 1–60000 毫秒，失败比例 1–100%")
+			return true
+		}
+		// Cancel stale queued messages when the recipient or alert policy changes.
+		if next != n.Config || !next.Enabled {
 			for i := range n.Events {
 				if n.Events[i].Status == "pending" {
 					n.Events[i].Status = "cancelled"
 				}
 			}
 		}
-		n.Config = notificationConfig{Enabled: input.Enabled, ChatID: input.ChatID, SealedToken: sealed, Monitor: input.Monitor, Traffic: input.Traffic, Expiry: input.Expiry, Days: input.Days, Percent: input.Percent, Failures: input.Failures}
+		n.Config = next
 		if e = s.saveNotifications(n); e != nil {
 			problem(w, 500, "通知配置保存失败")
 			return true
@@ -205,6 +249,23 @@ func (s *Server) notificationConditions(c notificationConfig, now time.Time) (ma
 				}
 			} else if h.Enabled {
 				out["unknown:"+id] = "1"
+			}
+		}
+		if c.Probes {
+			h, e := s.history.Read(id, now)
+			if e != nil {
+				return nil, e
+			}
+			if h.Enabled {
+				s.probeMu.Lock()
+				probes, e := s.readProbes(id)
+				s.probeMu.Unlock()
+				if e != nil {
+					return nil, e
+				}
+				for k, v := range notificationProbeConditions(id, name, probes.Points, c, now) {
+					out[k] = v
+				}
 			}
 		}
 		if c.Expiry {
@@ -273,6 +334,13 @@ func notificationReconcile(n *notificationState, current map[string]string, now 
 	}
 	sort.Strings(oldKeys)
 	for _, key := range oldKeys {
+		if strings.HasPrefix(key, "probe-") && current[key] == "" && n.Config.Probes {
+			if current["unknown:"+key] != "" {
+				current[key] = n.Active[key]
+			} else if current["healthy:"+key] != "" {
+				add("探测恢复通知（以下原告警已解除）：" + n.Active[key])
+			}
+		}
 		if strings.HasPrefix(key, "monitor:") && current[key] == "" {
 			if current["unknown:"+strings.TrimPrefix(key, "monitor:")] != "" {
 				current[key] = n.Active[key]
@@ -339,6 +407,18 @@ func (s *Server) pollNotifications(ctx context.Context) {
 		return
 	}
 	notificationReconcile(&n, current, now)
+	if n.Config.Daily && now.UTC().Hour() >= n.Config.DailyHour {
+		date := now.UTC().AddDate(0, 0, -1).Format("2006-01-02")
+		if n.LastDaily < date {
+			if message, e := s.notificationDailyReport(now); e == nil {
+				n.Events = append(n.Events, notificationEvent{Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
+				n.LastDaily = date
+			}
+		}
+	}
+	if len(n.Events) > 200 {
+		n.Events = n.Events[len(n.Events)-200:]
+	}
 	// Persist intent before sending; a crash after delivery can cause one duplicate.
 	if s.saveNotifications(n) != nil {
 		return
