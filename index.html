@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MXIOC // Terminal Control Center</title>
 <script>
-try { document.documentElement.dataset.theme = ['slate', 'high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'slate'; } catch (_) {}
+try { document.documentElement.dataset.theme = ['craft', 'slate', 'high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'slate'; } catch (_) {}
 </script>
 <style>
 :root {
@@ -1489,6 +1489,34 @@ html .subscription-qr{width:78px;height:78px}.subscription-qr-button span{displa
 @media(max-width:900px){.subscription-grid{grid-template-columns:1fr}html .main{padding:18px}html .panel,html[data-theme] .panel{padding:18px}}
 @media(max-width:600px){html .main{padding:14px 10px}html .top h2{font-size:22px}html .panel,html[data-theme] .panel{padding:16px}html .modalbox{width:calc(100vw - 20px)}html #modalBody{padding:16px}html .subscription-row{padding:12px;grid-template-columns:minmax(0,1fr) 90px}.client-navigation select{max-width:none;flex-basis:100%}html .subscription-actions .btn{font-size:12px;padding:7px 9px;min-height:36px}}
 
+
+/* Craft Monitor artwork and palette adapted to the panel's existing components. */
+@font-face{font-family:MXCraft;src:url('/sub/ui-craft/Silkscreen-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+.craft-hero{display:none}
+html[data-theme="craft"]{color-scheme:light;--bg:#edf0e4;--bg-card:#fffef5;--bg-card-hover:#f1f5e5;--bg-sidebar:#f4f1df;--bg-input:#fffef7;--surface-inset:#e8edda;--surface-header:#e6ebd8;--border:#b3bfa1;--border-focus:#4f702e;--blue:#4f702e;--blue-bright:#355521;--blue-dim:#4b682f;--blue-soft:#e0eacb;--cyan:#3e6d60;--accent-rgb:79 112 46;--shadow-rgb:47 56 33;--overlay-rgb:27 39 26;--primary-bg:#527b35;--primary-hover:#3e6126;--primary-border:#314c23;--text:#283b28;--text-muted:#56664b;--text-dim:#45583b;--placeholder:#69775e;--green:#3f752e;--success-text:#386425;--green-soft:#e4efcf;--danger:#a83b2e;--danger-text:#992c22;--danger-strong:#79201b;--danger-soft:#fbe8df;--radius-sm:2px;--radius-md:3px;--radius-lg:4px}
+html[data-theme="craft"] body{background-color:var(--bg);background-image:linear-gradient(#edf0e4f7,#edf0e4f7),url('/sub/ui-craft/dirt.svg');background-size:auto,96px 96px}
+html[data-theme="craft"] .side{background-image:linear-gradient(#f4f1dff2,#f4f1dff2),url('/sub/ui-craft/wood.svg');background-size:auto,128px;border-right:3px solid #687755}
+html[data-theme="craft"] :is(.panel,.profile-card,.host-card,.modalbox,.card,.subscription-row,.loginbox){border:2px solid #7f906a;border-radius:3px;box-shadow:inset 2px 2px #ffffffb3,inset -2px -2px #a6b58a50,3px 3px #34432c26}
+html[data-theme="craft"] .panel-head{border-bottom:2px solid #bcc6a7;padding-bottom:12px}
+html[data-theme="craft"] :is(.top h2,.panel h3,.modalhead h3){color:#324d28;font-weight:750}
+html[data-theme="craft"] :is(.btn,.btn.small){border:2px solid #566047;border-radius:2px;background:#d7dbc7;box-shadow:inset 2px 2px #f7faea,inset -2px -2px #949f7d,2px 2px #24372026;color:#2b3b24}
+html[data-theme="craft"] .btn.primary{background:#577e39;border-color:#304f24;box-shadow:inset 2px 2px #8fae65,inset -2px -2px #355521,2px 2px #24372033;color:#fffef1}
+html[data-theme="craft"] .btn.danger{background:#f3d8c9;color:#7d291f;border-color:#a36a51}
+html[data-theme="craft"] .btn:hover{filter:brightness(1.055)}html[data-theme="craft"] .btn:active{box-shadow:inset 2px 2px #34432c40;transform:translateY(1px)}
+html[data-theme="craft"] :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:2px solid #879670;border-radius:2px;box-shadow:inset 2px 2px #34432c12}
+html[data-theme="craft"] :is(input[type=checkbox],input[type=radio]){accent-color:#527b35}
+html[data-theme="craft"] .nav{border-radius:2px;color:#405632}html[data-theme="craft"] .nav.active{background:#dce7be;color:#304f24;border-color:#768e51;box-shadow:inset 2px 2px #f4f8de,2px 2px #34432c22}
+html[data-theme="craft"] .card{background-image:linear-gradient(#f6f7eced,#f6f7eced),url('/sub/ui-craft/stone.svg');background-size:auto,96px}
+html[data-theme="craft"] .side-logo{font-size:0;background:transparent url('/sub/ui-craft/block.svg') center/contain no-repeat;border:0;box-shadow:none;border-radius:0;image-rendering:pixelated}
+html[data-theme="craft"] .modalhead{background-image:linear-gradient(#e6ebd8ee,#e6ebd8ee),url('/sub/ui-craft/wood.svg');background-size:auto,96px}
+html[data-theme="craft"] .subscription-qr-button{border:2px solid #7f906a;border-radius:2px;background:#fff}
+html[data-theme="craft"] .craft-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:24px;align-items:center;margin:0 0 28px;padding:22px;background:#f8faef;border:2px solid #6d8357;box-shadow:5px 5px #34432c22}
+.craft-eyebrow{font:16px/1.4 MXCraft,var(--font-sans);color:#527b35;letter-spacing:1px}.craft-hero-copy h2{font:750 clamp(23px,2.3vw,35px)/1.45 var(--font-sans);margin:12px 0;color:#304b29}.craft-hero-copy p{font-size:14px;color:#536747;margin:0 0 18px}.craft-hero-note{display:block;font-size:12px;color:#617153;margin-top:14px}
+.craft-landscape{position:relative;min-width:0;border:3px solid #405b37;box-shadow:4px 4px #34432c33;background:#c2dcd2;overflow:hidden}.craft-landscape img{width:100%;height:auto;display:block;image-rendering:pixelated}.craft-landscape>span{position:absolute;bottom:10px;right:10px;background:#203b2bcc;color:#fffdeb;padding:4px 7px;font:11px/1.5 MXCraft,var(--font-sans)}
+.theme-preview.craft{background:#c2dcd2 url('/sub/ui-craft/overworld.png') center/cover;image-rendering:pixelated;border:2px solid #6d8357}.theme-preview.craft::before,.theme-preview.craft::after{display:none}
+@media(max-width:900px){html[data-theme="craft"] .craft-hero{gap:18px;padding:18px}}
+@media(max-width:600px){html[data-theme="craft"] .craft-hero{grid-template-columns:1fr;padding:16px;gap:18px;margin-bottom:20px}.craft-hero-copy h2{font-size:26px}.craft-hero-note{margin-top:10px}.craft-landscape>span{font-size:10px}}
+
 </style>
 </head>
 <body>
@@ -2163,7 +2191,7 @@ function formatBytes(value) {
 }
 
 function setTheme(theme) {
-  if (!['slate', 'high', 'low', 'pink', 'amber'].includes(theme)) return;
+  if (!['craft', 'slate', 'high', 'low', 'pink', 'amber'].includes(theme)) return;
   const root = document.documentElement;
   root.classList.add('theme-switching');
   root.dataset.theme = theme;
@@ -2173,7 +2201,7 @@ function setTheme(theme) {
   let persisted = true;
   try { localStorage.setItem('mxioc_theme', theme); } catch (_) { persisted = false; }
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
-  notice(persisted ? `已切换为${({slate:'云白',high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
+  notice(persisted ? `已切换为${({craft:'我的世界',slate:'云白',high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
 }
 
 
@@ -2204,7 +2232,7 @@ function editPanelUser(u, profiles) {
 async function memberPortal() {
   const data=await api('/portal'); S.page='portal';
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
-  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
+  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
     const t=p.traffic||{};
     return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制订阅链接</button><a class="btn" href="${esc(p.url)}" download>下载 Clash / Mihomo</a></div><details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(f.url)}" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
   }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
@@ -2220,6 +2248,7 @@ function settings() {
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
+      <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>复用你的 Craft Monitor 主图、木板与石块材质，草方块配色和像素标题，正文保持清晰易读。</p></button>
       <button type="button" class="theme-option" data-theme-choice="slate" aria-pressed="${theme === 'slate'}" onclick="setTheme('slate')"><span class="theme-preview slate" aria-hidden="true"></span><strong>云白主题 · 清晰控制台</strong><p>冷白背景、靛蓝操作色和轻量卡片，采用 Inter 与中文无衬线字体，突出内容和常用操作。</p></button>
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
         <span class="theme-preview high" aria-hidden="true"></span><strong>科技主题 · 终端工作台</strong><p>深色背景与蓝色强调色，保留品牌动效，采用统一易读字体和紧凑控件。</p>
@@ -2233,7 +2262,7 @@ function settings() {
       <button type="button" class="theme-option" data-theme-choice="amber" aria-pressed="${theme === 'amber'}" onclick="setTheme('amber')">
         <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白底色、珊瑚橙操作按钮与细描边，搭配轻量硬边阴影，清晰区分内容与操作。</p>
       </button>
-    </div><div class="note">五套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
+    </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
 }
 
@@ -3907,7 +3936,11 @@ async function overview() {
   const profile = S.profile;
   let p = S.profiles.find(x => x.id === S.profile) || S.data.profile;
   let url = location.origin + p.url;
-  $('content').innerHTML = cards() + trafficSummary() + `
+  $('content').innerHTML = `    <section class="craft-hero" aria-label="我的世界主题主图">
+      <div class="craft-hero-copy"><span class="craft-eyebrow">MXIOC WORLD</span><h2>每一个方块，<br>连接你的世界。</h2><p>管理订阅、守望节点，搭建你的方块工作台。</p><a class="btn primary" href="#clientSubscriptions">探索订阅世界 ↓</a><span class="craft-hero-note">主图来自你的 Craft Monitor 探针项目</span></div>
+      <div class="craft-landscape"><img src="/sub/ui-craft/overworld.png" alt="像素主世界：草地、树木、池塘与木屋" width="560" height="300"><span>OVERWORLD / 主世界</span></div>
+    </section>
+` + cards() + trafficSummary() + `
   <section class="panel">
     <div class="panel-head">
       <h3>${esc(p.name)}</h3>
