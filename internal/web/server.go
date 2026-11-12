@@ -47,32 +47,34 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
-	notificationMu    sync.Mutex
-	metadataMu        sync.Mutex
-	probeMu           sync.Mutex
-	agentMu           sync.Mutex
-	agentViews        map[string]agentObservation
-	agentSlots        chan struct{}
-	shareMu           sync.Mutex
-	shareSlots        chan struct{}
-	shareStreamSlots  chan struct{}
-	history           *monitorhistory.Store
-	historyOnce       sync.Once
-	historyDone       chan struct{}
-	options           Options
-	updates           goUpdates
-	account           account
-	mu                sync.Mutex
-	userAdminMu       sync.Mutex
-	userMu            sync.Mutex
-	sessions          map[[32]byte]session
-	failures          map[string]failure
-	hashSlots         chan struct{}
-	sourceSlots       chan struct{}
-	fetchSubscription func(context.Context, string) (string, error)
-	countryLookup     func(context.Context, string) (geo.Country, error)
-	now               func() time.Time
-	repository        *config.Repository
+	externalMu           sync.Mutex
+	fetchExternalTraffic func(context.Context, string) (subsource.Traffic, error)
+	notificationMu       sync.Mutex
+	metadataMu           sync.Mutex
+	probeMu              sync.Mutex
+	agentMu              sync.Mutex
+	agentViews           map[string]agentObservation
+	agentSlots           chan struct{}
+	shareMu              sync.Mutex
+	shareSlots           chan struct{}
+	shareStreamSlots     chan struct{}
+	history              *monitorhistory.Store
+	historyOnce          sync.Once
+	historyDone          chan struct{}
+	options              Options
+	updates              goUpdates
+	account              account
+	mu                   sync.Mutex
+	userAdminMu          sync.Mutex
+	userMu               sync.Mutex
+	sessions             map[[32]byte]session
+	failures             map[string]failure
+	hashSlots            chan struct{}
+	sourceSlots          chan struct{}
+	fetchSubscription    func(context.Context, string) (string, error)
+	countryLookup        func(context.Context, string) (geo.Country, error)
+	now                  func() time.Time
+	repository           *config.Repository
 }
 
 func New(options Options) (*Server, error) {
@@ -268,6 +270,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.clientOptionsRoute(w, r) {
+		return
+	}
+	if s.externalTrafficRoute(w, r) {
 		return
 	}
 	if s.notificationRoute(w, r) {

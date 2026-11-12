@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.29` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.30` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.29-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.30-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -235,3 +235,5 @@ Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南]
 从 Release 下载独立部署工具包，可使用容器或 Alpine OpenRC 安装，不需要 Go/Python。包含 HTTPS 网关、持久化和更新说明；已有 systemd 用户继续使用 `mx-p`。详见 [部署指南](docs/go/DEPLOYMENT-ALTERNATIVES.md)。
 
 服务器监控新增 [周期流量](docs/go/SERVER-BILLING.md)：按月/季度/半年/年查看网卡观测量、限额和有效采样时长。仅管理员可见，不等同服务商账单。
+
+管理员设置新增 [外部订阅流量汇总](docs/go/EXTERNAL-TRAFFIC.md)：加密保存订阅地址、手动读取上游额度及到期信息、查看 30 天每日快照和累计曲线。
