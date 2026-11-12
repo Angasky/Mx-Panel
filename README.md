@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.25` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.26` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.25-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.26-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh

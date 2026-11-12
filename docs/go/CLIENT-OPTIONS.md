@@ -37,3 +37,16 @@
 覆盖持久化、订阅隔离、原始 YAML 不变、缓存隔离、关闭/恢复、无代理组拒绝启用 DNS 防泄露、损坏/不完整请求和跨站操作拦截。真实浏览器验证保存、下载内容、Xray JSON 下载、禁用 sing-box、恢复配置、普通用户禁止读写以及六主题三宽度布局。
 
 生成的全开 Clash/Mihomo 配置通过 Mihomo 校验，Xray/sing-box 配置通过本地内核检查。未完成所有手机系统或客户端版本的实机验收。
+
+## v0.1.26：Android Clash Meta + Chrome
+
+新增「填入 Android Clash Meta + Chrome 推荐配置」，只填表，保存后才生效。选择国内兼容 DNS、国内真实 IP、Chrome UDP 代理，关闭 IPv6 与默认广告拦截；不会自动改变已有订阅。旧配置与旧客户端保持原来的严格模式，已有选择不会被悄悄改成较宽松模式。
+
+- **DNS 国内兼容**：CN/private 域名通过阿里/腾讯 HTTPS DNS 直连解析；其他查询通过代理 DoH，代理失败不回退到直连。国内查询是有意允许的隐私例外，国内解析器会知道这些域名与直连出口；不能称全部 DNS 都隐藏于代理后。实际分类依赖 GeoSite 数据，漏收域名或特殊 App 自建 DNS 仍可能需要单独适配。
+- **Chrome UDP 代理（实验性）**：将进程名为 com.android.chrome 的 UDP 规则放在最前，转发到 ✈️ Proxy；保留其他 App 的原规则，不再附加全局 STUN 拦截。这是减少 Chrome WebRTC UDP 绕行风险的兼容选项，不是 STUN 协议识别或完整的 WebRTC 防泄露保证。Chrome 的 QUIC/国内视频等 UDP 同样会代理，可能降低速度或影响地区判定。
+- 必须在 Clash Meta 中选择规则模式，允许 VPN 接管 Chrome，不能将 Chrome 排除。应用包名识别、UDP 转发需要在实际 Android/Clash Meta 版本中验证；不能仅凭生成配置或桌面内核校验判定手机有效。
+- ✈️ Proxy 必须选支持 UDP 的实际代理节点，不得选 DIRECT，也不能选择最终回落到 DIRECT 的策略组。内核不支持该节点 UDP 时，通信可能失败。其他端口、TCP TURN、本地地址候选和未进入 VPN 的流量不在该规则的绝对保证范围内。
+- Chrome「使用安全 DNS」建议关闭，使浏览器查询交给 Clash；Android 私人 DNS、自带 DNS 和 VPN 应用绕过选项也需检查。不要以加密 DNS 的供应商所在地单独判断泄露。
+- 使用浏览器 WebRTC 检测时核对公开候选 IP 是否出现真实直连出口，并在 Clash 连接日志确认 Chrome UDP 使用代理。国内 App 直连时服务方本来就会看到直连 IP，不能同时要求对该服务隐藏地址。
+
+本次环境没有 Android 手机，因此不宣称手机应用识别、WebRTC 实际候选和所有国内 App 均已实机通过。

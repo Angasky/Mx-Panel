@@ -10,14 +10,16 @@ import (
 // These are explicit per-subscription export overrides; the source YAML is kept
 // intact so deleting overrides restores custom configuration without guessing.
 type ClientOptions struct {
-	WebRTC         bool `json:"webRTC"`
-	DNSProtection  bool `json:"dnsProtection"`
-	DomesticRealIP bool `json:"domesticRealIP"`
-	IPv6           bool `json:"ipv6"`
-	BasicAds       bool `json:"basicAds"`
-	StrongAds      bool `json:"strongAds"`
-	XrayExport     bool `json:"xrayExport"`
-	SingBoxExport  bool `json:"singBoxExport"`
+	DNSMode        string `json:"dnsMode"`
+	WebRTCMode     string `json:"webRTCMode"`
+	WebRTC         bool   `json:"webRTC"`
+	DNSProtection  bool   `json:"dnsProtection"`
+	DomesticRealIP bool   `json:"domesticRealIP"`
+	IPv6           bool   `json:"ipv6"`
+	BasicAds       bool   `json:"basicAds"`
+	StrongAds      bool   `json:"strongAds"`
+	XrayExport     bool   `json:"xrayExport"`
+	SingBoxExport  bool   `json:"singBoxExport"`
 }
 
 func readClientOptions(record Document) (*ClientOptions, error) {
@@ -126,7 +128,26 @@ func (r *Repository) SetClientOptions(id string, options *ClientOptions) error {
 	return r.writeIndex(index)
 }
 func applyClientOptions(original Document, o ClientOptions) (Document, error) {
+	if o.DNSMode != "" && o.DNSMode != "strict" && o.DNSMode != "domestic" {
+		return nil, errors.New("DNS 模式无效")
+	}
+	if o.WebRTCMode != "" && o.WebRTCMode != "block" && o.WebRTCMode != "chrome-proxy" {
+		return nil, errors.New("WebRTC 模式无效")
+	}
 	doc := cloneConfig(original).(Document)
+	if o.WebRTC && o.WebRTCMode == "chrome-proxy" {
+		found := false
+		for _, v := range rows(doc, "proxy-groups") {
+			g, _ := v.(Document)
+			if g["name"] == "✈️ Proxy" {
+				found = true
+			}
+		}
+		if !found {
+			return nil, errors.New("Chrome UDP 模式需要「✈️ Proxy」策略组")
+		}
+	}
+
 	// Remove only the known block rules. Other user rules remain in order.
 	block := map[string]bool{}
 	for _, rule := range legacySTUNRules {
@@ -134,8 +155,13 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 	}
 	rules := []any{}
 	if o.WebRTC {
-		for _, rule := range legacySTUNRules {
-			rules = append(rules, rule)
+		if o.WebRTCMode == "chrome-proxy" {
+			rules = append(rules, "AND,((PROCESS-NAME,com.android.chrome),(NETWORK,UDP)),✈️ Proxy")
+			doc["find-process-mode"] = "always"
+		} else {
+			for _, rule := range legacySTUNRules {
+				rules = append(rules, rule)
+			}
 		}
 	}
 	for _, rule := range rows(doc, "rules") {
@@ -209,6 +235,11 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 		dns["nameserver-policy"] = Document{}
 		dns["direct-nameserver"] = remote
 		dns["direct-nameserver-follow-policy"] = false
+		if o.DNSMode == "domestic" {
+			local := []any{"https://dns.alidns.com/dns-query#DIRECT", "https://doh.pub/dns-query#DIRECT"}
+			dns["nameserver-policy"] = Document{"geosite:cn": local, "geosite:private": local}
+			dns["direct-nameserver-follow-policy"] = true
+		}
 		dns["proxy-server-nameserver"] = append([]any(nil), domesticDefaultDNS...)
 		dns["default-nameserver"] = []any{"223.5.5.5", "119.29.29.29"}
 		tun, ok := doc["tun"].(Document)
