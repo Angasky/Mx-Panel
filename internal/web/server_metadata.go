@@ -120,24 +120,7 @@ func (s *Server) metadataRoute(w http.ResponseWriter, r *http.Request) bool {
 			problem(w, 400, e.Error())
 			return true
 		}
-		b, _ := json.Marshal(m)
-		f, err := os.CreateTemp(s.options.Root, ".server-meta-*")
-		if err != nil {
-			problem(w, 500, "保存失败")
-			return true
-		}
-		defer os.Remove(f.Name())
-		defer f.Close()
-		if _, err = f.Write(b); err == nil {
-			err = f.Sync()
-		}
-		if err == nil {
-			err = f.Close()
-		}
-		if err == nil {
-			err = os.Rename(f.Name(), s.metadataPath(id))
-		}
-		if err != nil {
+		if e = s.writeMetadata(id, m); e != nil {
 			problem(w, 500, "保存失败")
 			return true
 		}
@@ -155,4 +138,31 @@ func (s *Server) metadataRoute(w http.ResponseWriter, r *http.Request) bool {
 	}
 	respond(w, 200, m)
 	return true
+}
+
+// Caller holds metadataMu. Keep renewal and manual edits in the same transaction domain.
+func (s *Server) writeMetadata(id string, m serverMetadata) error {
+	if e := validateMetadata(m); e != nil {
+		return e
+	}
+	b, e := json.Marshal(m)
+	if e != nil {
+		return e
+	}
+	f, e := os.CreateTemp(s.options.Root, ".server-meta-*")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if _, e = f.Write(b); e != nil {
+		return e
+	}
+	if e = f.Sync(); e != nil {
+		return e
+	}
+	if e = f.Close(); e != nil {
+		return e
+	}
+	return os.Rename(f.Name(), s.metadataPath(id))
 }

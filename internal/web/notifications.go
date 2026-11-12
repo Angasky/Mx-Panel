@@ -35,6 +35,7 @@ type notificationConfig struct {
 	LossPercent int    `json:"lossPercent"`
 }
 type notificationEvent struct {
+	Key      string `json:"key,omitempty"`
 	Time     int64  `json:"time"`
 	Text     string `json:"text"`
 	Status   string `json:"status"`
@@ -312,20 +313,49 @@ func (s *Server) notificationConditions(c notificationConfig, now time.Time) (ma
 	return out, nil
 }
 func notificationReconcile(n *notificationState, current map[string]string, now time.Time) {
+	// A renewed or edited expiry invalidates queued reminders before delivery.
+	for i := range n.Events {
+		event := &n.Events[i]
+		if event.Status != "pending" {
+			continue
+		}
+		if strings.HasPrefix(event.Key, "server-expiry:") || strings.HasPrefix(event.Key, "subscription-expiry:") {
+			if current[event.Key] != event.Text {
+				event.Status = "cancelled"
+			}
+		} else if event.Key == "" {
+			// Older queues had no keys: only cancel a known old expiry message when
+			// no current condition still needs that exact message.
+			oldExpiry, stillNeeded := false, false
+			for key, text := range n.Active {
+				if text == event.Text && (strings.HasPrefix(key, "server-expiry:") || strings.HasPrefix(key, "subscription-expiry:")) {
+					oldExpiry = true
+				}
+			}
+			for _, text := range current {
+				if text == event.Text {
+					stillNeeded = true
+				}
+			}
+			if oldExpiry && !stillNeeded {
+				event.Status = "cancelled"
+			}
+		}
+	}
 	keys := make([]string, 0, len(current))
 	for k := range current {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	add := func(message string) {
-		n.Events = append(n.Events, notificationEvent{Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
+	add := func(key, message string) {
+		n.Events = append(n.Events, notificationEvent{Key: key, Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
 	}
 	for _, key := range keys {
 		if strings.HasPrefix(key, "unknown:") || strings.HasPrefix(key, "healthy:") {
 			continue
 		}
 		if n.Active[key] != current[key] {
-			add(current[key])
+			add(key, current[key])
 		}
 	}
 	oldKeys := make([]string, 0, len(n.Active))
@@ -338,14 +368,14 @@ func notificationReconcile(n *notificationState, current map[string]string, now 
 			if current["unknown:"+key] != "" {
 				current[key] = n.Active[key]
 			} else if current["healthy:"+key] != "" {
-				add("探测恢复通知（以下原告警已解除）：" + n.Active[key])
+				add("", "探测恢复通知（以下原告警已解除）："+n.Active[key])
 			}
 		}
 		if strings.HasPrefix(key, "monitor:") && current[key] == "" {
 			if current["unknown:"+strings.TrimPrefix(key, "monitor:")] != "" {
 				current[key] = n.Active[key]
 			} else if n.Config.Monitor && current["healthy:"+strings.TrimPrefix(key, "monitor:")] != "" {
-				add("监控采样恢复：" + strings.TrimSuffix(n.Active[key], "连续监控采样失败，请检查连接；不代表代理服务一定离线。"))
+				add("", "监控采样恢复："+strings.TrimSuffix(n.Active[key], "连续监控采样失败，请检查连接；不代表代理服务一定离线。"))
 			}
 		}
 	}
