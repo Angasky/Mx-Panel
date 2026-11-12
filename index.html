@@ -1491,9 +1491,9 @@ html .subscription-qr{width:78px;height:78px}.subscription-qr-button span{displa
 
 
 /* Craft Monitor artwork and palette adapted to the panel's existing components. */
-@font-face{font-family:MXCraft;src:url('/sub/ui-craft/Silkscreen-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:MXCraft;src:url('/sub/ui-craft/Monocraft.ttf') format('truetype');font-weight:400;font-display:swap}
 .craft-hero{display:none}
-html[data-theme="craft"]{color-scheme:light;--bg:#edf0e4;--bg-card:#fffef5;--bg-card-hover:#f1f5e5;--bg-sidebar:#f4f1df;--bg-input:#fffef7;--surface-inset:#e8edda;--surface-header:#e6ebd8;--border:#b3bfa1;--border-focus:#4f702e;--blue:#4f702e;--blue-bright:#355521;--blue-dim:#4b682f;--blue-soft:#e0eacb;--cyan:#3e6d60;--accent-rgb:79 112 46;--shadow-rgb:47 56 33;--overlay-rgb:27 39 26;--primary-bg:#527b35;--primary-hover:#3e6126;--primary-border:#314c23;--text:#283b28;--text-muted:#56664b;--text-dim:#45583b;--placeholder:#69775e;--green:#3f752e;--success-text:#386425;--green-soft:#e4efcf;--danger:#a83b2e;--danger-text:#992c22;--danger-strong:#79201b;--danger-soft:#fbe8df;--radius-sm:2px;--radius-md:3px;--radius-lg:4px}
+html[data-theme="craft"]{color-scheme:light;--bg:#e8e7e2;--bg-card:#faf9f6;--bg-card-hover:#eeeee8;--bg-sidebar:#e4dfd2;--bg-input:#fffefa;--surface-inset:#e5e4dd;--surface-header:#deded7;--border:#999b8e;--border-focus:#326c24;--border-glow:transparent;--blue:#2d6420;--blue-bright:#245319;--blue-dim:#325c28;--blue-soft:#dcebcf;--cyan:#17645d;--accent-rgb:45 100 32;--shadow-rgb:49 49 49;--overlay-rgb:29 30 30;--primary-bg:#326c24;--primary-hover:#28581c;--primary-border:#203e18;--text:#242722;--text-muted:#505449;--text-dim:#42473d;--placeholder:#606457;--green:#2d6420;--success-text:#285c1d;--success-rgb:45 100 32;--green-soft:#e0edd5;--amber:#78520a;--amber-soft:#fff0ce;--warning-rgb:120 82 10;--danger:#a12b21;--danger-text:#92251c;--danger-strong:#722017;--danger-soft:#fbe6df;--danger-rgb:161 43 33;--radius-sm:0px;--radius-md:2px;--radius-lg:2px}
 html[data-theme="craft"] body{background-color:var(--bg);background-image:linear-gradient(#edf0e4f7,#edf0e4f7),url('/sub/ui-craft/dirt.svg');background-size:auto,96px 96px}
 html[data-theme="craft"] .side{background-image:linear-gradient(#f4f1dff2,#f4f1dff2),url('/sub/ui-craft/wood.svg');background-size:auto,128px;border-right:3px solid #687755}
 html[data-theme="craft"] :is(.panel,.profile-card,.host-card,.modalbox,.card,.subscription-row,.loginbox){border:2px solid #7f906a;border-radius:3px;box-shadow:inset 2px 2px #ffffffb3,inset -2px -2px #a6b58a50,3px 3px #34432c26}
@@ -1514,6 +1514,46 @@ html[data-theme="craft"] .craft-hero{display:grid;grid-template-columns:minmax(0
 .craft-eyebrow{font:16px/1.4 MXCraft,var(--font-sans);color:#527b35;letter-spacing:1px}.craft-hero-copy h2{font:750 clamp(23px,2.3vw,35px)/1.45 var(--font-sans);margin:12px 0;color:#304b29}.craft-hero-copy p{font-size:14px;color:#536747;margin:0 0 18px}.craft-hero-note{display:block;font-size:12px;color:#617153;margin-top:14px}
 .craft-landscape{position:relative;min-width:0;border:3px solid #405b37;box-shadow:4px 4px #34432c33;background:#c2dcd2;overflow:hidden}.craft-landscape img{width:100%;height:auto;display:block;image-rendering:pixelated}.craft-landscape>span{position:absolute;bottom:10px;right:10px;background:#203b2bcc;color:#fffdeb;padding:4px 7px;font:11px/1.5 MXCraft,var(--font-sans)}
 .theme-preview.craft{background:#c2dcd2 url('/sub/ui-craft/overworld.png') center/cover;image-rendering:pixelated;border:2px solid #6d8357}.theme-preview.craft::before,.theme-preview.craft::after{display:none}
+/* Vanilla inventory bevels; readable ink on quiet surfaces. */
+html[data-theme="craft"] body{background-image:linear-gradient(#e8e7e2ed,#e8e7e2ed),url('/sub/ui-craft/dirt.svg');font-size:15px}
+html[data-theme="craft"] :is(.hint,.muted,.note){color:var(--text-muted);font-size:14px}
+html[data-theme="craft"] :is(.panel,.card,.profile-card,.host-card,.modalbox,.subscription-row,.loginbox){background-color:var(--bg-card);border-color:#65685d;border-radius:2px;box-shadow:inset 2px 2px #fff,inset -2px -2px #b7b9ac,3px 3px #31313130}
+html[data-theme="craft"] :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#fffefa;color:var(--text);border-color:#787c6e;box-shadow:inset 2px 2px #31313118;font-size:14px}
+html[data-theme="craft"] ::placeholder{color:var(--placeholder);opacity:1}
+html[data-theme="craft"] :is(.craft-eyebrow,.craft-landscape>span,.card b,.usage-grid strong){font-family:MXCraft,var(--font-sans);letter-spacing:0}
+html[data-theme="craft"] :is(.btn,.nav,.panel h3,.modalhead h3){font-family:MXCraft,var(--font-sans);letter-spacing:0}
+html[data-theme="craft"] .btn{background:#d4d4ca;color:#262923;border-color:#45483f;box-shadow:inset 2px 2px #fff,inset -2px -3px #8d9083,2px 2px #31313130}
+html[data-theme="craft"] .btn.primary{background:var(--primary-bg);color:#fff;border-color:var(--primary-border);box-shadow:inset 2px 2px #71a355,inset -2px -3px #203e18,2px 2px #31313130}
+html[data-theme="craft"] .btn.danger{background:var(--danger-soft);color:var(--danger-text);border-color:#a36a51}
+html[data-theme="craft"] .btn:hover{filter:none;background:#e3e8d6}
+html[data-theme="craft"] .btn.primary:hover{background:var(--primary-hover);color:#fff}
+html[data-theme="craft"] .btn.danger:hover{background:#f3d4c9}
+html[data-theme="craft"] :is(button,a,input,select,textarea,summary):focus-visible{outline:3px solid #326c24;outline-offset:3px}
+html[data-theme="craft"] .craft-hero{background:#faf9f6;border-color:#65685d;border-top:6px solid #558b36;box-shadow:inset 2px 2px #fff,4px 4px #31313130}
+html[data-theme="craft"] .craft-hero-copy p{color:#454d3e;font-size:15px}
+html[data-theme="craft"] .craft-hero-note{color:#505449;font-size:13px}
+.craft-inventory{display:flex;gap:6px;align-items:center;margin:18px 0 4px;padding:8px;width:fit-content;max-width:100%;background:#c6c6c6;border:2px solid #373a32;box-shadow:inset 2px 2px #fff,inset -2px -2px #55584e}
+.craft-slot{width:44px;height:44px;display:grid;place-items:center;background:#8b8b8b;border:2px solid;border-color:#373737 #fff #fff #373737}
+.craft-slot img{width:32px;height:32px;image-rendering:pixelated}
+.craft-inventory>span:last-child{padding:0 8px;color:#34372f;font-size:13px}
+/* Dense data uses readable neutral ink; pixel type stays in decorative headings. */
+html[data-theme="craft"]{--data-text:#24292f;--data-bg:#ffffff;--data-header:#eef0eb;--data-hover:#f1f5ec;--data-border:#c8cdc2}
+html[data-theme="craft"] :is(.btn,.btn.small,.nav){font-family:var(--font-sans);font-size:14px}
+html[data-theme="craft"] :is(code,pre,textarea.raw,.server-log){font-family:var(--font-mono);font-size:14px;color:var(--data-text);background:var(--data-bg);text-shadow:none;letter-spacing:0}
+html[data-theme="craft"] .tablewrap{background:var(--data-bg);border-color:var(--data-border)}
+html[data-theme="craft"] :is(th,td){border-bottom-color:var(--data-border)}
+html[data-theme="craft"] th{background:var(--data-header);color:var(--data-text);font-size:14px;font-weight:650}
+html[data-theme="craft"] td{color:var(--data-text);font-size:14px;padding:14px 16px;line-height:1.75}
+html[data-theme="craft"] tbody tr:hover{background:var(--data-hover)}
+html[data-theme="craft"] td code{padding:0;border:0;border-radius:0;background:transparent;color:var(--data-text);font-size:14px;line-height:1.8}
+html[data-theme="craft"] :is(.pagination,.pill,.node-card-meta,.node-card-address,.profile-usage,.subscription-details,.current-profile>span){font-size:14px}
+.dns-table{table-layout:fixed;min-width:720px}
+.dns-table th:first-child{width:24%}.dns-table th:last-child{width:150px}
+.dns-table td{vertical-align:middle;white-space:normal}
+.dns-table td code{overflow-wrap:anywhere;white-space:normal}
+.dns-server-list{display:flex;flex-direction:column;gap:8px}
+.dns-server-list code{display:block}
+.dns-table td:last-child{white-space:nowrap}
 @media(max-width:900px){html[data-theme="craft"] .craft-hero{gap:18px;padding:18px}}
 @media(max-width:600px){html[data-theme="craft"] .craft-hero{grid-template-columns:1fr;padding:16px;gap:18px;margin-bottom:20px}.craft-hero-copy h2{font-size:26px}.craft-hero-note{margin-top:10px}.craft-landscape>span{font-size:10px}}
 
@@ -2248,7 +2288,7 @@ function settings() {
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
-      <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>复用你的 Craft Monitor 主图、木板与石块材质，草方块配色和像素标题，正文保持清晰易读。</p></button>
+      <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>原版物品栏与立体按钮，草地绿和石灰配色，像素英文搭配清晰中文。</p></button>
       <button type="button" class="theme-option" data-theme-choice="slate" aria-pressed="${theme === 'slate'}" onclick="setTheme('slate')"><span class="theme-preview slate" aria-hidden="true"></span><strong>云白主题 · 清晰控制台</strong><p>冷白背景、靛蓝操作色和轻量卡片，采用 Inter 与中文无衬线字体，突出内容和常用操作。</p></button>
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
         <span class="theme-preview high" aria-hidden="true"></span><strong>科技主题 · 终端工作台</strong><p>深色背景与蓝色强调色，保留品牌动效，采用统一易读字体和紧凑控件。</p>
@@ -3937,7 +3977,7 @@ async function overview() {
   let p = S.profiles.find(x => x.id === S.profile) || S.data.profile;
   let url = location.origin + p.url;
   $('content').innerHTML = `    <section class="craft-hero" aria-label="我的世界主题主图">
-      <div class="craft-hero-copy"><span class="craft-eyebrow">MXIOC WORLD</span><h2>每一个方块，<br>连接你的世界。</h2><p>管理订阅、守望节点，搭建你的方块工作台。</p><a class="btn primary" href="#clientSubscriptions">探索订阅世界 ↓</a><span class="craft-hero-note">主图来自你的 Craft Monitor 探针项目</span></div>
+      <div class="craft-hero-copy"><span class="craft-eyebrow">MXIOC WORLD</span><h2>每一个方块，<br>连接你的世界。</h2><p>管理订阅、守望节点，搭建你的方块工作台。</p><a class="btn primary" href="#clientSubscriptions">探索订阅世界 ↓</a><div class="craft-inventory" aria-label="方块工作台装饰物品栏"><span class="craft-slot"><img src="/sub/ui-craft/block.svg" alt="草方块"></span><span class="craft-slot"><img src="/sub/ui-craft/pickaxe.svg" alt="钻石镐"></span><span class="craft-slot"><img src="/sub/ui-craft/chest.svg" alt="储物箱"></span><span>你的方块工作台</span></div><span class="craft-hero-note">从一个方块开始，连接每一处世界。</span></div>
       <div class="craft-landscape"><img src="/sub/ui-craft/overworld.png" alt="像素主世界：草地、树木、池塘与木屋" width="560" height="300"><span>OVERWORLD / 主世界</span></div>
     </section>
 ` + cards() + trafficSummary() + `
@@ -4593,7 +4633,7 @@ function dns() {
       <input id="search" placeholder="> 搜索分流域名匹配规则..." value="${esc(q)}">
     </div>
     <div class="tablewrap">
-      <table>
+      <table class="dns-table">
         <thead>
           <tr>
             <th>域名匹配规则</th>
@@ -4605,7 +4645,7 @@ function dns() {
           ${rows.map(x => `
             <tr>
               <td><code>${esc(x.domain)}</code></td>
-              <td>${x.servers.map(s => `<code>${esc(s)}</code>`).join('<br>')}</td>
+              <td><div class="dns-server-list">${x.servers.map(s => `<code>${esc(s)}</code>`).join('')}</div></td>
               <td>
                 <button class="btn small" onclick="dnsModal('${encodeURIComponent(x.domain)}')">编辑</button>
                 <button class="btn small danger" onclick="deleteDns('${encodeURIComponent(x.domain)}')">删除</button>

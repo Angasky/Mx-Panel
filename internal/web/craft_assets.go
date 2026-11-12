@@ -18,7 +18,7 @@ func craftAsset(w http.ResponseWriter, r *http.Request) bool {
 	}
 	name := strings.TrimPrefix(r.URL.Path, prefix)
 	switch name {
-	case "block.svg", "dirt.svg", "stone.svg", "wood.svg", "overworld.png", "Silkscreen-Regular.ttf", "Silkscreen-OFL.txt":
+	case "block.svg", "dirt.svg", "stone.svg", "wood.svg", "overworld.png", "Silkscreen-Regular.ttf", "Silkscreen-OFL.txt", "Monocraft.ttf", "Monocraft-LICENSE.txt", "pickaxe.svg", "chest.svg":
 	default:
 		problem(w, 404, "资源不存在")
 		return true
