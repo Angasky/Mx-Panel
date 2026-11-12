@@ -23,3 +23,5 @@ Copyright 2001 The Silkscreen Project Authors，SIL OFL 1.1；完整许可证在
 Monocraft 字体以 SIL OFL 1.1 分发，许可保存在 internal/web/assets/craft/Monocraft-LICENSE.txt。新物品图标为原创 SVG，没有复制游戏贴图。
 
 DNS / 密集表格可读性修正：参考 https://github.com/primer/primitives/blob/main/DESIGN_TOKENS_GUIDE.md 的前景/背景搭配规则。表格采用 #24292f 深灰文字、白色底，数据代码从 12px 增至 14px，去除逐项边框，DNS 多地址以 8px 间距排布并允许长地址换行。小按钮和导航使用正常界面字体，像素字用于装饰标题。仅我的世界主题调整表格配色，其余主题保留各自配色。
+
+节点协议标签采用浅灰绿色底（#dbe2d1）、深色文字（#293525）和低对比边框，消除卡片内纯白色块，标签使用清晰界面字体并支持换行。
