@@ -14,16 +14,18 @@ func (s *Server) clientOptionsRoute(w http.ResponseWriter, r *http.Request) bool
 	case "GET":
 	case "PUT":
 		var input struct {
-			DNSMode        *string `json:"dnsMode"`
-			WebRTCMode     *string `json:"webRTCMode"`
-			WebRTC         *bool   `json:"webRTC"`
-			DNSProtection  *bool   `json:"dnsProtection"`
-			DomesticRealIP *bool   `json:"domesticRealIP"`
-			IPv6           *bool   `json:"ipv6"`
-			BasicAds       *bool   `json:"basicAds"`
-			StrongAds      *bool   `json:"strongAds"`
-			XrayExport     *bool   `json:"xrayExport"`
-			SingBoxExport  *bool   `json:"singBoxExport"`
+			AppCategories    *string `json:"appCategories"`
+			AppExtraPackages *string `json:"appExtraPackages"`
+			DNSMode          *string `json:"dnsMode"`
+			WebRTCMode       *string `json:"webRTCMode"`
+			WebRTC           *bool   `json:"webRTC"`
+			DNSProtection    *bool   `json:"dnsProtection"`
+			DomesticRealIP   *bool   `json:"domesticRealIP"`
+			IPv6             *bool   `json:"ipv6"`
+			BasicAds         *bool   `json:"basicAds"`
+			StrongAds        *bool   `json:"strongAds"`
+			XrayExport       *bool   `json:"xrayExport"`
+			SingBoxExport    *bool   `json:"singBoxExport"`
 		}
 		if readJSON(w, r, &input) != nil || input.WebRTC == nil || input.DNSProtection == nil || input.DomesticRealIP == nil || input.IPv6 == nil || input.BasicAds == nil || input.StrongAds == nil || input.XrayExport == nil || input.SingBoxExport == nil {
 			problem(w, 400, "请提交完整的开关设置")
@@ -34,6 +36,14 @@ func (s *Server) clientOptionsRoute(w http.ResponseWriter, r *http.Request) bool
 		if e != nil {
 			problem(w, 400, e.Error())
 			return true
+		}
+		o.AppCategories = previous.AppCategories
+		o.AppExtraPackages = previous.AppExtraPackages
+		if input.AppCategories != nil {
+			o.AppCategories = *input.AppCategories
+		}
+		if input.AppExtraPackages != nil {
+			o.AppExtraPackages = *input.AppExtraPackages
 		}
 		o.DNSMode = previous.DNSMode
 		o.WebRTCMode = previous.WebRTCMode
@@ -61,6 +71,6 @@ func (s *Server) clientOptionsRoute(w http.ResponseWriter, r *http.Request) bool
 		problem(w, 400, e.Error())
 		return true
 	}
-	respond(w, 200, map[string]any{"options": options, "configured": configured})
+	respond(w, 200, map[string]any{"options": options, "configured": configured, "appCatalog": config.AppPrivacyCatalog(), "appCatalogVersion": "2026-11-12"})
 	return true
 }

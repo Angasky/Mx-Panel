@@ -10,16 +10,18 @@ import (
 // These are explicit per-subscription export overrides; the source YAML is kept
 // intact so deleting overrides restores custom configuration without guessing.
 type ClientOptions struct {
-	DNSMode        string `json:"dnsMode"`
-	WebRTCMode     string `json:"webRTCMode"`
-	WebRTC         bool   `json:"webRTC"`
-	DNSProtection  bool   `json:"dnsProtection"`
-	DomesticRealIP bool   `json:"domesticRealIP"`
-	IPv6           bool   `json:"ipv6"`
-	BasicAds       bool   `json:"basicAds"`
-	StrongAds      bool   `json:"strongAds"`
-	XrayExport     bool   `json:"xrayExport"`
-	SingBoxExport  bool   `json:"singBoxExport"`
+	AppCategories    string `json:"appCategories"`
+	AppExtraPackages string `json:"appExtraPackages"`
+	DNSMode          string `json:"dnsMode"`
+	WebRTCMode       string `json:"webRTCMode"`
+	WebRTC           bool   `json:"webRTC"`
+	DNSProtection    bool   `json:"dnsProtection"`
+	DomesticRealIP   bool   `json:"domesticRealIP"`
+	IPv6             bool   `json:"ipv6"`
+	BasicAds         bool   `json:"basicAds"`
+	StrongAds        bool   `json:"strongAds"`
+	XrayExport       bool   `json:"xrayExport"`
+	SingBoxExport    bool   `json:"singBoxExport"`
 }
 
 func readClientOptions(record Document) (*ClientOptions, error) {
@@ -131,8 +133,11 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 	if o.DNSMode != "" && o.DNSMode != "strict" && o.DNSMode != "domestic" {
 		return nil, errors.New("DNS 模式无效")
 	}
-	if o.WebRTCMode != "" && o.WebRTCMode != "block" && o.WebRTCMode != "chrome-proxy" {
+	if o.WebRTCMode != "" && o.WebRTCMode != "block" && o.WebRTCMode != "chrome-proxy" && o.WebRTCMode != "apps-proxy" {
 		return nil, errors.New("WebRTC 模式无效")
+	}
+	if _, _, e := appPrivacySelection(o); e != nil {
+		return nil, e
 	}
 	doc := cloneConfig(original).(Document)
 	if o.WebRTC && o.WebRTCMode == "chrome-proxy" {
@@ -155,7 +160,13 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 	}
 	rules := []any{}
 	if o.WebRTC {
-		if o.WebRTCMode == "chrome-proxy" {
+		if o.WebRTCMode == "apps-proxy" {
+			var e error
+			rules, e = installAppPrivacy(doc, o)
+			if e != nil {
+				return nil, e
+			}
+		} else if o.WebRTCMode == "chrome-proxy" {
 			rules = append(rules, "AND,((PROCESS-NAME,com.android.chrome),(NETWORK,UDP)),✈️ Proxy")
 			doc["find-process-mode"] = "always"
 		} else {
@@ -221,6 +232,9 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 				proxy = "✈️ Proxy"
 			}
 		}
+		if o.WebRTC && o.WebRTCMode == "apps-proxy" {
+			proxy = AppPrivacyGroup
+		}
 		if proxy == "" {
 			return nil, errors.New("DNS 防泄露需要名为「✈️ Proxy」的策略组，请先配置代理组")
 		}
@@ -239,6 +253,15 @@ func applyClientOptions(original Document, o ClientOptions) (Document, error) {
 			local := []any{"https://dns.alidns.com/dns-query#DIRECT", "https://doh.pub/dns-query#DIRECT"}
 			dns["nameserver-policy"] = Document{"geosite:cn": local, "geosite:private": local}
 			dns["direct-nameserver-follow-policy"] = true
+		}
+		if o.WebRTC && o.WebRTCMode == "apps-proxy" {
+			// DNS requests often lose Android process attribution. Apply domain
+			// presets, but never pretend arbitrary app DNS can be attributed.
+			_, domains, _ := appPrivacySelection(o)
+			policy := dns["nameserver-policy"].(Document)
+			for _, domain := range domains {
+				policy["+."+domain] = append([]any(nil), remote...)
+			}
 		}
 		dns["proxy-server-nameserver"] = append([]any(nil), domesticDefaultDNS...)
 		dns["default-nameserver"] = []any{"223.5.5.5", "119.29.29.29"}
