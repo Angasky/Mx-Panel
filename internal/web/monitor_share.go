@@ -29,11 +29,12 @@ type sharedMonitor struct {
 	Label string `json:"label"`
 }
 type monitorShare struct {
-	Public  bool            `json:"public"`
-	Enabled bool            `json:"enabled"`
-	Digest  string          `json:"digest"`
-	Servers []sharedMonitor `json:"servers"`
-	Updated int64           `json:"updated"`
+	Appearance monitorAppearance `json:"appearance"`
+	Public     bool              `json:"public"`
+	Enabled    bool              `json:"enabled"`
+	Digest     string            `json:"digest"`
+	Servers    []sharedMonitor   `json:"servers"`
+	Updated    int64             `json:"updated"`
 }
 type sharedMetric struct {
 	ICMPProbes []netprobe.Result      `json:"icmpProbes,omitempty"`
@@ -50,8 +51,9 @@ type sharedMetric struct {
 	TXRate     *float64               `json:"txRate"`
 }
 type sharedReport struct {
-	GeneratedAt int64          `json:"generatedAt"`
-	Servers     []sharedMetric `json:"servers"`
+	Appearance  monitorAppearance `json:"appearance"`
+	GeneratedAt int64             `json:"generatedAt"`
+	Servers     []sharedMetric    `json:"servers"`
 }
 
 func (s *Server) sharePath() string { return filepath.Join(s.options.Root, "monitor-sharing.json") }
@@ -79,7 +81,7 @@ func (s *Server) readShare() (monitorShare, error) {
 	if err != nil {
 		return c, err
 	}
-	if len(data) > 64<<10 || json.Unmarshal(data, &c) != nil || !validSharedServers(c.Servers) {
+	if len(data) > 64<<10 || json.Unmarshal(data, &c) != nil || !validSharedServers(c.Servers) || !validMonitorAppearance(c.Appearance) {
 		return c, errors.New("监控分享配置损坏")
 	}
 	if c.Digest != "" {
@@ -137,13 +139,21 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 	token := ""
 	if r.Method == "PUT" || r.Method == "POST" {
 		var input struct {
-			Public  bool            `json:"public"`
-			Enabled bool            `json:"enabled"`
-			Servers []sharedMonitor `json:"servers"`
+			Appearance *monitorAppearance `json:"appearance"`
+			Public     bool               `json:"public"`
+			Enabled    bool               `json:"enabled"`
+			Servers    []sharedMonitor    `json:"servers"`
 		}
 		if readJSON(w, r, &input) != nil || !validSharedServers(input.Servers) {
 			problem(w, 400, "最多分享 32 台服务器，公开名称需为 1–60 个字符且不能包含控制字符")
 			return true
+		}
+		if input.Appearance != nil {
+			if !validMonitorAppearance(*input.Appearance) {
+				problem(w, 400, "标题最多 60 字、介绍最多 200 字；Logo 仅支持 24 KiB 内且尺寸不超过 512×512 的 PNG/JPEG")
+				return true
+			}
+			c.Appearance = *input.Appearance
 		}
 		manager, e := s.remoteManager()
 		if e != nil {
@@ -190,7 +200,7 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 			return true
 		}
 	}
-	result := map[string]any{"public": c.Public, "publicURL": "/sub/status-public", "enabled": c.Enabled, "servers": c.Servers, "hasLink": c.Digest != "", "updated": c.Updated}
+	result := map[string]any{"appearance": c.Appearance, "public": c.Public, "publicURL": "/sub/status-public", "enabled": c.Enabled, "servers": c.Servers, "hasLink": c.Digest != "", "updated": c.Updated}
 	if token != "" {
 		result["url"] = "/sub/status/" + token
 		result["token"] = token
@@ -200,7 +210,7 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 	return true
 }
 func (s *Server) sharedMetrics(c monitorShare) sharedReport {
-	report := sharedReport{GeneratedAt: s.now().Unix(), Servers: []sharedMetric{}}
+	report := sharedReport{Appearance: monitorAppearanceDefaults(c.Appearance), GeneratedAt: s.now().Unix(), Servers: []sharedMetric{}}
 	manager, err := s.remoteManager()
 	if err != nil {
 		return report
@@ -381,7 +391,7 @@ func (s *Server) monitorSharePublic(w http.ResponseWriter, r *http.Request) bool
 		return true
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 	if err = monitorShareTemplate.Execute(w, report); err != nil {
 		return true
 	}
@@ -389,6 +399,7 @@ func (s *Server) monitorSharePublic(w http.ResponseWriter, r *http.Request) bool
 }
 
 var monitorShareTemplate = template.Must(template.New("monitor-sharing").Funcs(template.FuncMap{
+	"logo":  monitorLogoURL,
 	"globe": sharedGlobe,
 	"latency": func(p *float64) string {
 		if p == nil {
@@ -445,8 +456,10 @@ var monitorShareTemplate = template.Must(template.New("monitor-sharing").Funcs(t
 		}
 		return time.Unix(t, 0).UTC().Format("2006-01-02 15:04:05 UTC")
 	},
-}).Parse(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="refresh" content="60"><title>MXIOC · 服务器状态</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f7f3ed;color:#302b26;font:16px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}main{max-width:1120px;margin:auto;padding:32px 20px}header{border-bottom:1px solid #d7c9bb;margin-bottom:24px}h1{font-size:28px;margin:0}header p,.hint{color:#77685a;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}article{background:#fffdf8;border:1px solid #d7c9bb;border-radius:16px;box-shadow:3px 4px 0 #e6ded4;padding:22px;min-width:0}h2{font-size:20px;overflow-wrap:anywhere;margin:0 0 10px}.status{display:inline-block;padding:2px 9px;border:1px solid #dcc9b9;border-radius:20px;background:#f5ede4;font-size:13px}.fresh{color:#196b40;background:#edf8ef;border-color:#b8dbc1}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}dt{font-size:13px;color:#77685a}dd{margin:0;font-size:24px;font-weight:650;overflow-wrap:anywhere}footer{margin-top:28px;font-size:13px;color:#77685a}.time{font-size:12px;color:#77685a;overflow-wrap:anywhere}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}</style></head><body><main><header><h1>MXIOC · 服务器状态</h1><p>管理员选择分享的资源指标 · 每 60 秒刷新</p></header><section aria-label="服务器位置"><h2>服务器位置 · 3D 地球</h2><p class="hint">仅显示管理员明确公开的手动坐标，不代表网络连通性。选择下方位置可定位；支持拖动和方向键旋转。</p><div data-mx-globe="{{globe .Servers}}"></div><noscript>启用 JavaScript 可查看地球；下方资源列表仍可使用。</noscript></section><section class="grid" aria-label="服务器状态" style="margin-top:24px">{{range .Servers}}<article><h2>{{.Label}}</h2>{{with .Metadata}}<p class="hint">{{.Region}}{{if .Provider}} · {{.Provider}}{{end}}</p>{{if .ProviderURL}}<a href="{{.ProviderURL}}" target="_blank" rel="noopener noreferrer">服务商网站</a>{{end}}<p class="hint">到期：{{expiry .Expires}}{{if .Currency}}<br>费用：{{price .Price}} {{.Currency}} / {{cycle .Cycle}}{{end}}</p>{{end}}<span class="status {{.Status}}">{{status .Status}}</span><dl><div><dt>CPU 使用率</dt><dd>{{percent .CPU}}</dd></div><div><dt>内存使用率</dt><dd>{{percent .Memory}}</dd></div><div><dt>接收速率</dt><dd>{{rate .RXRate}}</dd></div><div><dt>发送速率</dt><dd>{{rate .TXRate}}</dd></div></dl><div class="time">采样：{{stamp .SampledAt}}</div>{{if .Probes}}<details><summary>Agent TCP 连通延迟</summary>{{range .Probes}}<p>{{.Name}}：{{latency .Milliseconds}}</p>{{end}}<p class="hint">TCP 建连测试，不代表 ICMP 丢包或代理连通性。</p></details>{{end}}{{if .ICMPProbes}}<details><summary>Agent ICMP 回包延迟</summary>{{range .ICMPProbes}}<p>{{.Name}}：{{latency .Milliseconds}}{{if .Error}}（{{probeError .Error}}）{{end}}</p>{{end}}<p class="hint">无权限或发送失败不计作丢包；超时也可能由目标过滤 ICMP 引起。</p></details>{{end}}<details><summary>查看 24 小时 CPU / 内存趋势</summary>{{chart .History}}</details></article>{{else}}<article><h2>暂无可展示的服务器</h2><p class="hint">请联系管理员检查分享设置。</p></article>{{end}}</section><footer>更新时间：{{stamp .GeneratedAt}}<br>状态表示资源采样结果；采样失败或数据过期不等同于服务器或代理服务离线。</footer></main><script src="/sub/status-globe.js" defer></script></body></html>`))
+}).Parse(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="refresh" content="60"><title>{{.Appearance.Title}}</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f7f3ed;color:#302b26;font:16px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}main{max-width:1120px;margin:auto;padding:32px 20px}header{border-bottom:1px solid #d7c9bb;margin-bottom:24px}h1{font-size:28px;margin:0}header p,.hint{color:#77685a;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}article{background:#fffdf8;border:1px solid #d7c9bb;border-radius:16px;box-shadow:3px 4px 0 #e6ded4;padding:22px;min-width:0}h2{font-size:20px;overflow-wrap:anywhere;margin:0 0 10px}.status{display:inline-block;padding:2px 9px;border:1px solid #dcc9b9;border-radius:20px;background:#f5ede4;font-size:13px}.fresh{color:#196b40;background:#edf8ef;border-color:#b8dbc1}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}dt{font-size:13px;color:#77685a}dd{margin:0;font-size:24px;font-weight:650;overflow-wrap:anywhere}footer{margin-top:28px;font-size:13px;color:#77685a}.time{font-size:12px;color:#77685a;overflow-wrap:anywhere}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+header h1,header p{overflow-wrap:anywhere}.site-brand{display:flex;align-items:center;gap:16px;min-width:0}.site-logo{width:64px;height:64px;object-fit:contain;flex:none;border-radius:12px}header{padding-bottom:18px}.theme-slate{background:#f4f7fb;color:#1e293b}.theme-slate article{background:#fff;border-color:#cbd5e1;box-shadow:0 3px 10px #1e293b0a}.theme-slate header p,.theme-slate .hint,.theme-slate dt,.theme-slate footer,.theme-slate .time{color:#475569}.theme-dark{background:#111827;color:#f1f5f9}.theme-dark article{background:#1e293b;border-color:#475569;box-shadow:none}.theme-dark header p,.theme-dark .hint,.theme-dark dt,.theme-dark footer,.theme-dark .time{color:#cbd5e1}.theme-dark a{color:#93c5fd}.theme-dark .status{background:#334155;color:#e2e8f0;border-color:#64748b}.theme-dark .fresh{background:#14532d;color:#dcfce7}.theme-craft{background:#e8eddf;color:#243021}.theme-craft article{background:#faf9ed;border:2px solid #536547;border-radius:2px;box-shadow:4px 4px 0 #9da98e}.theme-craft header{border-bottom:4px solid #557b39}.theme-craft h1{letter-spacing:1px}.theme-craft .site-logo{image-rendering:pixelated;border-radius:0}.theme-craft header p,.theme-craft .hint,.theme-craft dt,.theme-craft footer,.theme-craft .time{color:#46553b}@media(max-width:480px){main{padding:24px 16px}h1{font-size:24px}.site-logo{width:48px;height:48px}}
+</style></head><body class="theme-{{.Appearance.Theme}}"><main><header><div class="site-brand">{{if .Appearance.Logo}}<img class="site-logo" src="{{logo .Appearance.Logo}}" alt="站点 Logo" width="64" height="64">{{end}}<h1>{{.Appearance.Title}}</h1></div><p>{{.Appearance.Description}}</p></header>{{if not .Appearance.HideGlobe}}<section aria-label="服务器位置"><h2>服务器位置 · 3D 地球</h2><p class="hint">仅显示管理员明确公开的手动坐标，不代表网络连通性。选择下方位置可定位；支持拖动和方向键旋转。</p><div data-mx-globe="{{globe .Servers}}"></div><noscript>启用 JavaScript 可查看地球；下方资源列表仍可使用。</noscript></section>{{end}}<section class="grid" aria-label="服务器状态" style="margin-top:24px">{{range .Servers}}<article><h2>{{.Label}}</h2>{{with .Metadata}}<p class="hint">{{.Region}}{{if .Provider}} · {{.Provider}}{{end}}</p>{{if .ProviderURL}}<a href="{{.ProviderURL}}" target="_blank" rel="noopener noreferrer">服务商网站</a>{{end}}<p class="hint">到期：{{expiry .Expires}}{{if .Currency}}<br>费用：{{price .Price}} {{.Currency}} / {{cycle .Cycle}}{{end}}</p>{{end}}<span class="status {{.Status}}">{{status .Status}}</span><dl><div><dt>CPU 使用率</dt><dd>{{percent .CPU}}</dd></div><div><dt>内存使用率</dt><dd>{{percent .Memory}}</dd></div><div><dt>接收速率</dt><dd>{{rate .RXRate}}</dd></div><div><dt>发送速率</dt><dd>{{rate .TXRate}}</dd></div></dl><div class="time">采样：{{stamp .SampledAt}}</div>{{if .Probes}}<details><summary>Agent TCP 连通延迟</summary>{{range .Probes}}<p>{{.Name}}：{{latency .Milliseconds}}</p>{{end}}<p class="hint">TCP 建连测试，不代表 ICMP 丢包或代理连通性。</p></details>{{end}}{{if .ICMPProbes}}<details><summary>Agent ICMP 回包延迟</summary>{{range .ICMPProbes}}<p>{{.Name}}：{{latency .Milliseconds}}{{if .Error}}（{{probeError .Error}}）{{end}}</p>{{end}}<p class="hint">无权限或发送失败不计作丢包；超时也可能由目标过滤 ICMP 引起。</p></details>{{end}}<details><summary>查看 24 小时 CPU / 内存趋势</summary>{{chart .History}}</details></article>{{else}}<article><h2>暂无可展示的服务器</h2><p class="hint">请联系管理员检查分享设置。</p></article>{{end}}</section><footer>更新时间：{{stamp .GeneratedAt}}<br>状态表示资源采样结果；采样失败或数据过期不等同于服务器或代理服务离线。</footer></main><script src="/sub/status-globe.js" defer></script></body></html>`))
 
 func fmtPercent(v float64) string { return fmt.Sprintf("%.1f%%", v) }
 func fmtRate(v float64) string {

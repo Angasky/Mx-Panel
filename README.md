@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.22` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.23` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.22-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.23-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -225,3 +225,5 @@ Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南]
 ### Telegram 通知
 
 管理员进入 **设置 → 通知中心**，配置 Bot Token 与 Chat ID 后开启监控异常/恢复、订阅额度与到期、服务器续费提醒。默认关闭，支持阈值配置、去重和自动重试；新增每日网卡流量汇总、日报预览，以及 TCP/ICMP 延迟和失败/丢包提醒。详见 [通知中心](docs/go/NOTIFICATIONS.md) 与 [功能差异](docs/go/MMWX-COMPARISON.md)。
+
+公开探针页支持标题、介绍、本地 Logo、四种配色及地球显隐，在 **设置 → 监控分享 → 探针站外观定制** 中配置，详见 [探针外观说明](docs/go/PROBE-APPEARANCE.md)。
