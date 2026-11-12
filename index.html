@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="high">
+<html lang="zh-CN" data-theme="slate">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MXIOC // Terminal Control Center</title>
 <script>
-try { document.documentElement.dataset.theme = ['high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'high'; } catch (_) {}
+try { document.documentElement.dataset.theme = ['slate', 'high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'slate'; } catch (_) {}
 </script>
 <style>
 :root {
@@ -1441,6 +1441,54 @@ html[data-theme="amber"] .modalhead { background:var(--surface-header); }
 .theme-options { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); }
 .node-protocol-filter { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
 .node-protocol-filter .btn[aria-pressed="true"] { background:var(--primary-bg); color:#fff; border-color:var(--primary-border); }
+
+/* Shared console layout: compact cards, predictable type and control sizes. */
+@font-face{font-family:MXInter;src:url('/sub/ui-fonts/inter.woff2') format('woff2');font-weight:100 900;font-display:swap}
+@font-face{font-family:MXNoto;src:url('/sub/ui-fonts/noto-ui.woff2') format('woff2');font-weight:400;font-display:swap}
+:root{--font-sans:MXInter,MXNoto,'Noto Sans CJK SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif}
+html[data-theme="slate"]{color-scheme:light;--bg:#f5f7fb;--bg-card:#fff;--bg-card-hover:#f1f5ff;--bg-sidebar:#fff;--bg-input:#fff;--surface-inset:#f5f7fb;--surface-header:#fafbfe;--border:#dce2ec;--border-focus:#4f46e5;--blue:#4f46e5;--blue-bright:#4338ca;--blue-dim:#4338ca;--blue-soft:#eef2ff;--cyan:#4338ca;--accent-rgb:79 70 229;--shadow-rgb:30 41 59;--overlay-rgb:15 23 42;--primary-bg:#4f46e5;--primary-hover:#4338ca;--primary-border:#4f46e5;--text:#182230;--text-muted:#5d6b7e;--text-dim:#475569;--placeholder:#69778c;--green:#16734b;--success-text:#166345;--green-soft:#eaf7f0;--danger:#bf2441;--danger-text:#b21e3c;--danger-strong:#8d1530;--danger-soft:#fff0f2;--border-glow:transparent;--radius-md:14px;--radius-lg:18px}
+html body{font-size:14px;line-height:1.65;letter-spacing:0;background-image:none}
+html .main{padding:28px clamp(16px,3vw,40px);max-width:1640px;margin-inline:auto}
+html .top h2{font-family:var(--font-sans);font-size:26px;line-height:1.3;font-weight:700;letter-spacing:-.025em}
+html .panel,html[data-theme] .panel{padding:22px;border-radius:14px;box-shadow:0 2px 8px rgb(var(--shadow-rgb)/.035)}
+html[data-theme] :is(.panel h3,.modalhead h3){font:650 17px/1.5 var(--font-sans);color:var(--text)}
+html[data-theme] :is(label,.btn,.nav){font-family:var(--font-sans);font-size:14px}
+html[data-theme] :is(label,.panel h3,.modalhead h3,.top h2)::before{content:none}
+html[data-theme] .btn{min-height:38px;padding:8px 14px;border-radius:9px;box-shadow:none;text-shadow:none;line-height:1.35}
+html[data-theme] .btn.small{font-size:13px;min-height:34px;padding:7px 11px}
+html[data-theme] .btn.primary{background:var(--primary-bg);color:#fff;box-shadow:none}
+html[data-theme] .nav{padding:10px 12px;border-radius:9px;box-shadow:none}
+html input:not([type=checkbox]):not([type=radio]),html select{min-height:40px;border-radius:9px}
+html textarea{border-radius:9px;line-height:1.65}
+html .panel-head{gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+html .grid{gap:18px}html .toolbar{gap:10px;flex-wrap:wrap}
+html .hint,html .muted{line-height:1.65;font-size:13px}
+html .note{font-size:13px;line-height:1.75;padding:12px 14px;border-radius:9px}
+html .modalbox{width:min(820px,calc(100vw - 32px));border-radius:16px}
+html .modalhead{padding:18px 22px}html #modalBody{padding:22px}
+html th{font-size:12px;font-weight:650;letter-spacing:.02em}html td{font-size:14px;line-height:1.5}
+html .card b,html .usage-grid strong{font-variant-numeric:tabular-nums;letter-spacing:-.025em}
+html[data-theme="slate"] .nav.active{color:#3730a3;background:#eef2ff;border-color:#c7d2fe}html[data-theme="slate"] .nav.active .nav-label{color:inherit}
+#clientSubscriptions{scroll-margin-top:24px}
+@media(max-width:600px){#clientSubscriptions{scroll-margin-top:145px}.subscription-row{scroll-margin-top:145px}}
+.theme-preview.slate{background:#f5f7fb;border-color:#dce2ec}.theme-preview.slate::before{background:#e0e7ff}.theme-preview.slate::after{background:#fff;border-color:#c7d2fe}
+.subscription-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch}
+#overviewConversionRows{display:contents}
+html .subscription-row{grid-template-columns:minmax(0,1fr) 90px;gap:12px;padding:16px;margin:0;background:var(--bg-card);border-radius:12px;scroll-margin-top:90px;align-items:start;min-width:0}
+.subscription-row:focus{outline:2px solid var(--border-focus);outline-offset:3px}
+.subscription-main{min-width:0}.subscription-main>b{font-size:15px;line-height:1.4;display:block}.subscription-main>.hint{margin:6px 0 10px}
+html .subscription-url{width:100%;min-height:32px!important;height:32px;padding:5px 8px;font-size:12px;text-overflow:ellipsis;background:var(--surface-inset);color:var(--text-muted)}
+html .subscription-actions{justify-content:flex-start;gap:6px;margin-top:10px}
+html .subscription-qr-button{width:90px;padding:5px;border-radius:8px;margin:0}
+html .subscription-qr{width:78px;height:78px}.subscription-qr-button span{display:block;font-size:10px;color:#334155;line-height:1.5;margin-top:4px}
+.subscription-details{grid-column:1/-1;border-top:1px solid var(--border);padding-top:8px;font-size:12px}.subscription-details summary{cursor:pointer;color:var(--text-muted)}
+.subscription-unavailable{opacity:.85}.subscription-unavailable .subscription-main{grid-column:1/-1}
+.client-navigation{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px;background:var(--surface-inset);border:1px solid var(--border);border-radius:10px;margin-bottom:14px}
+.client-navigation label{margin:0}.client-navigation select{flex:1 1 230px;max-width:360px;min-width:0}
+@media(min-width:1500px){html .main{padding-inline:44px}}
+@media(max-width:900px){.subscription-grid{grid-template-columns:1fr}html .main{padding:18px}html .panel,html[data-theme] .panel{padding:18px}}
+@media(max-width:600px){html .main{padding:14px 10px}html .top h2{font-size:22px}html .panel,html[data-theme] .panel{padding:16px}html .modalbox{width:calc(100vw - 20px)}html #modalBody{padding:16px}html .subscription-row{padding:12px;grid-template-columns:minmax(0,1fr) 90px}.client-navigation select{max-width:none;flex-basis:100%}html .subscription-actions .btn{font-size:12px;padding:7px 9px;min-height:36px}}
+
 </style>
 </head>
 <body>
@@ -2115,7 +2163,7 @@ function formatBytes(value) {
 }
 
 function setTheme(theme) {
-  if (!['high', 'low', 'pink', 'amber'].includes(theme)) return;
+  if (!['slate', 'high', 'low', 'pink', 'amber'].includes(theme)) return;
   const root = document.documentElement;
   root.classList.add('theme-switching');
   root.dataset.theme = theme;
@@ -2125,7 +2173,7 @@ function setTheme(theme) {
   let persisted = true;
   try { localStorage.setItem('mxioc_theme', theme); } catch (_) { persisted = false; }
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
-  notice(persisted ? `已切换为${({high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
+  notice(persisted ? `已切换为${({slate:'云白',high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
 }
 
 
@@ -2156,7 +2204,7 @@ function editPanelUser(u, profiles) {
 async function memberPortal() {
   const data=await api('/portal'); S.page='portal';
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
-  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
+  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
     const t=p.traffic||{};
     return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制订阅链接</button><a class="btn" href="${esc(p.url)}" download>下载 Clash / Mihomo</a></div><details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(f.url)}" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
   }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
@@ -2170,21 +2218,22 @@ async function memberPortal() {
 function settings() {
   const theme = document.documentElement.dataset.theme;
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
-    <p class="muted">首次使用默认科技主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
+    <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
+      <button type="button" class="theme-option" data-theme-choice="slate" aria-pressed="${theme === 'slate'}" onclick="setTheme('slate')"><span class="theme-preview slate" aria-hidden="true"></span><strong>云白主题 · 清晰控制台</strong><p>冷白背景、靛蓝操作色和轻量卡片，采用 Inter 与中文无衬线字体，突出内容和常用操作。</p></button>
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
-        <span class="theme-preview high" aria-hidden="true"></span><strong>科技主题 · 终端工作台</strong><p>恢复原来的网格背景、蓝色光晕、终端字体和磨砂弹窗。适合性能较好的设备。</p>
+        <span class="theme-preview high" aria-hidden="true"></span><strong>科技主题 · 终端工作台</strong><p>深色背景与蓝色强调色，保留品牌动效，采用统一易读字体和紧凑控件。</p>
       </button>
       <button type="button" class="theme-option" data-theme-choice="low" aria-pressed="${theme === 'low'}" onclick="setTheme('low')">
         <span class="theme-preview low" aria-hidden="true"></span><strong>简洁主题 · 轻量界面</strong><p>保留当前简洁界面，减少阴影和动画，关闭背景模糊。适合手机、旧电脑与省电场景。</p>
       </button>
       <button type="button" class="theme-option" data-theme-choice="pink" aria-pressed="${theme === 'pink'}" onclick="setTheme('pink')">
-        <span class="theme-preview pink" aria-hidden="true"></span><strong>猛男主题 · 温柔粉色</strong><p>暖粉底色、柔和边框与舒展留白，搭配衬线标题和圆角组件，让复杂配置也从容清晰。</p>
+        <span class="theme-preview pink" aria-hidden="true"></span><strong>猛男主题 · 温柔粉色</strong><p>暖粉底色、柔和边框与舒展留白，搭配统一无衬线字体和圆角组件，让复杂配置也从容清晰。</p>
       </button>
       <button type="button" class="theme-option" data-theme-choice="amber" aria-pressed="${theme === 'amber'}" onclick="setTheme('amber')">
         <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白底色、珊瑚橙操作按钮与细描边，搭配轻量硬边阴影，清晰区分内容与操作。</p>
       </button>
-    </div><div class="note">四套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
+    </div><div class="note">五套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
 }
 
@@ -3820,35 +3869,27 @@ function cards() {
 }
 
 function conversionRows(formats) {
-  return formats.map(f => {
-    const skipped = f.skipped || [], unit = f.unit || '节点';
-    let details = `<div class="hint">${esc(f.note)} · 可导出 ${esc(f.supported)} 个${esc(unit)}，跳过 ${skipped.length} 项</div>`;
-    if (skipped.length) details += `<details style="margin-top:8px;"><summary>查看不兼容项目 (${skipped.length})</summary><div class="note">${skipped.map(x => `${esc(x.name)} (${esc(x.type)}): ${esc(x.reason)}`).join('<br>')}</div></details>`;
-    if (f.available === false) return `<div class="note"><b>${esc(f.name)}</b>${details}<p>${esc(f.error || '当前没有兼容项目')}</p></div>`;
-    return subscriptionRow(f.name, `可导出 ${f.supported} 个${unit}`, location.origin + f.url, f.url, details);
+  const rank={'v2rayn':0,'v2rayng':1,'v2ray':2,'shadowrocket':3,'sing-box':4};
+  return [...formats].sort((a,b)=>(rank[a.id]??20)-(rank[b.id]??20)).map(f => {
+    const skipped=f.skipped||[],unit=f.unit||'节点';
+    const details=`<p class="hint">${esc(f.note||'')} · 可导出 ${esc(f.supported)} 个${esc(unit)}，跳过 ${skipped.length} 项</p>${skipped.length?`<details><summary>不兼容项目 (${skipped.length})</summary><div class="note">${skipped.map(x=>`${esc(x.name)} (${esc(x.type)}): ${esc(x.reason)}`).join('<br>')}</div></details>`:''}`;
+    const id='client-'+String(f.id||f.name).replace(/[^a-zA-Z0-9_-]/g,'-');
+    if(f.available===false)return `<article class="subscription-row subscription-unavailable" id="${esc(id)}" data-client-name="${esc(f.name)}" tabindex="-1"><div class="subscription-main"><b>${esc(f.name)}</b><p class="hint">${esc(f.error||'当前没有兼容项目')}</p><details class="subscription-details"><summary>兼容性说明</summary>${details}</details></div></article>`;
+    return subscriptionRow(f.name,`可导出 ${f.supported} 个${unit}`,location.origin+f.url,f.url,details,id);
   }).join('');
 }
-
-function subscriptionRow(name, description, url, href, details = '') {
-  let encodedUrl = encodeURIComponent(url).replace(/'/g, '%27');
-  let encodedName = encodeURIComponent(name).replace(/'/g, '%27');
-  let qr = '/admin/api/qrcode?url=' + encodedUrl;
-  return `
-    <div class="subscription-row">
-      <div style="min-width:0">
-        <b>${esc(name)}</b>
-        <div class="muted">${esc(description)}</div>
-        <code>${esc(url)}</code>
-        ${details}
-      </div>
-      <div class="subscription-actions">
-        <button class="btn small" onclick="copyText(decodeURIComponent('${encodedUrl}'))">复制</button>
-        <a class="btn small primary" href="${esc(href)}">下载</a>
-      </div>
-      <button class="subscription-qr-button" onclick="openSubscriptionQr('${encodedUrl}','${encodedName}')" title="点击放大二维码">
-        <img class="subscription-qr" src="${esc(qr)}" alt="${esc(name)}订阅二维码">
-      </button>
-    </div>`;
+function subscriptionRow(name, description, url, href, details='', id='') {
+ const encodedUrl=encodeURIComponent(url).replace(/'/g,'%27'),encodedName=encodeURIComponent(name).replace(/'/g,'%27'),qr='/admin/api/qrcode?url='+encodedUrl;
+ return `<article class="subscription-row" ${id?`id="${esc(id)}"`:''} data-client-name="${esc(name)}" tabindex="-1">
+ <div class="subscription-main"><b>${esc(name)}</b><p class="hint">${esc(description)}</p><input class="subscription-url" aria-label="${esc(name)}订阅地址" readonly value="${esc(url)}" title="点击选中完整链接" onclick="this.select()">
+ <div class="subscription-actions"><button class="btn small" onclick="copyText(decodeURIComponent('${encodedUrl}'))">复制链接</button><a class="btn small primary" href="${esc(href)}" download>下载</a><a class="btn small" href="${esc(href)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">打开链接</a></div></div>
+ <button class="subscription-qr-button" onclick="openSubscriptionQr('${encodedUrl}','${encodedName}')" title="放大 ${esc(name)} 二维码"><img loading="lazy" class="subscription-qr" src="${esc(qr)}" alt="${esc(name)}订阅二维码"><span>点击放大</span></button>
+ ${details?`<details class="subscription-details"><summary>格式说明与兼容性</summary>${details}</details>`:''}</article>`;
+}
+function updateClientNavigation(){
+ const select=$('clientJump');if(!select)return;
+ select.innerHTML='<option value="">选择客户端，跳转到对应卡片</option>'+[...document.querySelectorAll('#clientSubscriptions [data-client-name]')].filter(e=>e.id).map(e=>`<option value="${esc(e.id)}">${esc(e.dataset.clientName)}</option>`).join('');
+ select.onchange=()=>{const card=document.getElementById(select.value);if(card){card.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});card.focus({preventScroll:true})}};
 }
 
 function openSubscriptionQr(encodedUrl, encodedName) {
@@ -3882,19 +3923,21 @@ async function overview() {
     <button class="btn" onclick="go('raw')">查看/编辑完整 YAML 源代码</button>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="clientSubscriptions">
     <div class="panel-head">
       <h3>客户端订阅与扫码导入</h3>
     </div>
-    <div class="note">二维码内容就是旁边显示的订阅地址，可直接使用客户端扫码导入。Clash 保留完整规则和 DNS；Loon、Surge、sing-box、电脑、安卓和小火箭提供各自适配的客户端配置或节点订阅。主备配置只包含选定链路，不复制原来的分流规则。</div>
-    ${subscriptionRow('Clash / Mihomo 完整订阅', '保留节点、策略组、路由规则、DNS 与链式代理', url, p.url)}
-    <div id="overviewConversionRows"><div class="empty">正在生成客户端配置与节点订阅...</div></div>
+    <div class="client-navigation"><label for="clientJump">快速跳转</label><select id="clientJump" aria-label="选择客户端跳转"></select><a class="btn small" href="#client-clash">Clash / Mihomo</a><a class="btn small" href="#client-v2rayn">v2rayN</a><a class="btn small" href="#client-v2rayng">v2rayNG</a></div><p class="hint">复制链接、扫码或下载配置。各格式的支持范围请展开卡片说明；二维码可点击放大。</p>
+    <div class="subscription-grid">${subscriptionRow('Clash / Mihomo 完整订阅', '保留节点、策略组、路由规则、DNS 与链式代理', url, p.url,'','client-clash')}
+    <div id="overviewConversionRows"><div class="empty">正在生成客户端配置与节点订阅...</div></div></div>
   </section>`;
 
+  updateClientNavigation();
   try {
     let d = await api('/conversions');
     if (S.page !== 'overview' || S.profile !== profile || !$('overviewConversionRows')) return;
     $('overviewConversionRows').innerHTML = conversionRows(d.formats || []);
+    updateClientNavigation();
   } catch (error) {
     if (S.page === 'overview' && S.profile === profile && $('overviewConversionRows')) $('overviewConversionRows').innerHTML = `<div class="error">${esc(error.message)}</div>`;
   }
