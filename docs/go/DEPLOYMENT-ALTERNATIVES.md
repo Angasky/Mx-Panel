@@ -1,13 +1,13 @@
 # Docker Compose 与 Alpine OpenRC
 
-从 v0.1.31 起，Release 附带 `mxioc-deployment-v0.1.31.tar.gz`，内含两种部署方式。主程序包的文件清单保持兼容，旧 systemd 安装仍使用 `mx-p` 更新。下面流程适用于新安装；不自动搬动现有服务器或更换服务管理器。
+从 v0.1.32 起，Release 附带 `mxioc-deployment-v0.1.32.tar.gz`，内含两种部署方式。主程序包的文件清单保持兼容，旧 systemd 安装仍使用 `mx-p` 更新。下面流程适用于新安装；不自动搬动现有服务器或更换服务管理器。
 
 ## 下载部署工具
 
 在空目录下载以下两项，校验后解压。版本更新时统一替换版本号。
 
 ```sh
-version=v0.1.31
+version=v0.1.32
 base="https://github.com/Angasky/Mx-Panel/releases/download/go-$version"
 curl -fL "$base/mxioc-deployment-$version.tar.gz" -o "mxioc-deployment-$version.tar.gz"
 curl -fL "$base/SHA256SUMS" -o SHA256SUMS
@@ -21,7 +21,7 @@ tar -xzf "mxioc-deployment-$version.tar.gz"
 ## Docker Compose
 
 ```sh
-sh deploy/container/build-image.sh v0.1.31
+sh deploy/container/build-image.sh v0.1.32
 cd deploy/container
 cp access.example.json access.json
 ```
@@ -50,7 +50,7 @@ docker compose ps
 在 Compose 同目录的 `.env` 中填写：
 
 ```dotenv
-MX_PANEL_IMAGE=mx-panel:v0.1.31
+MX_PANEL_IMAGE=mx-panel:v0.1.32
 MX_PANEL_HTTPS_PORT=443
 MX_PANEL_TLS_PORT=443
 MX_PANEL_HTTP_PORT=80
@@ -83,7 +83,7 @@ docker compose start panel gateway
 apk add --no-cache openrc curl ca-certificates jq util-linux openssh-client
 ```
 
-下载对应 `mxioc-go-v0.1.31-linux-amd64.tar.gz`（ARM64 改 `arm64`），使用 Release 的 SHA256SUMS 校验，解压到空的 `bundle` 目录。将部署工具的脚本放到包旁边：
+下载对应 `mxioc-go-v0.1.32-linux-amd64.tar.gz`（ARM64 改 `arm64`），使用 Release 的 SHA256SUMS 校验，解压到空的 `bundle` 目录。将部署工具的脚本放到包旁边：
 
 ```sh
 cp deploy/install-openrc.sh bundle/

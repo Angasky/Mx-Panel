@@ -95,8 +95,23 @@ func metricHistoryPoint(view remote.Record, now time.Time) (monitorhistory.Point
 func (s *Server) startMonitorHistory(ctx context.Context) {
 	s.historyOnce.Do(func() {
 		s.historyDone = make(chan struct{})
+		externalDone := make(chan struct{})
+		go func() {
+			defer close(externalDone)
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					s.pollExternalTraffic(ctx)
+				}
+			}
+		}()
 		go func() {
 			defer close(s.historyDone)
+			defer func() { <-externalDone }()
 			ticker := time.NewTicker(30 * time.Second)
 			defer ticker.Stop()
 			for {

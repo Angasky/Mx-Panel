@@ -2,7 +2,7 @@
 # Build the image from a checksum-verified release, without a Go toolchain.
 set -eu
 umask 077
-version=${1:-v0.1.31}
+version=${1:-v0.1.32}
 case "$version" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo '版本号无效' >&2; exit 2 ;; esac
 case "$version" in *[!v0-9.]*) exit 2 ;; esac
 case "${MX_PANEL_ARCH:-$(uname -m)}" in x86_64|amd64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) echo '仅支持 amd64/arm64' >&2; exit 2 ;; esac

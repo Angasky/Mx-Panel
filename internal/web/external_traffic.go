@@ -21,12 +21,17 @@ type externalSnapshot struct {
 	subsource.Traffic
 }
 type externalSource struct {
-	ID      string             `json:"id"`
-	Name    string             `json:"name"`
-	Secret  string             `json:"secret,omitempty"`
-	Checked int64              `json:"checked"`
-	Error   string             `json:"error,omitempty"`
-	Samples []externalSnapshot `json:"samples"`
+	ScheduleRevision string             `json:"scheduleRevision,omitempty"`
+	Auto             bool               `json:"auto"`
+	Interval         int                `json:"interval"`
+	Next             int64              `json:"next"`
+	Failures         int                `json:"failures"`
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	Secret           string             `json:"secret,omitempty"`
+	Checked          int64              `json:"checked"`
+	Error            string             `json:"error,omitempty"`
+	Samples          []externalSnapshot `json:"samples"`
 }
 
 func (s *Server) readExternal() ([]externalSource, error) {
@@ -88,7 +93,7 @@ func (s *Server) externalTrafficRoute(w http.ResponseWriter, r *http.Request) bo
 	if r.URL.Path != "/admin/api/external-traffic" {
 		return false
 	}
-	if r.Method != "GET" && r.Method != "POST" && r.Method != "DELETE" {
+	if r.Method != "GET" && r.Method != "POST" && r.Method != "PUT" && r.Method != "DELETE" {
 		problem(w, 405, "请求方法不支持")
 		return true
 	}
@@ -101,6 +106,35 @@ func (s *Server) externalTrafficRoute(w http.ResponseWriter, r *http.Request) bo
 	}
 	now := s.now()
 	trimExternal(rows, now)
+	if r.Method == "PUT" {
+		var in struct {
+			ID       string `json:"id"`
+			Auto     *bool  `json:"auto"`
+			Interval int    `json:"interval"`
+		}
+		if readJSON(w, r, &in) != nil || in.Auto == nil || (in.Interval != 1 && in.Interval != 6 && in.Interval != 12 && in.Interval != 24) {
+			problem(w, 400, "请指定自动刷新开关及 1、6、12 或 24 小时间隔")
+			return true
+		}
+		found := false
+		for i := range rows {
+			if rows[i].ID == in.ID {
+				found = true
+				rows[i].ScheduleRevision = rand.Text()
+				rows[i].Auto = *in.Auto
+				rows[i].Interval = in.Interval
+				rows[i].Failures = 0
+				rows[i].Next = 0
+				if *in.Auto {
+					rows[i].Next = now.Add(time.Duration(in.Interval) * time.Hour).Unix()
+				}
+			}
+		}
+		if !found {
+			problem(w, 404, "外部订阅不存在")
+			return true
+		}
+	}
 	if r.Method == "POST" {
 		var in struct {
 			ID   string `json:"id"`
@@ -161,20 +195,7 @@ func (s *Server) externalTrafficRoute(w http.ResponseWriter, r *http.Request) bo
 			fetch = subsource.NewClient().FetchTraffic
 		}
 		info, err := fetch(ctx, in.URL)
-		rows[idx].Checked = now.Unix()
-		rows[idx].Error = ""
-		if err != nil {
-			rows[idx].Error = "未获取有效流量信息：上游未提供标准响应头，或请求失败。旧快照不代表当前剩余额度。"
-		} else {
-			sample := externalSnapshot{Time: now.Unix(), Traffic: info}
-			samples := rows[idx].Samples
-			if len(samples) > 0 && time.Unix(samples[len(samples)-1].Time, 0).UTC().Format("2006-01-02") == now.UTC().Format("2006-01-02") {
-				samples[len(samples)-1] = sample
-			} else {
-				samples = append(samples, sample)
-			}
-			rows[idx].Samples = samples
-		}
+		recordExternalResult(&rows[idx], info, err, now)
 	} else if r.Method == "DELETE" {
 		id := r.URL.Query().Get("id")
 		found := false
@@ -198,6 +219,7 @@ func (s *Server) externalTrafficRoute(w http.ResponseWriter, r *http.Request) bo
 	}
 	for i := range rows {
 		rows[i].Secret = ""
+		rows[i].ScheduleRevision = ""
 	}
 	respond(w, 200, map[string]any{"sources": rows, "timezone": "UTC"})
 	return true
