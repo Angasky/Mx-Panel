@@ -38,10 +38,12 @@ type Counter struct {
 	TX         uint64 `json:"tx"`
 }
 type State struct {
-	Enabled bool     `json:"enabled"`
-	Points  []Point  `json:"points"`
-	Days    []Day    `json:"days"`
-	Last    *Counter `json:"last,omitempty"`
+	Billing     *BillingConfig `json:"billing,omitempty"`
+	BillingDays []Day          `json:"billingDays,omitempty"`
+	Enabled     bool           `json:"enabled"`
+	Points      []Point        `json:"points"`
+	Days        []Day          `json:"days"`
+	Last        *Counter       `json:"last,omitempty"`
 }
 type Store struct {
 	mu  sync.Mutex
@@ -69,8 +71,13 @@ func (s *Store) read(id string) (State, error) {
 	if err = json.Unmarshal(data, &state); err != nil {
 		return state, errors.New("监控记录损坏")
 	}
-	if len(state.Points) > 3000 || len(state.Days) > 31 {
+	if len(state.Points) > 3000 || len(state.Days) > 31 || len(state.BillingDays) > 400 {
 		return state, errors.New("监控记录超出限制")
+	}
+	if state.Billing != nil {
+		if err := state.Billing.Validate(); err != nil {
+			return state, err
+		}
 	}
 	return state, nil
 }
@@ -90,6 +97,14 @@ func trim(state *State, now time.Time) {
 		}
 	}
 	state.Days = days
+	archive := []Day{}
+	cutoff = now.UTC().AddDate(0, 0, -399).Format("2006-01-02")
+	for _, d := range state.BillingDays {
+		if d.Date >= cutoff && d.Date <= now.UTC().Format("2006-01-02") {
+			archive = append(archive, d)
+		}
+	}
+	state.BillingDays = archive
 }
 func (s *Store) write(id string, state State) error {
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
@@ -124,9 +139,9 @@ func (s *Store) Read(id string, now time.Time) (State, error) {
 	if err != nil {
 		return state, err
 	}
-	beforePoints, beforeDays := len(state.Points), len(state.Days)
+	beforePoints, beforeDays, beforeBilling := len(state.Points), len(state.Days), len(state.BillingDays)
 	trim(&state, now)
-	if beforePoints != len(state.Points) || beforeDays != len(state.Days) {
+	if beforePoints != len(state.Points) || beforeDays != len(state.Days) || beforeBilling != len(state.BillingDays) {
 		if state.Last != nil && state.Last.Time < now.Add(-24*time.Hour).Unix() {
 			state.Last = nil
 		}
@@ -207,6 +222,20 @@ func (s *Store) Record(id string, p Point, c *Counter, now time.Time) error {
 	}
 	if c != nil && (c.Time != p.Time || c.Epoch == "" || c.Interfaces == "") {
 		c = nil
+	}
+	if state.Billing != nil {
+		found := false
+		for i := range state.BillingDays {
+			if state.BillingDays[i].Date == date {
+				state.BillingDays[i] = *d
+				found = true
+				break
+			}
+		}
+		if !found {
+			state.BillingDays = append(state.BillingDays, *d)
+		}
+		sort.Slice(state.BillingDays, func(i, j int) bool { return state.BillingDays[i].Date < state.BillingDays[j].Date })
 	}
 	state.Last = c
 	state.Points = append(state.Points, p)

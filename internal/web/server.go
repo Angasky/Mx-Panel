@@ -279,6 +279,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.probeHistoryAdmin(w, r) {
 		return
 	}
+	if s.billingRoute(w, r) {
+		return
+	}
 	if s.metadataRoute(w, r) {
 		return
 	}
