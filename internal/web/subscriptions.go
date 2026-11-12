@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -37,6 +38,11 @@ func (s *Server) subscriptionController() (*subscriptions.Controller, error) {
 func (s *Server) RunBackground(ctx context.Context) error {
 	if err := s.repository.MigrateLegacyProfiles(); err != nil {
 		return err
+	}
+	if n, err := s.repository.RepairLegacyDefaultConnectivity(); err != nil {
+		return err
+	} else if n > 0 {
+		log.Printf("repaired legacy default connectivity for %d profiles; originals backed up", n)
 	}
 	c, err := s.subscriptionController()
 	if err != nil {

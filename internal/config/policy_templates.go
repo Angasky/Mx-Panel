@@ -30,6 +30,7 @@ func (r *Repository) blankProfile() (Document, error) {
 	if decoder.Decode(&doc) != nil || doc == nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("内置模板损坏")
 	}
+	repairDefaultConnectivity(doc)
 	doc["proxies"] = []any{}
 	return doc, validate(doc)
 }

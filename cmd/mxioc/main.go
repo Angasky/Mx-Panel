@@ -102,6 +102,9 @@ func main() {
 	if updater != nil {
 		uninstaller = updater
 	}
+	if executable, e := os.Executable(); e == nil {
+		*adminHTML = releaseAdminHTML(*root, *adminHTML, executable, releaseVersion)
+	}
 	handler, err := web.New(web.Options{Root: *root, AuthFile: *auth, AdminHTML: *adminHTML, Version: releaseVersion, TrustLoopbackProxy: *proxy, LocalDevelopment: *local, ReleaseUpdater: updater, ServiceUninstaller: uninstaller})
 	if err != nil {
 		log.Fatal("startup validation failed: ", err)

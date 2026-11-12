@@ -17,6 +17,7 @@ dns:
   fake-ip-filter-mode: rule
   fake-ip-filter:
   - GEOSITE,private,real-ip
+  - GEOSITE,cn,real-ip
   - MATCH,fake-ip
   default-nameserver:
   - 223.5.5.5
@@ -29,6 +30,9 @@ dns:
   - https://doh.pub/dns-query
   direct-nameserver-follow-policy: false
   nameserver-policy:
+    geosite:cn:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
     +.openai.com:
     - https://1.1.1.1/dns-query#%E2%9C%88%EF%B8%8F%20Proxy
     - https://dns.google/dns-query#%E2%9C%88%EF%B8%8F%20Proxy
@@ -765,8 +769,8 @@ dns:
     - https://dns.adguard-dns.com/dns-query#%E8%B0%B7%E6%AD%8C%E6%9C%8D%E5%8A%A1
     +.firebase.google.com: *id001
   nameserver:
-  - https://1.1.1.1/dns-query#%E2%9C%88%EF%B8%8F%20Proxy
-  - https://dns.google/dns-query#%E2%9C%88%EF%B8%8F%20Proxy
+  - https://dns.alidns.com/dns-query
+  - https://doh.pub/dns-query
 proxies: []
 proxy-groups:
 - name: ✈️ Proxy
@@ -866,8 +870,8 @@ proxy-groups:
 - name: 🛡️ 基础广告拦截
   type: select
   proxies:
-  - REJECT
   - DIRECT
+  - REJECT
 - name: 🔥 强力广告拦截
   type: select
   proxies:
@@ -911,10 +915,6 @@ rules:
 - DOMAIN-SUFFIX,oracleinfinity.io,DIRECT
 - DOMAIN-SUFFIX,oraclecloud.com,DIRECT
 - DOMAIN-SUFFIX,oracle.com,DIRECT
-- DOMAIN-KEYWORD,stun,REJECT
-- AND,((NETWORK,UDP),(DST-PORT,3478-3481)),REJECT
-- AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT
-- AND,((NETWORK,UDP),(DST-PORT,19302-19309)),REJECT
 - DOMAIN-SUFFIX,googleadservices.com,🛡️ 基础广告拦截
 - DOMAIN-SUFFIX,googlesyndication.com,🛡️ 基础广告拦截
 - DOMAIN-SUFFIX,google-analytics.com,🛡️ 基础广告拦截
