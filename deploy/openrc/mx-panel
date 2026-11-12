@@ -1,0 +1,20 @@
+#!/sbin/openrc-run
+name="Mx-Panel"
+description="Mx-Panel Go backend"
+supervisor="supervise-daemon"
+command="/opt/mx-panel-openrc/current/mxioc"
+command_args="--root /var/lib/mx-panel/data --auth /var/lib/mx-panel/auth.json --admin-html /opt/mx-panel-openrc/current/index.html --listen 127.0.0.1:62578 --trust-loopback-proxy"
+command_user="mxpanel:mxpanel"
+output_log="/var/log/mx-panel/panel.log"
+error_log="/var/log/mx-panel/panel.log"
+respawn_delay=3
+respawn_max=5
+respawn_period=60
+retry="TERM/25/KILL/5"
+umask=0077
+depend() { need net; }
+start_pre() {
+    checkpath -d -m 0750 -o mxpanel:mxpanel /var/log/mx-panel
+    checkpath -f -m 0640 -o mxpanel:mxpanel "$output_log"
+    su -s /bin/sh -c '/opt/mx-panel-openrc/current/mxioc --root /var/lib/mx-panel/data --auth /var/lib/mx-panel/auth.json --check-data' mxpanel
+}

@@ -46,3 +46,6 @@ Thumbs.db
 /requirements.txt
 /deploy/mxioc-rule-manager.service
 /deploy/test-go-systemd.sh
+
+!deploy/container/compose.yaml
+/deploy/container/access.json

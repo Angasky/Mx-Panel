@@ -28,8 +28,9 @@ for arch in amd64 arm64; do
     rm -rf -- "$stage"
     trap - EXIT
 done
+tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -czf "$out/mxioc-deployment-$version.tar.gz" deploy/container/Dockerfile deploy/container/entrypoint.sh deploy/container/compose.yaml deploy/container/access.example.json deploy/container/build-image.sh deploy/install-openrc.sh deploy/openrc/mx-panel deploy/openrc/mx-panel-gateway docs/go/DEPLOYMENT-ALTERNATIVES.md
 (
     cd "$out"
-    sha256sum "mxioc-go-$version-linux-amd64.tar.gz" "mxioc-go-$version-linux-arm64.tar.gz" "mxioc-agent-$version-linux-amd64.tar.gz" "mxioc-agent-$version-linux-arm64.tar.gz" > SHA256SUMS
+    sha256sum "mxioc-go-$version-linux-amd64.tar.gz" "mxioc-go-$version-linux-arm64.tar.gz" "mxioc-agent-$version-linux-amd64.tar.gz" "mxioc-agent-$version-linux-arm64.tar.gz" "mxioc-deployment-$version.tar.gz" > SHA256SUMS
 )
 printf '%s\n' "$out"

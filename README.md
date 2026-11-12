@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.27` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.28` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.27-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.28-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -229,3 +229,7 @@ Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南]
 公开探针页支持标题、介绍、本地 Logo、四种配色及地球显隐，在 **设置 → 监控分享 → 探针站外观定制** 中配置，详见 [探针外观说明](docs/go/PROBE-APPEARANCE.md)。
 
 订阅安全开关：**设置 → 订阅安全与兼容**，按订阅选择 STUN/WebRTC、DNS 防泄露、国内真实 IP、IPv6 与广告策略，以及实验性 Xray/sing-box 导出。[作用范围与说明](docs/go/CLIENT-OPTIONS.md)。
+
+### Docker Compose / Alpine OpenRC
+
+从 Release 下载独立部署工具包，可使用容器或 Alpine OpenRC 安装，不需要 Go/Python。包含 HTTPS 网关、持久化和更新说明；已有 systemd 用户继续使用 `mx-p`。详见 [部署指南](docs/go/DEPLOYMENT-ALTERNATIVES.md)。
