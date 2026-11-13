@@ -92,8 +92,9 @@ env GOENV=off GOWORK=off GOFLAGS='' GOTOOLCHAIN=local CGO_ENABLED=0 GOMAXPROCS=2
   timeout 1800 "$workdir/go/bin/go" install -p 2 -trimpath -tags 'with_quic,with_utls,with_v2ray_api' \
   -ldflags '-s -w -X github.com/sagernet/sing-box/constant.Version=1.14.4' \
   github.com/sagernet/sing-box/cmd/sing-box@v1.14.4
-"$workdir/bin/sing-box" version | grep -q 'with_v2ray_api'
-"$workdir/bin/sing-box" version | grep -q 'with_quic'
+"$workdir/bin/sing-box" version > "$workdir/version.txt"
+grep -q 'with_v2ray_api' "$workdir/version.txt"
+grep -q 'with_quic' "$workdir/version.txt"
 if [ -n '__MXIOC_CONFIG64__' ]; then
   printf '%s' '__MXIOC_CONFIG64__' | base64 -d > "$workdir/check.json"
 elif [ "$had_config" = 1 ]; then

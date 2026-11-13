@@ -2721,7 +2721,7 @@ async function profileClientLinks(encoded) {
 function profileDuplicate(encoded) { profileCreate(decodeURIComponent(encoded)); }
 
 const panelType = value => ['3x-ui', 'x-ui', 'x-panel'].includes(value || '3x-ui');
-const remoteStage = stage => ({connecting:'连接 SSH',preflight:'检查安装环境',download:'下载安装文件',build:'编译并验证计量内核',install:'安装所选软件',config:'校验内核配置',credentials:'设置管理凭证',service:'启动服务',installed:'检查安装', 'api-check':'验证登录与接口',diagnostics:'读取失败诊断',complete:'安装完成'}[stage] || stage || '未开始');
+const remoteStage = stage => ({connecting:'连接 SSH',preflight:'检查安装环境',download:'下载并校验安装文件',verify:'解压并验证内核',build:'编译并验证计量内核',install:'安装所选软件',config:'校验内核配置',credentials:'设置管理凭证',service:'启动服务',installed:'检查安装', 'api-check':'验证登录与接口',diagnostics:'读取失败诊断',complete:'安装完成'}[stage] || stage || '未开始');
 const remoteStatus = status => ({running:'安装中',succeeded:'已安装',failed:'安装失败',interrupted:'任务已中断'}[status] || '待连接');
 
 function panelLink(value) {

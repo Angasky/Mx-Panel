@@ -5,7 +5,7 @@ trap 'rc=$?; printf "MXIOC_FAILURE_STAGE=%s EXIT=%s\n" "$stage" "$rc"; exit "$rc
 test "$(id -u)" = 0
 command -v systemctl >/dev/null || { echo 'Standalone cores require systemd'; exit 12; }
 if ! command -v curl >/dev/null || ! command -v flock >/dev/null || ! command -v unzip >/dev/null || ! command -v sha256sum >/dev/null || ! command -v timeout >/dev/null; then
-  if command -v apt-get >/dev/null; then apt-get update && apt-get install -y curl util-linux unzip coreutils ca-certificates
+  if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl util-linux unzip coreutils ca-certificates
   elif command -v dnf >/dev/null; then dnf install -y curl util-linux unzip coreutils ca-certificates
   elif command -v yum >/dev/null; then yum install -y curl util-linux unzip coreutils ca-certificates
   else echo 'Missing curl/flock or unsupported package manager'; exit 12; fi
@@ -81,10 +81,13 @@ case "$(uname -m)" in
 esac
 curl -fLsS --proto '=https' --tlsv1.2 --retry 2 --connect-timeout 20 --max-time 300 "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/$asset" -o "$workdir/xray.zip"
 printf '%s  %s\n' "$archive_sum" "$workdir/xray.zip" | sha256sum -c -
+stage=verify
+printf 'MXIOC_STAGE=verify\n'
 mkdir -p "$workdir/bin"
 unzip -p "$workdir/xray.zip" xray > "$workdir/bin/xray"
 chmod 755 "$workdir/bin/xray"
-"$workdir/bin/xray" version | grep -q '^Xray 26.10.31 '
+"$workdir/bin/xray" version > "$workdir/version.txt"
+grep -q '^Xray 26.10.31 ' "$workdir/version.txt"
 if [ -n '__MXIOC_CONFIG64__' ]; then
   printf '%s' '__MXIOC_CONFIG64__' | base64 -d > "$workdir/check.json"
 elif [ "$had_config" = 1 ]; then

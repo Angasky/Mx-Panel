@@ -14,7 +14,7 @@ func installStage(line string) string {
 	stage, ok := strings.CutPrefix(strings.TrimSuffix(line, "\r"), "MXIOC_STAGE=")
 	if ok {
 		switch stage {
-		case "preflight", "download", "build", "install", "config", "credentials", "service", "installed", "api-check":
+		case "preflight", "download", "verify", "build", "install", "config", "credentials", "service", "installed", "api-check":
 			return stage
 		}
 	}
@@ -95,7 +95,12 @@ func installFailure(stage string, code int) string {
 		}
 		return "安装环境检查失败，请检查 root 权限、系统和依赖"
 	case "download":
-		return "下载安装脚本失败，请检查远端 DNS、网络和下载地址"
+		if code == 141 {
+			return "安装文件处理被管道提前关闭（SIGPIPE），请更新面板安装器后重试；此错误不表示 DNS 故障"
+		}
+		return "安装文件下载或校验失败，请查看日志中的网络、下载地址或校验错误"
+	case "verify":
+		return "安装包解压、内核版本或配置预检失败，尚未替换原安装，请查看日志"
 	case "build":
 		return "计量内核编译或验证失败，请查看下载、内存、磁盘和配置错误；此阶段尚未替换原安装"
 	case "install":
