@@ -2,12 +2,15 @@ package remote
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Discovery never adopts, reconciles or writes another panel's configuration.
@@ -34,8 +37,84 @@ const probeInventoryScript = `set -eu
 done)
 `
 
+type probeCacheEntry struct {
+	done chan struct{}
+	data []byte
+	err  error
+	at   time.Time
+}
+type probeRefreshKey struct{}
+
+func (m *Manager) RefreshInboundsWithStats(ctx context.Context, id string) (Record, error) {
+	return m.inbounds(context.WithValue(ctx, probeRefreshKey{}, true), id, true)
+}
+
 func (m *Manager) probeInbounds(ctx context.Context, record Record) (Record, error) {
-	c, e := m.Connection(value(record["id"]))
+	raw, _ := json.Marshal(record)
+	key := sha256.Sum256(raw)
+	m.mu.Lock()
+	if m.probeCache == nil {
+		m.probeCache = make(map[[32]byte]*probeCacheEntry)
+	}
+	entry := m.probeCache[key]
+	if entry != nil {
+		select {
+		case <-entry.done:
+			if ctx.Value(probeRefreshKey{}) == true || time.Since(entry.at) >= 30*time.Second {
+				entry = nil
+			}
+		default:
+		}
+	}
+	owner := entry == nil
+	if owner {
+		// Remove completed old snapshots; never evict requests still in flight.
+		for k, v := range m.probeCache {
+			select {
+			case <-v.done:
+				if time.Since(v.at) >= 30*time.Second {
+					delete(m.probeCache, k)
+				}
+			default:
+			}
+		}
+		entry = &probeCacheEntry{done: make(chan struct{})}
+		m.probeCache[key] = entry
+	}
+	m.mu.Unlock()
+	if owner {
+		result, err := m.readProbeInbounds(ctx, record)
+		m.mu.Lock()
+		if err == nil {
+			entry.data, err = json.Marshal(result)
+		}
+		entry.err, entry.at = err, time.Now()
+		if err != nil {
+			delete(m.probeCache, key)
+		}
+		close(entry.done)
+		m.mu.Unlock()
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-entry.done:
+	}
+	if entry.err != nil {
+		return nil, entry.err
+	}
+	var result Record
+	decoder := json.NewDecoder(strings.NewReader(string(entry.data)))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil {
+		return nil, err
+	}
+	result["discoveryCached"] = !owner
+	return result, nil
+}
+
+func (m *Manager) readProbeInbounds(ctx context.Context, record Record) (Record, error) {
+	c, e := m.connectionRecord(record)
 	if e != nil {
 		return nil, e
 	}
@@ -101,7 +180,7 @@ func parseProbeInventory(record Record, out string) (Record, error) {
 		}
 	}
 	sort.Strings(sources)
-	message := fmt.Sprintf("已识别 %d 个配置中的 %d 个现有入站。当前为只读发现，未接管原面板；需要编辑或分配订阅用户时，请在连接设置中接入实际面板 / 内核。", len(sources), len(rows))
+	message := fmt.Sprintf("已识别 %d 个配置中的 %d 个现有入站。探针同步仅关联 SSH 和监控，不会自动接管 VPN。标准独立内核可在连接设置验证接入；X-ui 需验证原面板账号；多文件配置目录、容器和非标准路径暂不支持直接接管，请勿通过重新安装覆盖现有配置。", len(sources), len(rows))
 	if len(sources) == 0 {
 		message = "SSH 已接入，但未发现支持的节点配置。仅安装探针不会自动生成 VPN 节点；容器内、非标准路径或未运行的内核需手动接入。"
 	}

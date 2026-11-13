@@ -36,6 +36,7 @@ type Manager struct {
 	certificateRun   func(context.Context, Connection, string) (string, error)
 	installRun       func(context.Context, Connection, string) (string, error)
 	installRecovered bool
+	probeCache       map[[32]byte]*probeCacheEntry
 }
 type Record = map[string]any
 

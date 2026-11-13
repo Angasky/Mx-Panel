@@ -105,7 +105,12 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 				problem(w, 400, err.Error())
 				return true
 			}
-			result, err := manager.InboundsWithStats(ctx, serverID)
+			var result remote.Record
+			if r.URL.Query().Get("refresh") == "1" {
+				result, err = manager.RefreshInboundsWithStats(ctx, serverID)
+			} else {
+				result, err = manager.InboundsWithStats(ctx, serverID)
+			}
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {

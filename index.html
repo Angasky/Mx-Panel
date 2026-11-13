@@ -2756,7 +2756,7 @@ function renderServers() {
 }
 
 function serverForm(encoded = '', existing = false) {
-  const s = S.servers.find(x => x.id === decodeURIComponent(encoded)) || {};
+  const s = S.servers.find(x => x.id === decodeURIComponent(encoded)) || (S.remoteServer?.id === decodeURIComponent(encoded) ? S.remoteServer : {}) || {};
   existing = s.id ? (s.probeDiscovery || s.connectionMode === 'existing') : existing;
   openModal(s.id ? '服务器连接设置' : existing ? '接入已有面板 / 内核' : '添加服务器', `<form id="serverForm"><div class="grid">
     <div><label for="rsName">服务器名称</label><input id="rsName" required maxlength="80" value="${esc(s.name || '')}" placeholder="例如 香港入口"></div>
@@ -2953,7 +2953,7 @@ async function serverNodes(force = false) {
   }
   if (force || !S.remoteLoaded) {
     const id = S.serverId;
-    const data = await api('/servers/inbounds?id=' + encodeURIComponent(id));
+    const data = await api('/servers/inbounds?id=' + encodeURIComponent(id) + (force ? '&refresh=1' : ''));
     if (S.page !== 'serverNodes' || S.serverId !== id) return;
     S.remoteInventoryOnly = data.inventoryOnly === true; S.remoteDiscoveryMessage = data.discoveryMessage || ''; S.remoteDiscoveryWarnings = data.discoveryWarnings || []; S.remoteRows = data.inbounds; S.remoteRowsReadOnly = data.readOnly === true; S.canEnableCoreStats = data.canEnableCoreStats === true; S.remoteServer = data.server; S.remoteLoaded = true;
     if(data.coreStatsError)notice(data.coreStatsError);

@@ -215,7 +215,15 @@ func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, 
 	return action(panel, record)
 }
 func (m *Manager) AttachPanel(ctx context.Context, id string) (Record, error) {
-	_, err := m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
+	record, err := m.Record(id)
+	if err != nil {
+		return nil, err
+	}
+	if _, e := corePath(value(record["installType"])); e == nil {
+		return m.attachCore(ctx, id)
+	}
+
+	_, err = m.WithPanel(ctx, id, func(panel *Panel, record Record) (any, error) {
 		if _, err := panel.Request(ctx, "login", nil, ""); err != nil {
 			return nil, err
 		}
@@ -227,7 +235,7 @@ func (m *Manager) AttachPanel(ctx context.Context, id string) (Record, error) {
 	if err = m.updateDerived(id, Record{"existingVerifiedAt": time.Now().Unix(), "lastError": ""}); err != nil {
 		return nil, err
 	}
-	record, err := m.Record(id)
+	record, err = m.Record(id)
 	if err != nil {
 		return nil, err
 	}
