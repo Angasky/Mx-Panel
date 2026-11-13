@@ -2028,7 +2028,7 @@ SOFTWARE.
       <div class="nav-section-title">工作空间</div>
       <button class="nav active" type="button" data-page="overview" title="总览"><i aria-hidden="true"><svg class="icon"><use href="#icon-layout-dashboard"/></svg></i><span>总览</span></button>
 <details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
-<details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
+<details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="serverNodes" title="服务器节点"><span>服务器节点</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
 <details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
 <details class="nav-section" data-nav-section="settings" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-palette"/></svg><span>系统设置</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="settings" title="主题与外观"><span>主题与外观</span></button><button class="nav nav-child" type="button" data-nav-action="userManager" title="用户与权限"><span>用户与权限</span></button><button class="nav nav-child" type="button" data-nav-action="notificationManager" title="通知中心"><span>通知中心</span></button><button class="nav nav-child" type="button" data-page="system" title="账号与备份"><span>账号与备份</span></button><button class="nav nav-child" type="button" data-page="maintenance" title="升级与卸载"><span>升级与卸载</span></button></div></details>
     </div>
@@ -2412,7 +2412,7 @@ async function go(page) {
   $('content').dataset.page = page;
   setNavigationOpen(false, false);
   const section = sectionFor(page);
-  $('sectionTabs').innerHTML = pageSections[section].filter(p => p !== 'serverNodes' || S.serverId).map(p =>
+  $('sectionTabs').innerHTML = pageSections[section].map(p =>
     `<button type="button" data-page="${p}" class="btn small ${p === page ? 'primary' : ''}" ${p === page ? 'aria-current="page"' : ''} onclick="${p === 'monitoring' ? "S.monitorId='';" : ''}go('${p}').catch(error=>notice(error.message))">${esc(pageInfo[p][0])}</button>`).join('');
   $('sectionTabs').classList.toggle('hidden', pageSections[section].length === 1);
   document.querySelectorAll('.nav').forEach(n => {
@@ -2939,7 +2939,18 @@ async function openRemoteNodes(encoded) {
 }
 
 async function serverNodes(force = false) {
-  if (!S.serverId) return go('servers');
+  if (!S.serverId) {
+    const data = await api('/servers');
+    if (S.page !== 'serverNodes' || S.role !== 'admin') return;
+    S.servers = data.servers || [];
+    $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>服务器节点</h3><p class="muted">选择服务器，查看已有入站、节点和中转配置。</p></div></div>${S.servers.length ? `<form id="serverNodeSelectForm"><label for="serverNodeSelect">服务器</label><select id="serverNodeSelect" style="max-width:620px">${S.servers.map(s=>`<option value="${esc(s.id)}" ${s.job?.status==='running'?'disabled':''}>${esc(s.name)} · ${esc(s.host)}${s.job?.status==='running'?'（安装中）':''}</option>`).join('')}</select><div class="toolbar" style="margin-top:16px"><button class="btn primary" type="submit">查看服务器节点</button><button class="btn" type="button" onclick="go('servers')">管理服务器</button></div></form>` : `<p class="empty">尚未接入服务器，请先添加服务器或从探针同步。</p><div class="toolbar"><button class="btn primary" onclick="go('servers')">添加服务器</button><button class="btn" onclick="go('probeSync')">同步探针服务器</button></div>`}</section>`;
+    const form = $('serverNodeSelectForm');
+    if (form) {
+      form.querySelector('[type=submit]').disabled = !S.servers.some(s=>s.job?.status!=='running');
+      form.onsubmit = event => {event.preventDefault();const id=$('serverNodeSelect').value;if(id)openRemoteNodes(encodeURIComponent(id)).catch(error=>notice(error.message));};
+    }
+    return;
+  }
   if (force || !S.remoteLoaded) {
     const id = S.serverId;
     const data = await api('/servers/inbounds?id=' + encodeURIComponent(id));
