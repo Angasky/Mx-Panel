@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MXIOC // Terminal Control Center</title>
+<title>Mx-Panel · 订阅与服务器管理</title>
 <script>
 try { document.documentElement.dataset.theme = ['craft', 'slate', 'high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'slate'; } catch (_) {}
 </script>
@@ -1447,27 +1447,6 @@ html[data-theme="amber"] .modalhead { background:var(--surface-header); }
 @font-face{font-family:MXNoto;src:url('/sub/ui-fonts/noto-ui.woff2') format('woff2');font-weight:400;font-display:swap}
 :root{--font-sans:MXInter,MXNoto,'Noto Sans CJK SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif}
 html[data-theme="slate"]{color-scheme:light;--bg:#f5f7fb;--bg-card:#fff;--bg-card-hover:#f1f5ff;--bg-sidebar:#fff;--bg-input:#fff;--surface-inset:#f5f7fb;--surface-header:#fafbfe;--border:#dce2ec;--border-focus:#4f46e5;--blue:#4f46e5;--blue-bright:#4338ca;--blue-dim:#4338ca;--blue-soft:#eef2ff;--cyan:#4338ca;--accent-rgb:79 70 229;--shadow-rgb:30 41 59;--overlay-rgb:15 23 42;--primary-bg:#4f46e5;--primary-hover:#4338ca;--primary-border:#4f46e5;--text:#182230;--text-muted:#5d6b7e;--text-dim:#475569;--placeholder:#69778c;--green:#16734b;--success-text:#166345;--green-soft:#eaf7f0;--danger:#bf2441;--danger-text:#b21e3c;--danger-strong:#8d1530;--danger-soft:#fff0f2;--border-glow:transparent;--radius-md:14px;--radius-lg:18px}
-html body{font-size:14px;line-height:1.65;letter-spacing:0;background-image:none}
-html .main{padding:28px clamp(16px,3vw,40px);max-width:1640px;margin-inline:auto}
-html .top h2{font-family:var(--font-sans);font-size:26px;line-height:1.3;font-weight:700;letter-spacing:-.025em}
-html .panel,html[data-theme] .panel{padding:22px;border-radius:14px;box-shadow:0 2px 8px rgb(var(--shadow-rgb)/.035)}
-html[data-theme] :is(.panel h3,.modalhead h3){font:650 17px/1.5 var(--font-sans);color:var(--text)}
-html[data-theme] :is(label,.btn,.nav){font-family:var(--font-sans);font-size:14px}
-html[data-theme] :is(label,.panel h3,.modalhead h3,.top h2)::before{content:none}
-html[data-theme] .btn{min-height:38px;padding:8px 14px;border-radius:9px;box-shadow:none;text-shadow:none;line-height:1.35}
-html[data-theme] .btn.small{font-size:13px;min-height:34px;padding:7px 11px}
-html[data-theme] .btn.primary{background:var(--primary-bg);color:#fff;box-shadow:none}
-html[data-theme] .nav{padding:10px 12px;border-radius:9px;box-shadow:none}
-html input:not([type=checkbox]):not([type=radio]),html select{min-height:40px;border-radius:9px}
-html textarea{border-radius:9px;line-height:1.65}
-html .panel-head{gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-html .grid{gap:18px}html .toolbar{gap:10px;flex-wrap:wrap}
-html .hint,html .muted{line-height:1.65;font-size:13px}
-html .note{font-size:13px;line-height:1.75;padding:12px 14px;border-radius:9px}
-html .modalbox{width:min(820px,calc(100vw - 32px));border-radius:16px}
-html .modalhead{padding:18px 22px}html #modalBody{padding:22px}
-html th{font-size:12px;font-weight:650;letter-spacing:.02em}html td{font-size:14px;line-height:1.5}
-html .card b,html .usage-grid strong{font-variant-numeric:tabular-nums;letter-spacing:-.025em}
 html[data-theme="slate"] .nav.active{color:#3730a3;background:#eef2ff;border-color:#c7d2fe}html[data-theme="slate"] .nav.active .nav-label{color:inherit}
 #clientSubscriptions{scroll-margin-top:24px}
 @media(max-width:600px){#clientSubscriptions{scroll-margin-top:145px}.subscription-row{scroll-margin-top:145px}}
@@ -1571,6 +1550,235 @@ html[data-theme="craft"] :is(.pagination,.pill,.node-card-meta,.node-card-addres
 .nav-section.current>summary {color:var(--blue-bright)}
 @media(min-width:601px) and (max-width:768px){html .side,html[data-theme="pink"] .side {width:200px}.nav.nav-child {justify-content:flex-start}.nav.nav-child span {display:block}.main {min-width:0}}
 @media(max-width:600px){.nav-group {display:block;overflow-y:auto;max-height:38vh}.side .nav-section {margin:2px 0}.nav-section summary {min-height:38px;padding:7px 10px}.nav-children {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-left:12px}.nav.nav-child {width:100%;justify-content:flex-start;margin:0}.nav-group>.nav {width:100%;justify-content:flex-start}.side {position:relative}.nav-section summary span {display:block}}
+
+/* Console design system. References and rationale: docs/go/INTERFACE-DESIGN.md. */
+:root{--ui-space:8px;--ui-control:40px;--ui-radius:10px;--ui-panel-radius:16px;--ui-sidebar:248px;--ui-content:1480px}
+html{scrollbar-gutter:stable;scroll-padding-top:24px}
+html body{font-size:14px;line-height:1.65;letter-spacing:0}
+html[data-theme="craft"]{--ui-radius:3px;--ui-panel-radius:4px}
+html[data-theme="high"],html[data-theme="low"]{--primary-hover:#1267ad}
+html[data-theme] :is(.btn,.nav,label,input,select,textarea,th,td,.panel h3,.modalhead h3){font-family:var(--font-sans);letter-spacing:normal;text-shadow:none}
+html[data-theme] :is(.panel h3,.modalhead h3){font-size:17px;font-weight:650;line-height:1.5;color:var(--text)}
+html[data-theme] :is(label,.panel h3,.modalhead h3)::before{content:none}
+html[data-theme] .btn{min-height:var(--ui-control);max-width:100%;padding:9px 14px;border-radius:var(--ui-radius);font-size:14px;font-weight:550;line-height:1.4;gap:8px;box-shadow:0 1px 2px rgb(var(--shadow-rgb)/.04);color:var(--text);white-space:normal;text-align:center;overflow-wrap:anywhere;transition:background-color .15s,border-color .15s,color .15s}
+html[data-theme] .btn:hover{background:var(--bg-card-hover);border-color:var(--border-focus);color:var(--blue-bright);box-shadow:none}
+html[data-theme] .btn.primary{background:var(--primary-bg);border-color:var(--primary-border);color:#fff;box-shadow:0 1px 2px rgb(var(--shadow-rgb)/.12)}
+html[data-theme] .btn.primary:hover{background:var(--primary-hover);color:#fff}
+html[data-theme] .btn.danger{background:var(--bg-card);border-color:rgb(var(--danger-rgb)/.3);color:var(--danger-text)}
+html[data-theme] .btn.danger:hover{background:var(--danger-soft);border-color:var(--danger);color:var(--danger-text)}
+html[data-theme] .btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--text-muted)}
+html[data-theme] .btn.ghost:hover{background:var(--bg-card-hover);color:var(--text);border-color:var(--border)}
+html[data-theme] .btn.small{min-height:34px;padding:6px 10px;font-size:13px;line-height:1.5}
+html[data-theme] .btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;transform:none;pointer-events:auto}
+html[data-theme] :is(.btn,.close,.nav,summary):focus-visible{outline:2px solid var(--border-focus);outline-offset:3px}
+html[data-theme] .btn .icon{width:16px;height:16px;flex:0 0 16px}
+html[data-theme] .btn.icon-button{width:40px;min-width:40px;padding:10px;flex:none}
+html[data-theme] input:not([type=checkbox]):not([type=radio]),html[data-theme] select{min-height:40px;padding:9px 12px;border-radius:var(--ui-radius);font-size:14px;line-height:1.5;min-width:0}
+html[data-theme] textarea{border-radius:var(--ui-radius);font-size:14px;padding:12px;line-height:1.75;max-width:100%}
+html[data-theme] :is(input,textarea,select):focus{box-shadow:0 0 0 3px rgb(var(--accent-rgb)/.12);background:var(--bg-input)}
+html[data-theme] label{font-size:14px;font-weight:550;margin:18px 0 8px;line-height:1.5}
+html[data-theme] label:has(input:is([type=checkbox],[type=radio])){min-height:36px;cursor:pointer;font-weight:450;gap:10px}
+html[data-theme] :is(.toolbar,.actions){gap:8px;min-width:0}
+html[data-theme] .toolbar :is(input,select){flex:1 1 180px;width:auto;max-width:320px;min-width:0}
+html[data-theme] .toolbar input:is([type=checkbox],[type=radio]){flex:0 0 16px}
+html[data-theme] .toolbar label{margin:0}
+html[data-theme] .toolbar .btn{flex:0 1 auto}
+html[data-theme] .app{align-items:flex-start}
+html[data-theme] .side{width:var(--ui-sidebar);height:100dvh;position:sticky;top:0;padding:20px 14px 12px;border-right:1px solid var(--border);box-shadow:none;flex-shrink:0;z-index:30}
+html[data-theme] .side-brand{padding:0 8px 20px;margin-bottom:12px;gap:12px;justify-content:flex-start}
+html[data-theme] .side-brand div:last-child{display:block}
+html[data-theme] .side-brand h1{font:750 17px/1.4 var(--font-sans);letter-spacing:.04em}
+html[data-theme] .side-brand p{display:block;font:12px/1.5 var(--font-sans);color:var(--text-muted);opacity:1;margin-top:3px}
+html[data-theme] .nav-group{display:block;overflow-y:auto;overflow-x:hidden;max-height:none;flex:1;min-height:0;padding:4px 2px 16px;scrollbar-width:thin}
+html[data-theme] .nav-section-title{display:block;padding:12px 12px 6px;font-size:11px;letter-spacing:.08em;color:var(--text-muted)}
+html[data-theme] .nav-section{margin:6px 0}
+html[data-theme] .nav-section>summary{min-height:42px;padding:10px 12px;font-size:14px;border-radius:var(--ui-radius);color:var(--text);gap:10px}
+html[data-theme] .nav-section>summary:hover{background:var(--bg-card-hover)}
+html[data-theme] .nav{min-height:40px;display:flex;width:100%;padding:9px 12px;gap:10px;border-radius:var(--ui-radius);font-size:14px;justify-content:flex-start;white-space:normal;box-shadow:none}
+html[data-theme] .nav span{display:block}
+html[data-theme] .nav-children{display:block;margin:4px 0 8px 20px;padding-left:10px;border-left:1px solid var(--border)}
+html[data-theme] .nav.nav-child{min-height:38px;font-size:13px;padding:8px 10px}
+html[data-theme] .nav.active{color:var(--blue-bright);background:rgb(var(--accent-rgb)/.1);border-color:transparent;font-weight:650;box-shadow:inset 3px 0 var(--blue)}
+html[data-theme] .side-status{display:flex;padding:14px 8px 0;gap:8px;justify-content:flex-start;font-size:12px}
+html[data-theme] .side-status span{display:inline}
+html[data-theme] .main{width:0;min-width:0;max-width:var(--ui-content);flex:1;padding:0 32px 40px;margin-inline:auto}
+.workspace-bar{min-height:76px;padding:16px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);margin-bottom:28px}
+.workspace-context{font-size:13px;font-weight:550;color:var(--text-muted);display:flex;gap:8px;align-items:center;min-width:0}
+.workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;flex-wrap:wrap}
+html[data-theme] .workspace-actions .current-profile{display:inline-flex;min-width:0;max-width:320px;gap:8px;padding:8px 12px;flex:0 1 auto;background:var(--bg-card)}
+html[data-theme] .current-profile strong{max-width:156px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+html[data-theme] .current-profile>span{font-size:12px;white-space:nowrap;color:var(--text-muted)}
+html[data-theme] .top{border:0;padding:0;margin:0 0 24px;gap:16px;display:flex;align-items:center;flex-direction:row}
+html[data-theme] .top-title-area{flex:1 1 240px;min-width:0}
+html[data-theme] .top h2{font:700 clamp(24px,2.2vw,30px)/1.3 var(--font-sans);letter-spacing:-.025em}
+html[data-theme] .top h2::before{content:none}
+html[data-theme] .top p{font-size:14px;line-height:1.6;margin:8px 0 0;color:var(--text-muted)}
+html[data-theme] .cli-breadcrumb{display:none}
+html[data-theme] .top .actions{flex:0 1 auto;width:auto;justify-content:flex-end}
+html[data-theme] #sectionTabs{display:flex;flex-wrap:nowrap!important;gap:20px!important;overflow-x:auto;max-width:100%;border-bottom:1px solid var(--border);padding:0 0 1px;margin:0 0 24px!important;scrollbar-width:thin}
+html[data-theme] #sectionTabs .btn{border:0;border-radius:0;min-height:42px;padding:8px 0 12px;flex:none;white-space:nowrap;background:transparent;color:var(--text-muted);box-shadow:none;border-bottom:2px solid transparent}
+html[data-theme] #sectionTabs .btn[aria-current=page]{color:var(--blue-bright);border-bottom-color:var(--blue);font-weight:650}
+html[data-theme] #sectionTabs .btn:hover{color:var(--text);background:transparent}
+html[data-theme] .panel{padding:24px;margin-bottom:24px;border-radius:var(--ui-panel-radius);box-shadow:0 2px 8px rgb(var(--shadow-rgb)/.025);min-width:0}
+html[data-theme] .panel-head{gap:16px;align-items:center;margin-bottom:20px;padding-bottom:16px}
+html[data-theme] .panel-head>div:first-child{min-width:0;flex:1 1 240px}
+html[data-theme] .panel-head>.toolbar{flex:0 1 auto}
+html[data-theme] .panel-head :is(.hint,.muted){margin:6px 0 0;max-width:72ch}
+html[data-theme] :is(.hint,.muted){font-size:13px;line-height:1.7}
+html[data-theme] .note{font-size:13px;line-height:1.8;padding:14px 16px;margin:16px 0;border-radius:var(--ui-radius);overflow-wrap:anywhere}
+html[data-theme] .error{font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+html[data-theme] .error:empty{min-height:0;margin:0}
+html[data-theme] .error:not(:empty)::before{content:''}
+html[data-theme] .empty{padding:40px 24px;line-height:1.8;font-size:14px}
+html[data-theme] .empty::before{content:none}
+html[data-theme] .grid{gap:20px;grid-template-columns:repeat(2,minmax(0,1fr))}
+html[data-theme] :is(.cards,.profile-grid,.host-overview-grid,.theme-options){gap:16px}
+html[data-theme] :is(.profile-card,.host-card,.node-card){border-radius:var(--ui-radius);padding:20px;box-shadow:none;background:var(--bg-card)}
+html[data-theme] .profile-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+html[data-theme] .profile-card h4{font-size:16px;line-height:1.5;margin:0}
+html[data-theme] .profile-usage{font-size:13px;line-height:1.8;margin:16px 0;color:var(--text-muted)}
+html[data-theme] .profile-id{font-size:12px;margin-top:6px;line-height:1.6;overflow-wrap:anywhere}
+html[data-theme] .profile-actions{border-top:1px solid var(--border);padding-top:12px;margin-top:14px}
+.card-secondary{border-top:1px solid var(--border);margin-top:16px;padding-top:8px}
+.card-secondary>summary{cursor:pointer;min-height:36px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--text-muted);font-size:13px;font-weight:550;list-style:none}
+.card-secondary>summary::after{content:'＋';font-size:18px}
+.card-secondary[open]>summary::after{content:'−'}
+.card-secondary>.toolbar{padding-top:8px}
+html[data-theme] .pill{font-size:12px;line-height:1.5;padding:3px 9px;max-width:100%;white-space:normal;font-weight:500}
+html[data-theme] :is(.card b,.usage-grid strong,.monitor-metric strong,.host-mini-metrics strong){font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+html[data-theme] .node-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+html[data-theme] .node-card-name{font-size:15px}
+html[data-theme] .node-card-meta{font-size:12px;margin-block:12px}
+html[data-theme] .node-card-actions{gap:8px}
+html[data-theme] .node-selection-bar{background:var(--surface-inset);border:1px solid var(--border);padding:12px 16px;border-radius:var(--ui-radius);gap:12px}
+html[data-theme] .node-selection-count{font-size:13px;margin-left:auto}
+html[data-theme] .node-secondary{border-color:var(--border);border-radius:var(--ui-radius);margin:16px 0;background:var(--surface-inset)}
+html[data-theme] .node-secondary>summary{font-size:14px;padding:12px 16px}
+html[data-theme] :is(.tablewrap,.table-wrap){overflow:auto;max-width:100%;max-height:68vh;border:1px solid var(--border);border-radius:var(--ui-radius);background:var(--bg-card);margin:16px 0 0;overscroll-behavior-x:contain}
+html[data-theme] table{font-size:14px;min-width:640px}
+html[data-theme] th{font-size:12px;line-height:1.5;font-weight:600;letter-spacing:0;padding:12px 16px;background:var(--surface-header);color:var(--text-muted)}
+html[data-theme] td{font-size:14px;line-height:1.65;padding:14px 16px;vertical-align:middle;color:var(--text)}
+html[data-theme] td:has(>.btn){white-space:normal;min-width:160px;max-width:360px}
+html[data-theme] td>.btn{margin:3px 4px 3px 0;vertical-align:middle}
+html[data-theme] td>code{white-space:normal;overflow-wrap:anywhere;word-break:normal;display:inline-block;max-width:420px;font-size:12px}
+html[data-theme] tbody tr:has(input[type=checkbox]:checked){background:rgb(var(--accent-rgb)/.07)}
+html[data-theme] .pagination{margin-top:16px;gap:12px;font-size:13px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+html[data-theme] .modal{padding:24px;background:rgb(var(--overlay-rgb)/.6)}
+html[data-theme] .modalbox{width:min(760px,100%);max-height:calc(100dvh - 48px);border-radius:var(--ui-panel-radius);border:1px solid var(--border);box-shadow:0 24px 80px rgb(var(--shadow-rgb)/.2)}
+html[data-theme] .modalbox[data-layout=wide]{width:min(1080px,100%)}
+html[data-theme] .modalhead{padding:20px 24px;gap:16px;background:var(--bg-card);z-index:4}
+html[data-theme] .modalhead .window-dots{display:none}
+html[data-theme] .close{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;flex:none;padding:8px;border-radius:var(--ui-radius)}
+html[data-theme] #modalBody{padding:24px}
+html[data-theme] #modalBody>form{max-width:100%}
+html[data-theme] #modalBody>form>input:not([type=checkbox]):not([type=radio]),html[data-theme] #modalBody>form>select{max-width:620px;display:block}
+html[data-theme] #modalBody>form>input[type=number]{max-width:200px}
+html[data-theme] #modalBody>form>.btn{margin:16px 8px 0 0}
+html[data-theme] #modalBody form>.toolbar:last-child{border-top:1px solid var(--border);padding-top:16px;margin-top:24px;gap:10px}
+html[data-theme] #modalBody :is(h4,hr){margin-top:24px;margin-bottom:12px}
+html[data-theme] .checks{gap:8px;padding:12px;border-radius:var(--ui-radius);max-height:320px}
+html[data-theme] .choice{min-height:44px;font-size:14px;line-height:1.5;padding:10px 12px}
+html[data-theme] .choice:has(input:checked){border-color:var(--border-focus);background:rgb(var(--accent-rgb)/.08)}
+html[data-theme] .theme-option{padding:16px;border-radius:var(--ui-panel-radius);text-align:left}
+html[data-theme] .theme-option p{font-size:13px;line-height:1.7;color:var(--text-muted)}
+html[data-theme] .theme-option[aria-pressed=true]{outline:2px solid var(--border-focus);outline-offset:2px}
+html[data-theme] .subscription-row{border-radius:var(--ui-radius);padding:18px;gap:16px}
+html[data-theme] .subscription-actions{gap:8px}
+html[data-theme] .subscription-url{font-size:12px;min-height:32px;padding:5px 8px}
+html[data-theme] .client-navigation{gap:12px;padding:12px 16px}
+html[data-theme] .loginbox{border-radius:var(--ui-panel-radius);box-shadow:0 20px 60px rgb(var(--shadow-rgb)/.12)}
+html[data-theme] .login-body{padding:32px}
+html[data-theme] .login-meta{font-size:13px;line-height:1.8}
+.mobile-menu-toggle,.side-close,.nav-backdrop{display:none!important}
+.skip-link{position:fixed;left:12px;top:-100px;z-index:300;background:var(--primary-bg);color:white;padding:12px 20px;border-radius:8px}
+.skip-link:focus{top:12px}
+body.member-mode .side,body.member-mode .mobile-menu-toggle{display:none!important}
+body.member-mode .main{width:100%;max-width:1240px}
+html[data-theme] .panel-head>.toolbar:has(.btn:nth-child(4)){flex-basis:100%;justify-content:flex-start}
+html[data-theme] .profile-card{gap:16px}
+html[data-theme] .profile-card .profile-usage{margin:0}
+html[data-theme] .profile-card-head>div{flex:1;min-width:0}
+html[data-theme] .profile-card-head>.pill{flex:none;white-space:nowrap;align-self:flex-start}
+html[data-theme] .profile-card>.card-secondary{margin-top:0}
+html[data-theme] .node-selection-bar>label{margin:0;min-height:32px}
+.node-source-actions{padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.node-source-actions>.hint{flex-basis:100%;margin:0 0 2px}
+html[data-theme] .node-sort-status{color:var(--text-muted);line-height:1.65}
+.backup b{display:block;overflow-wrap:anywhere;word-break:break-word;font-size:13px;line-height:1.7}
+.backup>div:first-child{flex:1 1 240px;min-width:0}
+.backup{gap:16px}
+.settings-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.settings-shortcut{display:flex;align-items:center;gap:14px;padding:18px;text-align:left;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--ui-radius);color:var(--text);cursor:pointer;min-width:0;font:inherit;transition:background .15s,border-color .15s}
+.settings-shortcut:hover{background:var(--bg-card-hover);border-color:var(--border-focus)}
+.settings-shortcut:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px}
+.settings-shortcut>.icon:first-child{width:22px;height:22px;flex:none;color:var(--blue-bright)}
+.settings-shortcut>.icon:last-child{width:16px;height:16px;flex:none;color:var(--text-muted)}
+.settings-shortcut>span{flex:1;min-width:0}
+.settings-shortcut strong{display:block;font-size:14px;font-weight:600;line-height:1.5}
+.settings-shortcut small{display:block;font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6}
+#probeConfig{max-width:720px}
+#probeConfig>.btn{margin-top:8px}
+.probe-batch-actions{display:grid;gap:14px;padding:16px;margin:16px 0;background:var(--surface-inset);border:1px solid var(--border);border-radius:var(--ui-radius)}
+.probe-recovery-actions{padding-top:12px;border-top:1px solid var(--border)}
+html[data-theme] .probe-batch-actions #psDefaultPort{flex:0 1 96px;width:96px}
+html[data-theme] .probe-recovery-actions .btn{background:var(--bg-card);font-size:13px}
+body:has(#app.hidden) .skip-link{display:none}
+@media(max-width:1100px){.settings-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.settings-shortcuts{grid-template-columns:1fr}.settings-shortcut{padding:16px}.probe-batch-actions{padding:12px}html[data-theme] .client-navigation{padding:12px;gap:8px}html[data-theme] .subscription-actions .btn{font-size:12px;padding:7px 9px}}
+@media(min-width:769px){html[data-theme] #content[data-page=system],html[data-theme] #content[data-page=maintenance]{max-width:1060px}}
+@media(min-width:769px) and (max-width:1100px){:root{--ui-sidebar:216px}html[data-theme] .main{padding-inline:24px}.workspace-context{display:none}html[data-theme] .top-title-area{flex-basis:200px}html[data-theme] .panel{padding:20px}}
+@media(max-width:768px){
+ :root{--ui-control:44px}
+ html[data-theme] .app{display:block}
+ html[data-theme] .main{width:100%;max-width:none;padding:0 16px 28px}
+ .workspace-bar{min-height:68px;padding:12px 0;margin-bottom:24px;gap:8px}
+ .workspace-context{display:none}
+ .workspace-actions{flex:1;gap:4px;flex-wrap:nowrap}
+ html[data-theme] .workspace-actions .current-profile{flex:1;max-width:none;justify-content:flex-start;min-height:44px;padding:8px;gap:6px}
+ html[data-theme] .current-profile>span:first-child{display:none}
+ html[data-theme] .current-profile strong{max-width:none;flex:1;font-size:13px;text-align:left}
+ html[data-theme] .workspace-actions .utility-label{display:none}
+ html[data-theme] .workspace-actions>.btn:not(.current-profile){width:40px;min-width:40px;min-height:44px;padding:8px}
+ html[data-theme] .mobile-menu-toggle{display:inline-flex!important;min-height:44px;width:44px;min-width:44px;padding:10px}
+ html[data-theme] .side{position:fixed;inset:0 auto 0 0;width:min(300px,86vw);height:100dvh;z-index:90;padding:20px 16px 16px;transform:translateX(-105%);visibility:hidden;transition:transform .18s ease,visibility .18s;box-shadow:12px 0 40px rgb(var(--shadow-rgb)/.15);background:var(--bg-sidebar)}
+ body.nav-open{overflow:hidden}
+ body.nav-open .side{transform:translateX(0);visibility:visible}
+ html[data-theme] .side-close{display:inline-flex!important;margin-left:auto;flex:none}
+ .side-brand{position:relative}
+ html[data-theme] .side-brand div:last-child{display:block}
+ body.nav-open .nav-backdrop{display:block!important;position:fixed;inset:0;background:rgb(var(--overlay-rgb)/.5);z-index:80;border:0;width:100%;height:100%;padding:0}
+ html[data-theme] .nav-section>summary,html[data-theme] .nav.nav-child{min-height:44px}
+ html[data-theme] .top{gap:14px;flex-wrap:wrap;margin-bottom:20px}
+ html[data-theme] .top-title-area{flex:1 1 100%}
+ html[data-theme] .top h2{font-size:24px}
+ html[data-theme] .top p{font-size:13px;margin-top:6px}
+ html[data-theme] .top .actions{justify-content:flex-start;flex-wrap:wrap;gap:8px}
+ html[data-theme] .top .actions .btn{flex:0 1 auto}
+ html[data-theme] #sectionTabs{gap:20px!important;margin-bottom:20px!important}
+ html[data-theme] .panel{padding:18px;margin-bottom:18px}
+ html[data-theme] .panel-head{gap:12px;padding-bottom:14px;margin-bottom:16px}
+ html[data-theme] .panel-head>div:first-child{flex-basis:100%}
+ html[data-theme] .panel-head>.toolbar{justify-content:flex-start}
+ html[data-theme] .grid{grid-template-columns:1fr;gap:16px}
+ html[data-theme] .span2{grid-column:auto}
+ html[data-theme] .toolbar :is(input,select){max-width:100%;flex-basis:160px}
+ html[data-theme] .btn.small{min-height:40px;padding:8px 12px}
+ html[data-theme] :is(.profile-card,.host-card,.node-card){padding:16px}
+ html[data-theme] .profile-grid,html[data-theme] .host-overview-grid{grid-template-columns:1fr}
+ html[data-theme] .node-selection-bar{padding:12px;gap:12px}
+ html[data-theme] .node-selection-count{margin-left:0}
+ html[data-theme] .modal{padding:10px}
+ html[data-theme] .modalbox{width:100%;max-height:calc(100dvh - 20px)}
+ html[data-theme] .modalhead{padding:16px 18px}
+ html[data-theme] #modalBody{padding:18px}
+ html[data-theme] .modalhead h3{font-size:16px}
+ html[data-theme] .checks{grid-template-columns:1fr}
+ html[data-theme] .subscription-row{padding:14px;gap:12px}
+ html[data-theme] :is(.subscription-actions,.profile-actions) .btn{min-height:40px}
+ html[data-theme] #clientSubscriptions,html[data-theme] .subscription-row{scroll-margin-top:16px}
+ html[data-theme] .pagination{font-size:13px}
+}
+@media(max-width:380px){html[data-theme] .main{padding-inline:12px}html[data-theme] .panel{padding:14px}html[data-theme] .workspace-actions .current-profile{border:0;background:transparent;padding-inline:4px}.workspace-actions .current-profile>span:last-child{display:none}}
 
 </style>
 </head>
@@ -1798,14 +2006,17 @@ SOFTWARE.
 </div>
 
 <!-- MAIN APP SHELL -->
+<a class="skip-link" href="#content">跳转到主要内容</a>
 <div id="app" class="app hidden">
-  <aside class="side">
+  <button id="navBackdrop" class="nav-backdrop" type="button" aria-label="关闭导航" tabindex="-1"></button>
+  <aside class="side" id="appSidebar" aria-label="主导航">
     <div class="side-brand">
       <div class="side-logo">M</div>
       <div>
         <h1>MXIOC<span class="brand-terminal"> // CLI</span></h1>
-        <p>订阅管理控制台</p>
+        <p>订阅与服务器管理</p>
       </div>
+      <button class="btn ghost icon-button side-close" id="navClose" type="button" aria-label="关闭导航">×</button>
     </div>
     <div class="nav-group">
       <div class="nav-section-title">工作空间</div>
@@ -1821,7 +2032,16 @@ SOFTWARE.
     </div>
   </aside>
 
-  <main class="main">
+  <main class="main" id="appMain">
+    <div class="workspace-bar">
+      <button class="btn ghost mobile-menu-toggle" id="navToggle" type="button" aria-label="打开导航" aria-controls="appSidebar" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <span class="workspace-context">MXIOC <span aria-hidden="true">/</span> 管理工作台</span>
+      <div class="workspace-actions">
+        <button id="manageProfiles" class="btn current-profile" title="进入订阅管理并切换配置"><span>当前订阅</span><strong id="currentProfileName">—</strong><span>切换 <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span></button>
+        <button id="refresh" class="btn ghost" title="刷新当前页面" aria-label="刷新当前页面"><svg class="icon" aria-hidden="true"><use href="#icon-refresh-cw"/></svg><span class="utility-label">刷新</span></button>
+        <button id="logout" class="btn ghost" title="退出登录" aria-label="退出登录"><svg class="icon" aria-hidden="true"><use href="#icon-log-out"/></svg><span class="utility-label">退出</span></button>
+      </div>
+    </div>
     <div class="top">
       <div class="top-title-area">
         <div class="cli-breadcrumb">MXIOC <span>/ 工作空间 / </span><span id="titleBreadcrumb">overview</span></div>
@@ -1829,16 +2049,13 @@ SOFTWARE.
         <p id="subtitle">综合订阅配置状态</p>
       </div>
       <div class="actions">
-        <button id="manageProfiles" class="btn current-profile" title="进入订阅管理并切换配置"><span>当前订阅</span><strong id="currentProfileName">—</strong><span>切换 <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span></button>
-        <button id="refresh" class="btn"><svg class="icon" aria-hidden="true"><use href="#icon-refresh-cw"/></svg>刷新</button>
         <button id="importNode" class="btn hidden"><svg class="icon" aria-hidden="true"><use href="#icon-link"/></svg>批量链接导入</button>
         <button id="add" class="btn primary hidden"><svg class="icon" aria-hidden="true"><use href="#icon-circle-plus"/></svg>新增</button>
-        <button id="logout" class="btn danger"><svg class="icon" aria-hidden="true"><use href="#icon-log-out"/></svg>退出</button>
       </div>
     </div>
-    <nav id="sectionTabs" class="toolbar" aria-label="当前功能分区" style="margin-bottom:16px;gap:8px;flex-wrap:wrap"></nav>
+    <nav id="sectionTabs" class="toolbar" aria-label="当前功能分区"></nav>
     <aside id="goReleaseNotice" class="panel hidden" role="status" style="margin-bottom:16px"></aside>
-    <div id="content"></div>
+    <div id="content" tabindex="-1"></div>
   </main>
 </div>
 
@@ -1883,6 +2100,26 @@ const S = {
   updatePrompted: ''
 };
 
+function setNavigationOpen(open, restore = true) {
+  const mobile = matchMedia('(max-width:768px)').matches;
+  open = !!open && mobile && S.role !== 'user';
+  const wasOpen = document.body.classList.contains('nav-open');
+  document.body.classList.toggle('nav-open', open);
+  $('navToggle').setAttribute('aria-expanded', String(open));
+  $('navToggle').setAttribute('aria-label', open ? '关闭导航' : '打开导航');
+  $('appMain').inert = open;
+  $('appSidebar').inert = mobile && !open;
+  if (open) {
+    $('appSidebar').setAttribute('role', 'dialog');
+    $('appSidebar').setAttribute('aria-modal', 'true');
+    $('navClose').focus({preventScroll:true});
+  } else {
+    $('appSidebar').removeAttribute('role');
+    $('appSidebar').removeAttribute('aria-modal');
+    if (wasOpen && restore) $('navToggle').focus({preventScroll:true});
+  }
+}
+
 function notice(text) {
   const t = $('toast');
   t.innerHTML = uiIcon('check') + esc(text);
@@ -1892,6 +2129,8 @@ function notice(text) {
 }
 
 function showLogin() {
+ setNavigationOpen(false, false);
+ document.body.classList.remove('member-mode');
  clearTimeout(S.probeBatchTimer);
   S.modalEpoch=(S.modalEpoch||0)+1;
   if(S.globeCleanup){S.globeCleanup();S.globeCleanup=null}
@@ -1932,6 +2171,7 @@ function showLogin() {
 async function showAuthenticatedApp() {
   const account = await api('/account');
   S.role = account.role;
+  document.body.classList.toggle('member-mode', S.role === 'user');
   if (S.role === 'user') {
     document.querySelector('#app .nav-group').classList.add('hidden');
     ['manageProfiles','add','importNode','sectionTabs'].forEach(id => $(id).classList.add('hidden'));
@@ -2139,7 +2379,7 @@ const pageInfo = {
   traffic: ['流量与到期', '按订阅管理流量额度、已用量与有效期，统一同步至三个客户端'],
   raw: ['原始配置', '直接编辑并校验底层 Clash / Mihomo YAML'],
   system: ['账号与安全', '修改管理员用户名、密码以及查看历史配置备份'],
-  settings: ['设置', '选择适合当前设备的界面主题'],
+  settings: ['设置', '安全、通知、权限与界面外观'],
   maintenance: ['升级与卸载', '检查升级、重新安装或安全卸载管理后台']
 };
 
@@ -2163,6 +2403,8 @@ async function go(page) {
   if (page !== 'monitoring') stopMonitoring();
   if (S.page !== page) $('content').innerHTML = '<div class="empty" role="status">正在加载…</div>';
   S.page = page;
+  $('content').dataset.page = page;
+  setNavigationOpen(false, false);
   const section = sectionFor(page);
   $('sectionTabs').innerHTML = pageSections[section].filter(p => p !== 'serverNodes' || S.serverId).map(p =>
     `<button type="button" data-page="${p}" class="btn small ${p === page ? 'primary' : ''}" ${p === page ? 'aria-current="page"' : ''} onclick="${p === 'monitoring' ? "S.monitorId='';" : ''}go('${p}').catch(error=>notice(error.message))">${esc(pageInfo[p][0])}</button>`).join('');
@@ -2179,8 +2421,9 @@ async function go(page) {
   }
   $('title').textContent = pageInfo[page][0];
   $('subtitle').textContent = pageInfo[page][1];
-  $('titleBreadcrumb').textContent = page;
+  $('titleBreadcrumb').textContent = pageInfo[page][0];
   $('add').classList.toggle('hidden', !['nodes', 'chains', 'groups', 'rules', 'dns'].includes(page));
+  $('add').innerHTML = uiIcon('circle-plus') + ({nodes:'新增节点',chains:'新增代理链',groups:'新增策略组',rules:'新增规则',dns:'新增 DNS 分流'}[page] || '新增');
   $('importNode').classList.toggle('hidden', page !== 'nodes');
   if (!S.profiles.length) await loadProfiles();
   if (!S.data && !['profiles', 'settings', 'system', 'maintenance', 'servers', 'serverNodes', 'monitoring', 'probeSync'].includes(page)) await reload(false);
@@ -2296,7 +2539,7 @@ function editPanelUser(u, profiles) {
   };
 }
 async function memberPortal() {
-  const data=await api('/portal'); S.page='portal';
+  const data=await api('/portal'); S.page='portal'; $('content').dataset.page='portal';
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
   $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
     const t=p.traffic||{};
@@ -2311,7 +2554,8 @@ async function memberPortal() {
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><h3>外观与性能</h3><div class="toolbar"><button class="btn" onclick="clientOptionsManager().catch(e=>notice(e.message))">订阅安全与兼容</button><button class="btn" onclick="externalTrafficManager().catch(e=>notice(e.message))">外部订阅流量</button><button class="btn" onclick="notificationManager().catch(e=>notice(e.message))">通知中心</button><button class="btn" onclick="agentRolloutManager().catch(e=>notice(e.message))">Agent 分批升级</button><button class="btn" onclick="monitorShareManager().catch(e=>notice(e.message))">监控分享</button><button class="btn primary" onclick="userManager().catch(e=>notice(e.message))">用户与权限</button></div></div>
+  const shortcuts=[['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>常用设置</h3><p class="muted">按任务选择设置，主题与显示偏好位于下方。</p></div></div><div class="settings-shortcuts">${shortcuts.map(([icon,title,description,action])=>`<button class="settings-shortcut" type="button" onclick="${action}().catch(e=>notice(e.message))">${uiIcon(icon)}<span><strong>${title}</strong><small>${description}</small></span>${uiIcon('chevron-right')}</button>`).join('')}</div></section><section class="panel"><div class="panel-head"><div><h3>主题与外观</h3><p class="muted">六种配色，共用一致的按钮、表单与排版。</p></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
       <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>原版物品栏与立体按钮，草地绿和石灰配色，像素英文搭配清晰中文。</p></button>
@@ -2388,7 +2632,7 @@ async function notificationManager() {
  <p class="hint">按后台采样周期检查，相同告警持续期间只提醒一次；日期按 UTC。失败自动重试，最多 8 次。记录保留最近 200 条。首次启用会提醒已达到阈值的项目。</p>
  <label class="check"><input type="checkbox" id="ntClear">清除已保存的 Token（需同时关闭通知）</label>
  <div class="toolbar"><button class="btn primary" type="submit">保存通知设置</button><button class="btn" type="button" id="ntRefresh">刷新记录</button></div></form>
- <h4>最近通知</h4><div class="table-wrap"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${(data.events||[]).slice().reverse().map(e=>`<tr><td>${esc(new Date(e.time*1000).toLocaleString())}</td><td>${esc(e.text)}${e.error?'<br><span class="muted">'+esc(e.error)+'</span>':''}</td><td>${esc(({pending:'等待发送',sent:'已发送',failed:'发送失败',cancelled:'已取消'})[e.status]||e.status)} · ${e.attempts} 次</td></tr>`).join('')||'<tr><td colspan="3">暂无通知</td></tr>'}</tbody></table></div>`);
+ <h4>最近通知</h4><div class="tablewrap"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${(data.events||[]).slice().reverse().map(e=>`<tr><td>${esc(new Date(e.time*1000).toLocaleString())}</td><td>${esc(e.text)}${e.error?'<br><span class="muted">'+esc(e.error)+'</span>':''}</td><td>${esc(({pending:'等待发送',sent:'已发送',failed:'发送失败',cancelled:'已取消'})[e.status]||e.status)} · ${e.attempts} 次</td></tr>`).join('')||'<tr><td colspan="3">暂无通知</td></tr>'}</tbody></table></div>`);
  $('ntPreview').onclick=async()=>{try{const d=await api('/notifications/daily-preview');$('ntDailyPreview').textContent=d.text;$('ntDailyPreview').classList.remove('hidden');}catch(e){notice(e.message);}};
  $('ntRefresh').onclick=()=>notificationManager().catch(e=>notice(e.message));
  $('notificationForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('/notifications',jsonOpt('PUT',{enabled:$('ntEnabled').checked,token:$('ntToken').value,chatId:$('ntChat').value,clearToken:$('ntClear').checked,monitor:$('ntMonitor').checked,traffic:$('ntTraffic').checked,expiry:$('ntExpiry').checked,days:Number($('ntDays').value),percent:Number($('ntPercent').value),failures:Number($('ntFailures').value),daily:$('ntDaily').checked,dailyHour:Number($('ntDailyHour').value),probes:$('ntProbes').checked,latencyMs:Number($('ntLatency').value),lossPercent:Number($('ntLoss').value)}));$('ntToken').value='';notice('通知设置已保存');await notificationManager();}catch(err){notice(err.message);}finally{button.disabled=false;}};
@@ -2417,8 +2661,8 @@ function profiles() {
         <details><summary>查看订阅地址</summary><code>${esc(location.origin + p.url)}</code></details>
         <div class="toolbar"><button class="btn primary small" onclick="useProfile('${id}')">进入配置</button><button class="btn small" onclick="useProfile('${id}','traffic')">套餐 / 流量</button>
           <button class="btn small" onclick="profileCopyLink('${id}')" title="复制 Clash / Mihomo 订阅地址">复制链接</button><button class="btn small" onclick="profileClientLinks('${id}')">订阅 / 二维码</button></div>
-        <div class="toolbar profile-actions"><button class="btn small" onclick="profileEdit('${id}')">重命名 / 设置</button><button class="btn small" onclick="profileDuplicate('${id}')">复制为新订阅</button>
-          ${p.protected ? '<span class="hint">主订阅不可删除</span>' : `<button class="btn small danger" onclick="profileDelete('${id}')">删除</button>`}</div>
+        <details class="card-secondary"><summary>订阅设置与更多操作</summary><div class="toolbar"><button class="btn small" onclick="profileEdit('${id}')">重命名 / 设置</button><button class="btn small" onclick="profileDuplicate('${id}')">复制为新订阅</button>
+          ${p.protected ? '<span class="hint">主订阅不可删除</span>' : `<button class="btn small danger" onclick="profileDelete('${id}')">删除</button>`}</div></details>
       </article>`;
     }).join('') || '<div class="empty">没有找到匹配的订阅</div>'}</div>${pagination(page)}</section>`;
   $('profileFilter').value = S.profileFilter;
@@ -2493,14 +2737,14 @@ function renderServers() {
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"></div>
     <div class="profile-grid">${page.rows.map(s => {
       const id = encodeURIComponent(s.id), url = panelLink(s.panelUrl), running = s.job?.status === 'running';
-      return `<article class="profile-card"><div class="profile-card-head"><div><h4>${esc(s.name)}</h4><div class="profile-id">${esc(s.sshUser)}@${esc(s.host)}:${s.sshPort}</div></div><span class="pill ${s.job?.status === 'failed' ? 'reject' : ''}">${s.connectionMode === 'existing' ? (s.existingVerifiedAt ? '已接入' : '待验证') : remoteStatus(s.job?.status)}</span></div>
-      <div class="profile-usage">${s.connectionMode === 'existing' ? (panelType(s.installType) ? '接入现有面板' : '接入已有内核') : s.domain ? '绑定域名：' + esc(s.domain) : '无域名自动安装'}<br>节点连接地址：${esc(s.nodeAddress || s.domain || s.host)}<br>安装类型：${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')}${panelType(s.installType) ? ' · 面板账号：' + esc(s.panelUser) : ' · 支持模板节点 / 中转'}${s.job ? '<br>阶段：' + esc(remoteStage(s.job.stage)) : ''}</div>
+      return `<article class="profile-card"><div class="profile-card-head"><div><h4>${esc(s.name)}</h4><div class="profile-id">${esc(s.sshUser)}@${esc(s.host)}:${s.sshPort}</div></div><span class="pill ${s.job?.status === 'failed' ? 'reject' : ''}">${s.probeDiscovery ? '探针已接入' : s.connectionMode === 'existing' ? (s.existingVerifiedAt ? '已接入' : '待验证') : remoteStatus(s.job?.status)}</span></div>
+      <div class="profile-usage">${s.probeDiscovery ? '复用探针监控 · SSH 已授权' : s.connectionMode === 'existing' ? (panelType(s.installType) ? '接入现有面板' : '接入已有内核') : s.domain ? '绑定域名：' + esc(s.domain) : '无域名自动安装'}<br>节点连接地址：${esc(s.nodeAddress || s.domain || s.host)}<br>安装类型：${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')}${panelType(s.installType) ? ' · 面板账号：' + esc(s.panelUser) : ' · 支持模板节点 / 中转'}${s.job ? '<br>阶段：' + esc(remoteStage(s.job.stage)) : ''}</div>
       ${s.lastError ? `<div class="error">${esc(s.lastError)}</div>` : ''}
       ${url ? `<a class="btn small" href="${esc(url)}" target="_blank" rel="noopener noreferrer">打开面板 ${uiIcon('chevron-right')}</a><code style="overflow-wrap:anywhere;white-space:normal">${esc(url)}</code>` : ''}
-      <div class="toolbar"><button class="btn small primary" onclick="openRemoteNodes('${id}')" ${running ? 'disabled' : ''}>节点 / 中转</button><button class="btn small" onclick="serverForm('${id}')" ${running ? 'disabled' : ''}>连接设置</button><button class="btn small" onclick="openHostMonitor('${id}')">硬件监控</button><button class="btn small" onclick="serverTest('${id}',this)">测试 SSH</button></div>
-      <div class="toolbar profile-actions">${s.connectionMode === 'existing' ? `<button class="btn small" onclick="serverAttach('${id}',this)">${panelType(s.installType) ? '验证现有面板' : '验证已有内核'}</button>` : `<button class="btn small" onclick="serverInstall('${id}')" ${running ? 'disabled' : ''}>${s.job?.status === 'failed' || s.job?.status === 'interrupted' ? '重新安装 / 重试' : '安装 / 更新'}</button>`}
+      <div class="toolbar"><button class="btn small primary" onclick="openRemoteNodes('${id}')" ${running ? 'disabled' : ''}>节点 / 中转</button><button class="btn small" onclick="serverForm('${id}')" ${running ? 'disabled' : ''}>连接设置</button><button class="btn small" onclick="openHostMonitor('${id}')">硬件监控</button></div>
+      <details class="card-secondary"><summary>连接检查与维护</summary><div class="toolbar"><button class="btn small" onclick="serverTest('${id}',this)">测试 SSH</button>${s.connectionMode === 'existing' ? `<button class="btn small" onclick="serverAttach('${id}',this)">${panelType(s.installType) ? '验证现有面板' : '验证已有内核'}</button>` : `<button class="btn small" onclick="serverInstall('${id}')" ${running ? 'disabled' : ''}>${s.job?.status === 'failed' || s.job?.status === 'interrupted' ? '重新安装 / 重试' : '安装 / 更新'}</button>`}
       ${s.job ? `<button class="btn small" onclick="showServerJob('${encodeURIComponent(s.job.id)}')">安装日志</button>` : ''}
-      <button class="btn small" onclick="serverDiagnose('${id}')">读取诊断</button><button class="btn small danger" onclick="serverRemove('${id}')" ${running ? 'disabled' : ''}>移除管理</button></div></article>`;
+      <button class="btn small" onclick="serverDiagnose('${id}')">读取诊断</button><button class="btn small danger" onclick="serverRemove('${id}')" ${running ? 'disabled' : ''}>移除管理</button></div></details></article>`;
     }).join('') || '<div class="empty">尚未添加服务器，或没有匹配结果。</div>'}</div>${pagination(page)}</section>`;
   bindSearch('servers', renderServers);
 }
@@ -3246,7 +3490,7 @@ async function probeSync(){
  clearTimeout(S.probeBatchTimer);const data=await api('/probe-sync');if(S.page!=='probeSync')return;
  const batchActive=data.batch?.status==='running';
  const bindings=new Map((data.bindings||[]).map(v=>[v.uuid,v])),labels={dispatching:'派发状态待核对',unknown:'派发结果未知，请核对原探针',pending:'授权任务已发送，等待确认',failed:'授权失败，请核对原探针任务',bound:'已接入服务器管理'};
- $('content').innerHTML=`<section class="panel"><h3>同步 Komari 探针服务器</h3><p class="note">先连接探针，再选择服务器接入。不需要重新填写 SSH 密码：原探针 Agent 将为本面板添加独立 SSH 公钥，核对主机指纹并验证连接后登记。原探针不受影响，两边可管理同一台服务器。</p><form id="probeConfig"><label for="psURL">探针地址</label><input id="psURL" type="url" required value="${esc(data.url||'https://monitor.mxioc.com')}" autocomplete="url"><label for="psKey">Komari 管理 API Key</label><input id="psKey" type="password" autocomplete="new-password" placeholder="${data.configured?'已加密保存，留空保留':'在 Komari 管理设置中获取'}"><p class="hint">API Key 加密保存在服务器，页面不回显。使用公网 HTTPS 地址；接口不跟随跳转。</p><button class="btn primary">保存并读取服务器</button></form></section><section class="panel"><div class="panel-head"><h3>探针服务器 · ${(data.clients||[]).length} 台</h3><button class="btn" id="psRefresh">刷新列表</button><button class="btn primary" id="psResyncAll" ${batchActive?'disabled':''}>重新同步已接入服务器</button></div><div class="toolbar" style="margin:16px 0"><label for="psDefaultPort">默认 SSH 端口</label><input id="psDefaultPort" type="number" min="1" max="65535" value="22" style="width:100px"><button class="btn" id="psSelectAll" ${batchActive?'disabled':''}>全选未接入</button><button class="btn primary" id="psBatchSelected" ${batchActive?'disabled':''}>批量接入所选</button><button class="btn primary" id="psBatchAll" ${batchActive?'disabled':''}>一键接入全部未接入服务器</button><button class="btn" id="psBatchRetry" ${batchActive?'disabled':''}>批量重试失败 / 超时</button><button class="btn" id="psBatchRepair" ${batchActive?'disabled':''}>开启公钥登录并批量重试</button></div><div id="psBatchPanel" role="status"></div><p class="note">一次确认后，后台自动授权并核对结果，最多 200 台、同时最多 3 台等待验证；关闭网页仍继续。关联服务器的硬件与历史数据直接读取 Komari，不重复 SSH 采样。自动识别 sshd 实际端口，IPv4 不通时尝试 IPv6；NAT 映射端口可手动填写。</p><p class="hint">接入要求：Linux、root 或免密码 sudo 权限 Agent、允许 root 公钥登录的 SSH，以及本面板能连接其公网 SSH 端口。接入仅增加密钥，不安装代理内核、不修改已有节点、不重启服务器。请避免两边同时修改同一份服务配置。</p><div class="tablewrap"><table><thead><tr><th>选择</th><th>服务器</th><th>地址</th><th>状态</th><th>操作</th></tr></thead><tbody>${(data.clients||[]).map(c=>{const b=bindings.get(c.uuid);return `<tr><td><input type="checkbox" data-ps-select="${esc(c.uuid)}" aria-label="选择 ${esc(c.name)}" ${b||batchActive?'disabled':''}></td><td>${esc(c.name)}<br><small>${esc(c.os||'')} · ${esc(c.region||'')}</small></td><td>${esc(c.ipv4||c.ipv6||'暂无公网地址')}${b?.host?`<br><small>本面板：${esc(b.host)}:${b.port}</small>`:''}${b?.synced?`<br><small>同步于 ${esc(new Date(b.synced*1000).toLocaleString())}</small>`:''}</td><td>${b?esc(labels[b.status]||b.status):'尚未接入'}${b?.error?`<p class="error">${esc(b.error)}</p>`:''}${b?.keyFingerprint?`<details><summary>授权密钥指纹</summary><small>${esc(b.keyFingerprint)}</small></details>`:''}</td><td>${b?.status==='bound'?`<button class="btn" data-ps-open="${esc(b.serverId)}">管理服务器</button><button class="btn" data-ps-resync="${esc(c.uuid)}" ${batchActive?'disabled':''}>重新同步 IP</button>`:b?`${b.status==='failed'?`<button class="btn" data-ps-retry="${esc(c.uuid)}">使用新版重试</button><button class="btn" data-ps-repair="${esc(c.uuid)}" ${batchActive?'disabled':''}>启用公钥登录并重试</button>`:!b.task?`<button class="btn" data-ps-recover="${esc(c.uuid)}">自动找回授权任务</button>`:''}<button class="btn" data-ps-check="${esc(c.uuid)}" ${b.task?'':'disabled'}>核对接入结果</button><button class="btn" data-ps-address="${esc(c.uuid)}" ${batchActive?'disabled':''}>修改公网 SSH 地址/端口</button>`:`<input type="number" data-ps-port="${esc(c.uuid)}" min="1" max="65535" placeholder="默认端口" aria-label="${esc(c.name)} SSH 端口" style="width:100px"><button class="btn primary" data-ps-bind="${esc(c.uuid)}" ${batchActive?'disabled':''}>授权并接入</button>`}</td></tr>`}).join('')||'<tr><td colspan="5">保存探针连接后显示服务器，无需重复手动绑定。</td></tr>'}</tbody></table></div><p id="psError" class="error" role="alert">${esc(data.connectionError||'')}</p><p class="hint">删除本面板服务器记录不会撤销远端公钥；需要停用访问时，请从远端 /root/.ssh/authorized_keys 删除标记 mx-panel-probe-sync 的对应公钥。接入失败的任务不会自动重发，可在原探针核对原因。</p></section>`;
+ $('content').innerHTML=`<section class="panel"><h3>同步 Komari 探针服务器</h3><p class="note">先连接探针，再选择服务器接入。不需要重新填写 SSH 密码：原探针 Agent 将为本面板添加独立 SSH 公钥，核对主机指纹并验证连接后登记。原探针不受影响，两边可管理同一台服务器。</p><form id="probeConfig"><label for="psURL">探针地址</label><input id="psURL" type="url" required value="${esc(data.url||'https://monitor.mxioc.com')}" autocomplete="url"><label for="psKey">Komari 管理 API Key</label><input id="psKey" type="password" autocomplete="new-password" placeholder="${data.configured?'已加密保存，留空保留':'在 Komari 管理设置中获取'}"><p class="hint">API Key 加密保存在服务器，页面不回显。使用公网 HTTPS 地址；接口不跟随跳转。</p><button class="btn primary">保存并读取服务器</button></form></section><section class="panel"><div class="panel-head"><h3>探针服务器 · ${(data.clients||[]).length} 台</h3><button class="btn" id="psRefresh">刷新列表</button><button class="btn primary" id="psResyncAll" ${batchActive?'disabled':''}>重新同步已接入服务器</button></div><div class="probe-batch-actions"><div class="toolbar"><label for="psDefaultPort">默认 SSH 端口</label><input id="psDefaultPort" type="number" min="1" max="65535" value="22" style="width:100px"><button class="btn" id="psSelectAll" ${batchActive?'disabled':''}>全选未接入</button><button class="btn primary" id="psBatchSelected" ${batchActive?'disabled':''}>批量接入所选</button><button class="btn" id="psBatchAll" ${batchActive?'disabled':''}>一键接入全部未接入服务器</button></div><div class="toolbar probe-recovery-actions"><span class="hint">失败恢复</span><button class="btn" id="psBatchRetry" ${batchActive?'disabled':''}>批量重试失败 / 超时</button><button class="btn" id="psBatchRepair" ${batchActive?'disabled':''}>开启公钥登录并批量重试</button></div></div><div id="psBatchPanel" role="status"></div><p class="note">一次确认后，后台自动授权并核对结果，最多 200 台、同时最多 3 台等待验证；关闭网页仍继续。关联服务器的硬件与历史数据直接读取 Komari，不重复 SSH 采样。自动识别 sshd 实际端口，IPv4 不通时尝试 IPv6；NAT 映射端口可手动填写。</p><p class="hint">接入要求：Linux、root 或免密码 sudo 权限 Agent、允许 root 公钥登录的 SSH，以及本面板能连接其公网 SSH 端口。接入仅增加密钥，不安装代理内核、不修改已有节点、不重启服务器。请避免两边同时修改同一份服务配置。</p><div class="tablewrap"><table><thead><tr><th>选择</th><th>服务器</th><th>地址</th><th>状态</th><th>操作</th></tr></thead><tbody>${(data.clients||[]).map(c=>{const b=bindings.get(c.uuid);return `<tr><td><input type="checkbox" data-ps-select="${esc(c.uuid)}" aria-label="选择 ${esc(c.name)}" ${b||batchActive?'disabled':''}></td><td>${esc(c.name)}<br><small>${esc(c.os||'')} · ${esc(c.region||'')}</small></td><td>${esc(c.ipv4||c.ipv6||'暂无公网地址')}${b?.host?`<br><small>本面板：${esc(b.host)}:${b.port}</small>`:''}${b?.synced?`<br><small>同步于 ${esc(new Date(b.synced*1000).toLocaleString())}</small>`:''}</td><td>${b?esc(labels[b.status]||b.status):'尚未接入'}${b?.error?`<p class="error">${esc(b.error)}</p>`:''}${b?.keyFingerprint?`<details><summary>授权密钥指纹</summary><small>${esc(b.keyFingerprint)}</small></details>`:''}</td><td>${b?.status==='bound'?`<button class="btn" data-ps-open="${esc(b.serverId)}">管理服务器</button><button class="btn" data-ps-resync="${esc(c.uuid)}" ${batchActive?'disabled':''}>重新同步 IP</button>`:b?`${b.status==='failed'?`<button class="btn" data-ps-retry="${esc(c.uuid)}">使用新版重试</button><button class="btn" data-ps-repair="${esc(c.uuid)}" ${batchActive?'disabled':''}>启用公钥登录并重试</button>`:!b.task?`<button class="btn" data-ps-recover="${esc(c.uuid)}">自动找回授权任务</button>`:''}<button class="btn" data-ps-check="${esc(c.uuid)}" ${b.task?'':'disabled'}>核对接入结果</button><button class="btn" data-ps-address="${esc(c.uuid)}" ${batchActive?'disabled':''}>修改公网 SSH 地址/端口</button>`:`<input type="number" data-ps-port="${esc(c.uuid)}" min="1" max="65535" placeholder="默认端口" aria-label="${esc(c.name)} SSH 端口" style="width:100px"><button class="btn primary" data-ps-bind="${esc(c.uuid)}" ${batchActive?'disabled':''}>授权并接入</button>`}</td></tr>`}).join('')||'<tr><td colspan="5">保存探针连接后显示服务器，无需重复手动绑定。</td></tr>'}</tbody></table></div><p id="psError" class="error" role="alert">${esc(data.connectionError||'')}</p><p class="hint">删除本面板服务器记录不会撤销远端公钥；需要停用访问时，请从远端 /root/.ssh/authorized_keys 删除标记 mx-panel-probe-sync 的对应公钥。接入失败的任务不会自动重发，可在原探针核对原因。</p></section>`;
 
  const batchNames=new Map((data.clients||[]).map(c=>[c.uuid,c.name]));
  const renderBatch=batch=>{const el=$('psBatchPanel');if(!el)return;const names={running:'批量接入中',completed:'全部接入完成',partial:'已结束，部分服务器需核对',stopped:'已停止后续操作',queued:'排队中',starting:'正在授权',waiting:'等待结果并验证',bound:'已接入',failed:'失败 / 超时',unknown:'结果待核对'};el.innerHTML=batch?`<p><strong>${esc(names[batch.status]||batch.status)}</strong> · 已接入 ${batch.items.filter(i=>i.status==='bound').length} / ${batch.items.length} 台 ${batch.status==='running'?'<button class="btn danger" id="psBatchStop">停止后续接入</button>':''}</p><details><summary>查看每台进度与失败原因</summary>${batch.items.map(i=>`<p>${esc(batchNames.get(i.uuid)||i.uuid)} · ${esc(names[i.status]||i.status)} ${esc(i.error||'')}</p>`).join('')}</details>`:'';if($('psBatchStop'))$('psBatchStop').onclick=async()=>{if(!confirm('停止后续派发与自动核对？已发送的远端授权任务仍可能完成。'))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'stop',id:batch.id,confirmed:true}));await probeSync()}catch(e){notice(e.message)}}};
@@ -4150,7 +4394,7 @@ async function overview() {
   <section class="panel">
     <div class="panel-head">
       <h3>${esc(p.name)}</h3>
-      <span class="muted" style="font-family:var(--font-sans);font-size:11px;">更新时间：${esc(S.data.updated)}</span>
+      <span class="muted" >更新时间：${esc(S.data.updated)}</span>
     </div>
     <label>当前订阅地址</label>
     <div class="toolbar">
@@ -4229,14 +4473,14 @@ function nodes() {
   let rows = S.data.nodes.filter(x => (!protocol || x.type === protocol) && (x.name + ' ' + x.type + ' ' + nodeProtocol(x) + ' ' + x.server).toLowerCase().includes(q.toLowerCase()));
   $('content').innerHTML = cards() + `
   <section class="panel">
-    <div class="panel-head"><div><h3>我的节点</h3><p class="hint">服务器绑定节点可直接“批量加入订阅”，为每份订阅生成独立凭据；点击“策略组”设置用途。</p></div><button type="button" class="btn primary" onclick="importNodeModal()">${uiIcon('circle-plus')}导入链接</button></div>
-    <div class="toolbar">
-      <input id="search" placeholder="> 搜索节点名称、协议类型、服务器地址..." value="${esc(q)}">
-      <button type="button" class="btn small primary" onclick="chooseNodeServer('create')">选择服务器添加订阅节点</button>
-      <button type="button" class="btn small primary" onclick="batchServerImport()">从服务器批量导入节点</button>
-      <button type="button" class="btn small primary" onclick="chooseNodeServer('subscriptions')">单个节点批量加入订阅</button><button type="button" class="btn small" onclick="chooseNodeServer('browse')">查看服务器节点</button>
+    <div class="panel-head"><div><h3>我的节点</h3><p class="hint">服务器绑定节点可直接“批量加入订阅”，为每份订阅生成独立凭据；点击“策略组”设置用途。</p></div></div>
+    <div class="toolbar node-source-actions"><span class="hint">服务器节点与订阅分配</span>
+      <button type="button" class="btn small" onclick="chooseNodeServer('create')">选择服务器添加订阅节点</button>
+      <button type="button" class="btn small" onclick="batchServerImport()">从服务器批量导入节点</button>
+      <button type="button" class="btn small" onclick="chooseNodeServer('subscriptions')">单个节点批量加入订阅</button><button type="button" class="btn small" onclick="chooseNodeServer('browse')">查看服务器节点</button>
       <button type="button" class="btn small" onclick="go('traffic')">订阅流量与有效期</button>
     </div>
+    <div class="toolbar"><input id="search" aria-label="搜索节点" placeholder="搜索名称、协议或服务器地址…" value="${esc(q)}"></div>
     <div class="node-protocol-filter" role="group" aria-label="按节点协议筛选">
       <button type="button" class="btn small" data-node-protocol="" aria-pressed="${!protocol}">全部 · ${S.data.nodes.length}</button>
       ${[...protocolCounts].sort(([a],[b]) => a.localeCompare(b)).map(([type,count]) => `<button type="button" class="btn small" data-node-protocol="${esc(type)}" aria-pressed="${type === protocol}">${esc(type.toUpperCase())} · ${count}</button>`).join('')}
@@ -4989,7 +5233,7 @@ async function system() {
   <section class="panel">
     <div class="panel-head">
       <h3>配置备份与恢复</h3>
-      <span class="muted" style="font-family:var(--font-sans);font-size:11px;">AUTO-ROTATION: 100 SLOTS</span>
+      <span class="muted" >自动保留最近 100 份</span>
     </div>
     <div class="note">每次执行写入前均会自动备份；执行恢复时亦会预先对当前配置进行瞬时快照。</div>
     ${d.backups.length ? d.backups.map(x => `
@@ -5162,12 +5406,14 @@ async function uninstallManager(e) {
 }
 
 function openModal(title, html) {
+  setNavigationOpen(false, false);
   S.modalEpoch=(S.modalEpoch||0)+1;
   if(S.globeCleanup){S.globeCleanup();S.globeCleanup=null}
   closeSniScanner();
   if ($('modal').classList.contains('hidden')) S.modalFocus = document.activeElement;
   $('modalTitle').textContent = title.replace(/^[A-Z_0-9 ]+\s*\/\/\s*/, '');
   $('modalBody').innerHTML = html;
+  $('modal').querySelector('.modalbox').dataset.layout = $('modalBody').querySelector('table,textarea.raw,.theme-options') ? 'wide' : 'form';
   $('modal').classList.remove('hidden');
   document.body.classList.add('modal-open');
   const box=$('modal').querySelector('.modalbox');box.scrollTop=0;box.focus({preventScroll:true});
@@ -5182,7 +5428,8 @@ function closeModal() {
   S.jobView = null;
   $('modal').classList.add('hidden');
   document.body.classList.remove('modal-open');
-  if (S.modalFocus?.isConnected) S.modalFocus.focus();
+  if (S.modalFocus?.isConnected && S.modalFocus.getClientRects().length && !S.modalFocus.closest('[inert]')) S.modalFocus.focus();
+  else if (!$('app').classList.contains('hidden')) $('content').focus({preventScroll:true});
   S.modalFocus = null;
   if ($('shareLink')||$('downloadAgentConfig')||$('acContent')) $('modalBody').replaceChildren();
 }
@@ -6411,8 +6658,22 @@ $('loginForm').onsubmit = async e => {
   }
 };
 
-document.querySelectorAll('.nav').forEach(n => n.onclick = () => { if(n.dataset.navAction){const actions={clientOptionsManager,externalTrafficManager,agentRolloutManager,monitorShareManager,userManager,notificationManager};return Promise.resolve(actions[n.dataset.navAction]()).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
+document.querySelectorAll('.nav').forEach(n => n.onclick = () => { const wasOpen=document.body.classList.contains('nav-open');setNavigationOpen(false,false);if(wasOpen)$('content').focus({preventScroll:true}); if(n.dataset.navAction){const actions={clientOptionsManager,externalTrafficManager,agentRolloutManager,monitorShareManager,userManager,notificationManager};return Promise.resolve(actions[n.dataset.navAction]()).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
 document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(localStorage.getItem('mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);localStorage.setItem('mx-nav-expanded',JSON.stringify(state))}catch{}})});
+$('navToggle').onclick = () => setNavigationOpen(!document.body.classList.contains('nav-open'));
+$('navClose').onclick = $('navBackdrop').onclick = () => setNavigationOpen(false);
+matchMedia('(max-width:768px)').addEventListener('change', () => setNavigationOpen(false));
+setNavigationOpen(false, false);
+document.addEventListener('keydown', event => {
+  if (!document.body.classList.contains('nav-open')) return;
+  if (event.key === 'Escape') {event.preventDefault();setNavigationOpen(false);return;}
+  if (event.key !== 'Tab') return;
+  const controls=[...$('appSidebar').querySelectorAll('button:not(:disabled),summary,a[href]')].filter(el=>el.getClientRects().length);
+  const first=controls[0],last=controls.at(-1);
+  if (!first) {event.preventDefault();return;}
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
 $('modalClose').onclick = closeModal;
 $('modal').onclick = e => { if (e.target === $('modal')) e.stopPropagation(); };
 document.addEventListener('keydown', e => {
