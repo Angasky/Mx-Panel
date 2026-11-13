@@ -346,6 +346,9 @@ func (s *Server) userAdminRoute(w http.ResponseWriter, r *http.Request) bool {
 
 // Members never reach administrator routes, even with forged headers or IDs.
 func (s *Server) memberRoutes(w http.ResponseWriter, r *http.Request, u panelUser) {
+	if s.aiRoute(w, r, &u) {
+		return
+	}
 	switch {
 	case r.URL.Path == "/admin/api/account" && r.Method == "GET":
 		respond(w, 200, userView(u))

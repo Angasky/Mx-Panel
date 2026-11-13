@@ -1786,6 +1786,12 @@ html[data-theme="craft"] .btn.primary:not(:disabled){box-shadow:inset 2px 2px #7
 html[data-theme="craft"] .btn.primary:not(:disabled):hover{box-shadow:inset 2px 2px #87b66a,inset -2px -3px #203e18,2px 2px #31313130}
 html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px 2px #203e18,inset -1px -1px #71a355;transform:translateY(1px)}
 
+
+.ai-workspace{display:grid;grid-template-columns:minmax(190px,240px) minmax(0,1fr);gap:18px;align-items:start}
+.ai-history,.ai-chat{min-width:0}.ai-history select{width:100%;margin-bottom:12px}.ai-history .toolbar{flex-wrap:wrap}.ai-starters{display:grid;gap:10px;margin-top:24px}.ai-starters .btn{white-space:normal;text-align:left;justify-content:flex-start;line-height:1.6;padding:12px}
+.ai-messages{min-height:280px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:16px;padding:4px 2px 18px}.ai-message{border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;background:var(--bg-input);min-width:0}.ai-user{border-color:var(--border-focus);background:var(--blue-soft)}.ai-message-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.ai-prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85}.ai-message pre,.ai-preview{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--border);padding:14px;border-radius:8px;max-height:420px;overflow:auto}.ai-message code{white-space:pre-wrap}.ai-context-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:18px}.ai-context-row select{flex:1;min-width:130px}.ai-context-row label{margin:0}.ai-send{justify-content:flex-end;margin-top:12px}.ai-send span{margin-right:auto}.ai-empty{margin:auto;text-align:center;padding:24px;color:var(--text-muted)}.ai-empty h3{color:var(--text)}#aiMessage{min-height:110px;max-height:300px;resize:vertical}#aiTestStatus{overflow-wrap:anywhere}
+@media(max-width:800px){.ai-workspace{grid-template-columns:minmax(0,1fr)}.ai-starters{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}.ai-starters h4{grid-column:1/-1;margin:0}.ai-message{padding:12px}.ai-messages{max-height:55vh}.ai-header .toolbar{flex-wrap:wrap}.ai-context-row label{width:100%}}
+
 </style>
 </head>
 <body>
@@ -2030,6 +2036,7 @@ SOFTWARE.
 <details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
 <details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="serverNodes" title="服务器节点"><span>服务器节点</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
 <details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
+<button class="nav" type="button" data-page="assistant" title="AI 协助"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"/></svg><span>AI 协助</span></button>
 <details class="nav-section" data-nav-section="settings" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-palette"/></svg><span>系统设置</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="settings" title="主题与外观"><span>主题与外观</span></button><button class="nav nav-child" type="button" data-nav-action="userManager" title="用户与权限"><span>用户与权限</span></button><button class="nav nav-child" type="button" data-nav-action="notificationManager" title="通知中心"><span>通知中心</span></button><button class="nav nav-child" type="button" data-page="system" title="账号与备份"><span>账号与备份</span></button><button class="nav nav-child" type="button" data-page="maintenance" title="升级与卸载"><span>升级与卸载</span></button></div></details>
     </div>
     <div class="side-status">
@@ -2135,6 +2142,7 @@ function notice(text) {
 }
 
 function showLogin() {
+ S.aiView?.controller?.abort();S.aiView=null;S.aiConversation='';
  setNavigationOpen(false, false);
  document.body.classList.remove('member-mode');
  clearTimeout(S.probeBatchTimer);
@@ -2385,12 +2393,14 @@ const pageInfo = {
   traffic: ['流量与到期', '按订阅管理流量额度、已用量与有效期，统一同步至三个客户端'],
   raw: ['原始配置', '直接编辑并校验底层 Clash / Mihomo YAML'],
   system: ['账号与安全', '修改管理员用户名、密码以及查看历史配置备份'],
+  assistant: ['AI 协助', '配置自己的模型，问答、分析配置与诊断故障'],
   settings: ['设置', '安全、通知、权限与界面外观'],
   maintenance: ['升级与卸载', '检查升级、重新安装或安全卸载管理后台']
 };
 
 const pageSections = {
   overview: ['overview'],
+  assistant: ['assistant'],
   profiles: ['profiles', 'traffic', 'subscriptions'],
   servers: ['servers', 'monitoring', 'serverNodes', 'probeSync'],
   nodes: ['nodes', 'chains', 'groups', 'rules', 'dns', 'raw'],
@@ -2399,8 +2409,9 @@ const pageSections = {
 const sectionFor = page => Object.keys(pageSections).find(key => pageSections[key].includes(page)) || 'overview';
 
 async function go(page) {
-  if (S.role === "user") return memberPortal();
-  if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring','probeSync'].includes(page)) {
+  if (S.role === "user") return page==='assistant'?aiAssistant():memberPortal();
+  if(page!=='assistant')S.aiView?.controller?.abort();
+  if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring','probeSync','assistant'].includes(page)) {
     page = 'profiles';
     notice('请先创建一份订阅，再管理节点和规则');
   }
@@ -2432,7 +2443,7 @@ async function go(page) {
   $('add').innerHTML = uiIcon('circle-plus') + ({nodes:'新增节点',chains:'新增代理链',groups:'新增策略组',rules:'新增规则',dns:'新增 DNS 分流'}[page] || '新增');
   $('importNode').classList.toggle('hidden', page !== 'nodes');
   if (!S.profiles.length) await loadProfiles();
-  if (!S.data && !['profiles', 'settings', 'system', 'maintenance', 'servers', 'serverNodes', 'monitoring', 'probeSync'].includes(page)) await reload(false);
+  if (!S.data && !['profiles', 'settings', 'system', 'maintenance', 'servers', 'serverNodes', 'monitoring', 'probeSync','assistant'].includes(page)) await reload(false);
   if (S.page !== page) return;
   draw();
 }
@@ -2444,7 +2455,7 @@ function draw() {
     $('content').innerHTML = `<section class="panel"><h3>页面加载失败</h3><p class="muted">${esc(error.message)}</p><button class="btn" onclick="draw()">重试</button></section>`;
   };
   try {
-    Promise.resolve(({ overview, profiles, servers, serverNodes, monitoring, probeSync, nodes, chains, groups, rules, dns, subscriptions, traffic, raw, system, settings, maintenance }[page] || overview)()).catch(failed);
+    Promise.resolve(({ overview, profiles, servers, serverNodes, monitoring, probeSync, nodes, chains, groups, rules, dns, subscriptions, traffic, raw, system, settings, maintenance, assistant:aiAssistant }[page] || overview)()).catch(failed);
   } catch (error) { failed(error); }
 }
 
@@ -2545,9 +2556,10 @@ function editPanelUser(u, profiles) {
   };
 }
 async function memberPortal() {
+ S.aiView?.controller?.abort();
   const data=await api('/portal'); S.page='portal'; $('content').dataset.page='portal';
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
-  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
+  $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><button class="btn primary" onclick="aiAssistant().catch(e=>notice(e.message))">AI 协助</button><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
     const t=p.traffic||{};
     return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制订阅链接</button><a class="btn" href="${esc(p.url)}" download>下载 Clash / Mihomo</a></div><details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(f.url)}" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
   }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
@@ -2558,9 +2570,80 @@ async function memberPortal() {
   });
 }
 
+const aiProtocols={
+ 'openai-chat':{label:'OpenAI · Chat Completions',url:'https://api.openai.com/v1'},
+ 'openai-responses':{label:'OpenAI · Responses',url:'https://api.openai.com/v1'},
+ anthropic:{label:'Anthropic · Messages',url:'https://api.anthropic.com/v1'},
+ gemini:{label:'Google Gemini · 原生接口',url:'https://generativelanguage.googleapis.com/v1beta'}
+};
+function aiText(text){
+ return String(text).split('```').map((part,i)=>i%2?`<pre><code>${esc(part.replace(/^[\w+-]*\n/,''))}</code></pre>`:`<div class="ai-prose">${esc(part)}</div>`).join('');
+}
+async function aiSettingsManager(){
+ const accountEpoch=S.aiView, accountRole=S.role;
+ const c=await api('/ai/settings');if(S.aiView!==accountEpoch||S.role!==accountRole||!S.role)return;
+ openModal('我的 AI 接入设置',`<form id="aiSettingsForm"><p class="hint">设置和 API Key 仅属于当前登录账号。调用费用由你填写的 API 账号承担。</p><label class="inlinecheck"><input type="checkbox" id="aiEnabled" ${c.enabled?'checked':''}>启用 AI 助手</label><div class="grid"><div><label for="aiProtocol">接口格式</label><select id="aiProtocol">${Object.entries(aiProtocols).map(([k,v])=>`<option value="${k}" ${c.protocol===k?'selected':''}>${esc(v.label)}</option>`).join('')}</select></div><div><label for="aiModel">模型 ID</label><input id="aiModel" value="${esc(c.model||'')}" required maxlength="160" placeholder="填写供应商提供的模型 ID"></div></div><label for="aiBaseURL">API 基础地址</label><input id="aiBaseURL" type="url" required value="${esc(c.baseUrl)}" maxlength="2048"><p class="hint">支持官方及兼容网关的公网 HTTPS 地址。OpenAI 通常以 /v1 结尾，Gemini 通常以 /v1beta 结尾。更换地址或接口格式后需重新填写 Key。</p><label for="aiKey">API Key ${c.hasKey?'（已保存，留空保留）':''}</label><input id="aiKey" type="password" autocomplete="new-password" maxlength="4096" placeholder="${c.hasKey?'已加密保存，不回显':'填写自己的 API Key'}"><label class="inlinecheck"><input type="checkbox" id="aiClearKey">删除已保存的 Key</label><div class="grid"><div><label for="aiMaxTokens">最大输出 tokens</label><input type="number" id="aiMaxTokens" min="128" max="8192" value="${c.maxTokens||2048}"></div><div id="aiLegacyField"><label class="inlinecheck"><input type="checkbox" id="aiLegacyTokens" ${c.legacyTokens?'checked':''}>兼容旧版 max_tokens 参数</label><p class="hint">仅用于不支持 max_completion_tokens 的 Chat Completions 网关。</p></div></div><label for="aiPrompt">自定义回答偏好（可选）</label><textarea id="aiPrompt" rows="3" maxlength="12000" placeholder="例如：用中文回答，先给排查步骤，再解释原因。">${esc(c.prompt||'')}</textarea><p class="hint">AI 提供解释和修改建议；不会自动运行命令或修改面板。对话与 Key 加密保存在面板服务器，请勿将真实密码或私钥粘贴到聊天中。</p><div id="aiSettingsError" class="error" role="alert"></div><div class="toolbar"><button type="submit" class="btn primary" id="aiSaveSettings">保存设置</button><button type="button" class="btn" id="aiTestConnection">保存并测试连接</button></div><p class="hint" id="aiTestStatus" role="status"></p></form>`);
+ const form=$('aiSettingsForm'),valid=()=>form.isConnected&&!$('modal').classList.contains('hidden');
+ $('aiLegacyField').classList.toggle('hidden',c.protocol!=='openai-chat');
+ $('aiProtocol').onchange=()=>{$('aiBaseURL').value=aiProtocols[val('aiProtocol')].url;$('aiKey').value='';$('aiLegacyField').classList.toggle('hidden',val('aiProtocol')!=='openai-chat');};
+ const save=async(test=false)=>{
+  if(!form.reportValidity())return;
+  const saveButton=$('aiSaveSettings'),testButton=$('aiTestConnection'),error=$('aiSettingsError'),status=$('aiTestStatus');saveButton.disabled=testButton.disabled=true;error.textContent='';
+  const payload={enabled:$('aiEnabled').checked,protocol:val('aiProtocol'),baseUrl:val('aiBaseURL'),model:val('aiModel'),key:$('aiKey').value,clearKey:$('aiClearKey').checked,maxTokens:Number(val('aiMaxTokens')),legacyTokens:$('aiLegacyTokens').checked,prompt:$('aiPrompt').value};
+  try{
+   await api('/ai/settings',jsonOpt('PUT',payload));if(!valid())return;if(S.page==='assistant')await aiAssistant();if(!valid())return;$('aiKey').value='';$('aiClearKey').checked=false;status.textContent='已保存';
+   if(test){status.textContent='正在发送一条简短测试消息，请稍候…';const data=await api('/ai/test',jsonOpt('POST',{}));if(!valid())return;status.textContent=`连接成功 · ${data.model} · ${Math.round(data.elapsedMs)} ms`;}
+   else{closeModal();notice('AI 设置已保存');}
+  }catch(e){if(valid())error.textContent=e.message;}finally{if(valid())saveButton.disabled=testButton.disabled=false;}
+ };
+ form.onsubmit=e=>{e.preventDefault();void save();};$('aiTestConnection').onclick=()=>save(true);
+}
+async function aiAssistant(){
+ S.aiView?.controller?.abort();
+ const view={controller:new AbortController(),conversation:S.aiConversation||'',messages:[],busy:false};S.aiView=view;S.page='assistant';
+ $('title').textContent='AI 协助';$('subtitle').textContent='使用自己的模型，分析配置与排查问题';$('titleBreadcrumb').textContent='AI 协助';$('content').dataset.page='assistant';['add','importNode'].forEach(id=>$(id).classList.add('hidden'));
+ $('content').innerHTML='<section class="panel"><p class="empty">正在读取你的 AI 助手…</p></section>';
+ const valid=()=>S.aiView===view&&S.page==='assistant'&&S.role;
+ const [settings,chats,context]=await Promise.all([api('/ai/settings'),api('/ai/conversations'),api('/ai/context')]);if(!valid())return;
+ view.settings=settings;view.chats=chats.conversations||[];
+ $('content').innerHTML=`<section class="panel ai-header"><div class="panel-head"><div><h3>${uiIcon('cpu')} AI 协助</h3><p class="muted">${settings.enabled&&settings.hasKey?esc(aiProtocols[settings.protocol]?.label)+' · '+esc(settings.model):'尚未启用，请先填写自己的 API Key 和模型。'}</p></div><div class="toolbar">${S.role==='user'?'<button class="btn" onclick="memberPortal().catch(e=>notice(e.message))">返回我的订阅</button>':''}<button class="btn" id="aiOpenSettings">接入设置</button><button class="btn primary" id="aiNewChat">${uiIcon('circle-plus')}新对话</button></div></div></section><div class="ai-workspace"><aside class="panel ai-history"><label for="aiConversation">我的对话</label><select id="aiConversation" aria-label="选择对话"></select><div class="toolbar"><button class="btn small" id="aiRenameChat">重命名</button><button class="btn small danger" id="aiDeleteChat">删除</button></div><p class="hint">每个账号最多保存 20 个对话，每个对话保留最近 15 轮，并按长度截断。</p><div class="ai-starters"><h4>开始分析</h4>${['国内 App 开启代理后无法联网，应该如何排查？','帮我检查策略组和分流规则是否合理。','解释 sing-box 原生入站与托管节点的区别。','给我一份节点连接失败的排查步骤。'].map((p,i)=>`<button type="button" class="btn" data-ai-starter="${i}">${esc(p)}</button>`).join('')}</div></aside><section class="panel ai-chat"><div id="aiMessages" class="ai-messages" aria-live="polite"></div><form id="aiComposer"><div class="ai-context-row"><label for="aiContextProfile">附带配置摘要</label><select id="aiContextProfile"><option value="">不附带，仅发送对话</option>${(context.profiles||[]).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button type="button" class="btn small" id="aiPreviewContext">预览摘要</button></div><p class="hint">选择附带后，摘要将发送给你配置的 AI 服务。节点地址、Key、密码和订阅链接不会自动附带；普通用户仅附带授权订阅用量。</p><label class="sr-only" for="aiMessage">发给 AI 的消息</label><textarea id="aiMessage" rows="4" maxlength="24000" placeholder="描述问题，或粘贴已去除密码与密钥的配置片段…" required></textarea><div id="aiChatError" class="error" role="alert"></div><div class="toolbar ai-send"><span id="aiStatus" class="hint" role="status">Ctrl / ⌘ + Enter 发送</span><button type="button" class="btn hidden" id="aiStop">停止</button><button type="submit" class="btn primary" id="aiSend">发送</button></div></form><p class="hint">AI 回复是建议，不代表已执行测试或修改。重要配置请先核对；代码块可复制后自行使用。</p></section></div>`;
+ const form=$('aiComposer'),input=$('aiMessage');
+ const renderMessages=()=>{
+  if(!valid())return;
+  $('aiMessages').innerHTML=view.messages.length?view.messages.map((m,i)=>`<article class="ai-message ${m.role==='user'?'ai-user':'ai-answer'}"><div class="ai-message-head"><strong>${m.role==='user'?'你':'AI 助手'}</strong><button type="button" class="btn small" data-ai-copy="${i}">复制</button></div>${aiText(m.content)}</article>`).join(''):'<div class="ai-empty"><h3>把问题交给 AI，一起找出原因</h3><p>先配置自己的 API Key 和模型，再输入问题。需要分析订阅时，可先预览要附带的摘要。</p></div>';
+  document.querySelectorAll('[data-ai-copy]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(view.messages[Number(b.dataset.aiCopy)].content).then(()=>notice('已复制')).catch(()=>notice('复制失败，请手动选择文字')));
+  $('aiMessages').scrollTop=$('aiMessages').scrollHeight;
+ };
+ const controls=()=>{if(!valid())return;['aiConversation','aiNewChat','aiRenameChat','aiDeleteChat','aiOpenSettings','aiContextProfile'].forEach(id=>$(id).disabled=view.busy);$('aiSend').disabled=view.busy||!view.settings.enabled||!view.settings.hasKey;$('aiStop').classList.toggle('hidden',!view.busy);};
+ const loadChats=async()=>{const data=await api('/ai/conversations');if(!valid())return;view.chats=data.conversations||[];if(!view.chats.some(c=>c.id===view.conversation))view.conversation=view.chats[0]?.id||'';$('aiConversation').innerHTML=view.chats.length?view.chats.map(c=>`<option value="${esc(c.id)}">${esc(c.title)}</option>`).join(''):'<option value="">暂无对话</option>';$('aiConversation').value=view.conversation;S.aiConversation=view.conversation;};
+ const loadMessages=async()=>{const id=view.conversation;if(!id){view.messages=[];renderMessages();return;}const data=await api('/ai/conversations?id='+encodeURIComponent(id));if(!valid()||view.conversation!==id)return;view.messages=data.messages||[];renderMessages();};
+ const newChat=async()=>{const data=await api('/ai/conversations',jsonOpt('POST',{}));if(!valid())return;view.conversation=data.id;await loadChats();await loadMessages();};
+ $('aiOpenSettings').onclick=()=>aiSettingsManager().catch(e=>notice(e.message));
+ $('aiNewChat').onclick=async()=>{if(view.busy)return;view.busy=true;controls();try{await newChat();}catch(e){notice(e.message);}finally{view.busy=false;controls();}};
+ $('aiConversation').onchange=()=>{view.conversation=val('aiConversation');S.aiConversation=view.conversation;loadMessages().catch(e=>notice(e.message));};
+ $('aiRenameChat').onclick=async()=>{if(!view.conversation)return;const title=prompt('对话名称',view.chats.find(c=>c.id===view.conversation)?.title||'');if(!title?.trim())return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('PUT',{title}));await loadChats();}catch(e){notice(e.message);}};
+ $('aiDeleteChat').onclick=async()=>{if(!view.conversation||!confirm('删除这个对话及其记录？'))return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('DELETE',{}));view.conversation='';await loadChats();await loadMessages();}catch(e){notice(e.message);}};
+ document.querySelectorAll('[data-ai-starter]').forEach(b=>b.onclick=()=>{input.value=b.textContent;input.focus();});
+ $('aiPreviewContext').onclick=async()=>{const id=val('aiContextProfile');if(!id)return notice('请先选择一份订阅');try{const data=await api('/ai/context?profile='+encodeURIComponent(id));if(!valid())return;openModal('将发送给 AI 的配置摘要','<p class="hint">发送消息时会重新读取这份摘要。这里只展示，不调用 AI。</p><pre class="ai-preview">'+esc(JSON.stringify(data,null,2))+'</pre>');}catch(e){notice(e.message);}};
+ $('aiStop').onclick=()=>{view.controller.abort();$('aiStatus').textContent='正在停止；上游可能已产生调用费用';};
+ input.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();form.requestSubmit();}};
+ form.onsubmit=async e=>{
+  e.preventDefault();if(view.busy||!input.value.trim()||!view.settings.enabled||!view.settings.hasKey)return;
+  const message=input.value.trim(),contextProfile=val('aiContextProfile');view.busy=true;view.controller=new AbortController();controls();$('aiChatError').textContent='';$('aiStatus').textContent='AI 正在分析，请稍候…';
+  try{
+   if(!view.conversation)await newChat();if(!valid())return;
+   view.messages.push({role:'user',content:message});renderMessages();
+   const data=await api('/ai/chat',{...jsonOpt('POST',{conversationId:view.conversation,message,contextProfile}),signal:view.controller.signal});if(!valid())return;
+   input.value='';await loadMessages();await loadChats();$('aiStatus').textContent=`${data.model} · ${(data.elapsedMs/1000).toFixed(1)} 秒 · 输入 ${data.reply.inputTokens} / 输出 ${data.reply.outputTokens} tokens${data.reply.truncated?' · 回复达到长度上限':''}`;
+  }catch(e){if(valid()){$('aiChatError').textContent=e.name==='AbortError'?'已停止接收回复。可以稍后重新打开对话核对保存结果。':e.message;$('aiStatus').textContent='输入内容已保留，可修改后重新发送';try{await loadMessages();}catch{}}}
+  finally{view.busy=false;controls();}
+ };
+ renderMessages();controls();await loadChats();await loadMessages();
+}
+
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  const shortcuts=[['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
+  const shortcuts=[['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>常用设置</h3><p class="muted">按任务选择设置，主题与显示偏好位于下方。</p></div></div><div class="settings-shortcuts">${shortcuts.map(([icon,title,description,action])=>`<button class="settings-shortcut" type="button" onclick="${action}().catch(e=>notice(e.message))">${uiIcon(icon)}<span><strong>${title}</strong><small>${description}</small></span>${uiIcon('chevron-right')}</button>`).join('')}</div></section><section class="panel"><div class="panel-head"><div><h3>主题与外观</h3><p class="muted">六种配色，共用一致的按钮、表单与排版。</p></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">

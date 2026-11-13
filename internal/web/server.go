@@ -47,6 +47,9 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	aiMu                 sync.Mutex
+	aiActive             map[string]bool
+	aiHTTP               *http.Client
 	probeCacheMu         sync.Mutex
 	probeCache           map[string]*probeCacheEntry
 	probeSyncMu          sync.Mutex
@@ -273,6 +276,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.aiRoute(w, r, nil) {
 		return
 	}
 	if s.clientOptionsRoute(w, r) {

@@ -137,6 +137,7 @@ bash install.sh local-build
 
 | 想了解什么 | 从这里开始 |
 | :--- | :--- |
+| AI 接入、配置分析和账号隔离 | [AI 协助使用说明](docs/go/AI-ASSISTANT.md) |
 | 安装、迁移、更新与卸载 | [部署指南](docs/go/DEPLOY.md) |
 | 协议与客户端适配 | [客户端兼容说明](docs/client-compatibility.md) |
 | Reality / Snell 兼容内核 | [补丁与构建工具](tools/core-compat/README.md) |
