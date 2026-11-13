@@ -7,12 +7,14 @@ import (
 )
 
 type probeBatchItem struct {
-	Checked int64  `json:"checked,omitempty"`
-	UUID    string `json:"uuid"`
-	Port    int    `json:"port"`
-	Status  string `json:"status"`
-	Error   string `json:"error,omitempty"`
-	Started int64  `json:"started,omitempty"`
+	Action    string `json:"action,omitempty"`
+	RepairSSH bool   `json:"repairSSH,omitempty"`
+	Checked   int64  `json:"checked,omitempty"`
+	UUID      string `json:"uuid"`
+	Port      int    `json:"port"`
+	Status    string `json:"status"`
+	Error     string `json:"error,omitempty"`
+	Started   int64  `json:"started,omitempty"`
 }
 type probeBatch struct {
 	ID      string           `json:"id"`
@@ -38,6 +40,7 @@ func (s *Server) probeBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 	}
 	if r.Method == "POST" {
 		var in struct {
+			RepairSSH bool             `json:"repairSSH"`
 			Action    string           `json:"action"`
 			ID        string           `json:"id"`
 			Items     []probeBatchItem `json:"items"`
@@ -85,6 +88,29 @@ func (s *Server) probeBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 			}
 			if len(cfg.Bindings)+len(items) > 200 {
 				problem(w, 400, "接入总数不能超过 200 台")
+				return true
+			}
+			cfg.Batch = &probeBatch{ID: rand.Text(), Status: "running", Items: items, Created: s.now().Unix()}
+
+		case "retry":
+			if cfg.Batch != nil && cfg.Batch.Status == "running" {
+				problem(w, 409, "已有活动批次，请等待或停止")
+				return true
+			}
+			items := []probeBatchItem{}
+			for _, b := range cfg.Bindings {
+				action := ""
+				if b.Status == "failed" {
+					action = "retry"
+				} else if b.Status == "pending" && b.Task != "" {
+					action = "check"
+				}
+				if action != "" {
+					items = append(items, probeBatchItem{UUID: b.UUID, Port: b.Port, Status: "queued", Action: action, RepairSSH: in.RepairSSH})
+				}
+			}
+			if len(items) == 0 {
+				problem(w, 400, "暂无可重试或核对的服务器；未知任务请先恢复关联")
 				return true
 			}
 			cfg.Batch = &probeBatch{ID: rand.Text(), Status: "running", Items: items, Created: s.now().Unix()}
@@ -159,7 +185,7 @@ func (s *Server) pollProbeBatch(ctx context.Context) {
 			return
 		}
 		if item.Status == "queued" {
-			if binding != nil {
+			if binding != nil && item.Action == "" {
 				item.Status = "failed"
 				item.Error = "该服务器已有接入任务，请单独核对"
 				_ = s.writeProbeSync(cfg)
@@ -170,7 +196,11 @@ func (s *Server) pollProbeBatch(ctx context.Context) {
 			if s.writeProbeSync(cfg) != nil {
 				return
 			}
-			e = s.probeSyncAction(ctx, &cfg, probeSyncInput{Action: "bind", UUID: item.UUID, Port: item.Port, Confirmed: true})
+			action := item.Action
+			if action == "" {
+				action = "bind"
+			}
+			e = s.probeSyncAction(ctx, &cfg, probeSyncInput{Action: action, UUID: item.UUID, Port: item.Port, Confirmed: true, RepairSSH: item.RepairSSH})
 			if e != nil {
 				item.Status = "failed"
 				item.Error = e.Error()
@@ -191,7 +221,10 @@ func (s *Server) pollProbeBatch(ctx context.Context) {
 							item.Error = ""
 						} else if b.Status == "failed" {
 							item.Status = "failed"
-							item.Error = "原探针授权任务失败"
+							item.Error = b.Error
+							if item.Error == "" {
+								item.Error = "原探针授权任务失败"
+							}
 						}
 					}
 				}
@@ -200,7 +233,7 @@ func (s *Server) pollProbeBatch(ctx context.Context) {
 				}
 				if item.Status != "bound" && item.Status != "failed" && s.now().Unix()-item.Started >= 300 {
 					item.Status = "failed"
-					item.Error = "5 分钟内未完成验证，请单独核对接入结果；不会重复授权"
+					item.Error = "5 分钟内未完成验证；" + item.Error + "。可单独核对结果，不会重复授权"
 				}
 			}
 		}

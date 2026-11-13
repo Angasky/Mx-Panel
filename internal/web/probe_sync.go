@@ -36,6 +36,9 @@ type probeClient struct {
 	Region  string `json:"region"`
 }
 type probeBinding struct {
+	ScriptVersion  int    `json:"scriptVersion,omitempty"`
+	RepairSSH      bool   `json:"repairSSH,omitempty"`
+	Error          string `json:"error,omitempty"`
 	KeyFingerprint string `json:"keyFingerprint"`
 	UUID           string `json:"uuid"`
 	Name           string `json:"name"`
@@ -176,7 +179,7 @@ func (s *Server) probeRequest(ctx context.Context, cfg probeSyncConfig, method, 
 	}
 	return nil
 }
-func probeBootstrap(public string, port int) string {
+func probeBootstrapLegacy(public string, port int) string {
 	return `set -eu
 [ "$(id -u)" = 0 ] || { echo 'MX_SYNC_ERROR=Agent must run as root'; exit 1; }
 command -v ssh-keygen >/dev/null
@@ -259,6 +262,8 @@ func (s *Server) probeSyncRoute(w http.ResponseWriter, r *http.Request) bool {
 }
 
 type probeSyncInput struct {
+	Host      string `json:"host"`
+	RepairSSH bool   `json:"repairSSH"`
 	Task      string `json:"task"`
 	Action    string `json:"action"`
 	URL       string `json:"url"`
@@ -364,7 +369,7 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 		if e != nil {
 			return (e)
 		}
-		binding := probeBinding{KeyFingerprint: ssh.FingerprintSHA256(key), UUID: in.UUID, Name: selected.Name, Host: host, Port: in.Port, Secret: sealed, Status: "dispatching", Created: s.now().Unix()}
+		binding := probeBinding{ScriptVersion: 2, RepairSSH: in.RepairSSH, KeyFingerprint: ssh.FingerprintSHA256(key), UUID: in.UUID, Name: selected.Name, Host: host, Port: in.Port, Secret: sealed, Status: "dispatching", Created: s.now().Unix()}
 		cfg.Bindings = append(cfg.Bindings, binding)
 		// Persist intent and key before external side effects. Ambiguous dispatch is never retried.
 		if e = s.writeProbeSync(*cfg); e != nil {
@@ -375,7 +380,7 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 				Task string `json:"task_id"`
 			} `json:"data"`
 		}
-		e = s.probeRequest(ctx, *cfg, "POST", "/api/admin/task/exec", map[string]any{"clients": []string{in.UUID}, "command": probeBootstrap(string(ssh.MarshalAuthorizedKey(key)), in.Port)}, &result)
+		e = s.probeRequest(ctx, *cfg, "POST", "/api/admin/task/exec", map[string]any{"clients": []string{in.UUID}, "command": probeBootstrapOptions(string(ssh.MarshalAuthorizedKey(key)), in.Port, in.RepairSSH)}, &result)
 		b := &cfg.Bindings[len(cfg.Bindings)-1]
 		if e != nil || !probeID.MatchString(result.Data.Task) {
 			b.Status = "unknown"
@@ -393,6 +398,28 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 			return (errors.New("任务已派发但记录保存失败，请核对探针任务"))
 		}
 
+	case "connection":
+		if !in.Confirmed || in.Port < 1 || in.Port > 65535 {
+			return errors.New("请确认公网 SSH 地址和端口")
+		}
+		ip, err := netip.ParseAddr(strings.TrimSpace(in.Host))
+		if err != nil || !netguard.PublicAddress(ip) {
+			return errors.New("请填写有效公网 IPv4 或 IPv6 地址")
+		}
+		for i := range cfg.Bindings {
+			b := &cfg.Bindings[i]
+			if b.UUID != in.UUID {
+				continue
+			}
+			if b.Status == "bound" {
+				return errors.New("已接入服务器请在服务器管理修改")
+			}
+			b.Host = ip.String()
+			b.Port = in.Port
+			b.Error = ""
+			return s.writeProbeSync(*cfg)
+		}
+		return errors.New("接入记录不存在")
 	case "recover", "retry":
 		if !in.Confirmed {
 			return (errors.New("请确认任务恢复操作"))
@@ -419,8 +446,35 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 		if e != nil {
 			return (errors.New("接入密钥无效"))
 		}
-		script := probeBootstrap(string(ssh.MarshalAuthorizedKey(signer.PublicKey())), b.Port)
+		public := string(ssh.MarshalAuthorizedKey(signer.PublicKey()))
+		script := probeBootstrapOptions(public, b.Port, b.RepairSSH)
+		if b.ScriptVersion < 2 {
+			script = probeBootstrapLegacy(public, b.Port)
+		}
 		if in.Action == "recover" {
+			if in.Task == "" {
+				var tasks struct {
+					Data []struct {
+						Task    string   `json:"task_id"`
+						Command string   `json:"command"`
+						Clients []string `json:"clients"`
+					} `json:"data"`
+				}
+				if e = s.probeRequest(ctx, *cfg, "GET", "/api/admin/task/client/"+b.UUID, nil, &tasks); e != nil {
+					return e
+				}
+				for _, task := range tasks.Data {
+					if len(task.Clients) == 1 && task.Clients[0] == b.UUID && task.Command == script {
+						if in.Task != "" {
+							return errors.New("找到多个相同授权任务，请手动指定编号核对")
+						}
+						in.Task = task.Task
+					}
+				}
+				if in.Task == "" {
+					return errors.New("原探针中未找到匹配的授权任务，请核对原探针连接和任务记录")
+				}
+			}
 			if !probeID.MatchString(in.Task) {
 				return (errors.New("请输入原探针中的任务编号"))
 			}
@@ -443,6 +497,16 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 			if b.Status != "failed" {
 				return (errors.New("仅已确认失败的任务可重试，未知任务请先恢复关联"))
 			}
+			if in.Port != 0 {
+				if in.Port < 1 || in.Port > 65535 {
+					return errors.New("SSH 端口无效")
+				}
+				b.Port = in.Port
+			}
+			b.ScriptVersion = 2
+			b.RepairSSH = in.RepairSSH
+			b.Error = ""
+			script = probeBootstrapOptions(public, b.Port, b.RepairSSH)
 			b.Status = "dispatching"
 			b.Task = ""
 			if e = s.writeProbeSync(*cfg); e != nil {
@@ -508,33 +572,25 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 		if *result.Data.ExitCode != 0 || !strings.Contains(result.Data.Result, "MX_SYNC_READY") {
 			b.Status = "failed"
 			_ = s.writeProbeSync(*cfg)
-			return (errors.New("探针授权失败，请在原探针查看任务输出；需要 root Agent 和支持密钥登录的 SSH"))
+			b.Error = probeFailureReason(result.Data.Result)
+			_ = s.writeProbeSync(*cfg)
+			return errors.New(b.Error)
 		}
 		secret, e := m.OpenUser(b.Secret)
 		if e != nil {
 			return (errors.New("接入密钥读取失败"))
 		}
 		private := stringField(secret, "private")
-		connection := remote.Connection{Host: b.Host, Port: b.Port, User: "root", PrivateKey: private}
-		fp, e := remote.Probe(ctx, connection)
+		connection, e := s.probeVerifiedConnection(ctx, *cfg, *b, private, result.Data.Result)
 		if e != nil {
-			return (e)
+			b.Error = e.Error()
+			_ = s.writeProbeSync(*cfg)
+			return e
 		}
-		trusted := false
-		for _, line := range strings.Split(result.Data.Result, "\n") {
-			if strings.TrimSpace(line) == "MX_SYNC_FP="+fp {
-				trusted = true
-			}
-		}
-		if !trusted {
-			return (errors.New("SSH 主机指纹与探针返回值不匹配，拒绝接入"))
-		}
-		connection.Fingerprint = fp
-		client, e := remote.Connect(ctx, connection)
-		if e != nil {
-			return (e)
-		}
-		client.Close()
+		b.Host = connection.Host
+		b.Port = connection.Port
+		fp := connection.Fingerprint
+
 		// A repeated check after a crash reuses the same registration, never recreates a server.
 		rows, e := m.List()
 		if e != nil {
@@ -553,6 +609,23 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 			b.ServerID = stringField(row, "id")
 		}
 		b.Status = "bound"
+		if cfg.Batch != nil {
+			all := true
+			for i := range cfg.Batch.Items {
+				item := &cfg.Batch.Items[i]
+				if item.UUID == b.UUID {
+					item.Status = "bound"
+					item.Error = ""
+				}
+				if item.Status != "bound" {
+					all = false
+				}
+			}
+			if all {
+				cfg.Batch.Status = "completed"
+			}
+		}
+		b.Error = ""
 		b.Secret = ""
 		if e = s.writeProbeSync(*cfg); e != nil {
 			return (errors.New("服务器已登记但同步状态保存失败，请刷新核对"))
