@@ -12,6 +12,9 @@ import (
 )
 
 func (s *Server) agentDeploy(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/admin/api/servers/agent/upgrade" {
+		return s.agentUpgrade(w, r)
+	}
 	if r.URL.Path != "/admin/api/servers/agent/deploy" {
 		return false
 	}
@@ -90,6 +93,59 @@ func (s *Server) agentDeploy(w http.ResponseWriter, r *http.Request) bool {
 	entries[input.ID] = entry
 	if e = s.writeAgents(entries); e != nil {
 		problem(w, 500, "安装已启动，但任务关联保存失败；请到服务器安装任务查看状态")
+		return true
+	}
+	respond(w, 202, map[string]any{"job": job})
+	return true
+}
+
+func (s *Server) agentUpgrade(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != "POST" {
+		problem(w, 405, "请求方法不支持")
+		return true
+	}
+	var input struct {
+		ID        string `json:"id"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if readJSON(w, r, &input) != nil || !input.Confirmed {
+		problem(w, 400, "请确认升级 Agent 并短暂重启采样进程")
+		return true
+	}
+	m, e := s.remoteManager()
+	if e != nil {
+		problem(w, 500, "服务器不可用")
+		return true
+	}
+	record, e := m.Record(input.ID)
+	if e != nil {
+		problem(w, 404, "服务器不存在")
+		return true
+	}
+	s.agentMu.Lock()
+	defer s.agentMu.Unlock()
+	entries, e := s.readAgents()
+	entry := entries[input.ID]
+	if e != nil || !entry.Enabled || entry.Revision != agentServerRevision(record) {
+		problem(w, 409, "Agent 未启用或服务器身份已变化")
+		return true
+	}
+	if entry.DeployJob != "" {
+		if job, e := m.InstallJob(entry.DeployJob); e == nil && (job["status"] == "running" || job["status"] == "queued") {
+			respond(w, 202, map[string]any{"job": job})
+			return true
+		}
+	}
+	job, e := m.StartAgentUpgrade(input.ID, entry.Revision)
+	if e != nil {
+		problem(w, 400, e.Error())
+		return true
+	}
+	entry.DeployJob = job["id"].(string)
+	entry.DeployHash = ""
+	entries[input.ID] = entry
+	if e = s.writeAgents(entries); e != nil {
+		problem(w, 500, "升级已启动但任务关联保存失败，请检查服务器任务")
 		return true
 	}
 	respond(w, 202, map[string]any{"job": job})

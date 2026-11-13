@@ -83,14 +83,14 @@ mx-p
 
 ### 2. 校验并安装
 
-以下以 `v0.1.32` 的 amd64 包为例；其他版本或架构请替换文件名。
+以下以 `v0.1.33` 的 amd64 包为例；其他版本或架构请替换文件名。
 
 ```bash
 # 在安装包与校验文件所在目录执行，确认对应压缩包显示 OK
 sha256sum --check --ignore-missing SHA256SUMS
 
 mkdir -p mx-panel-install
-tar -xzf mxioc-go-v0.1.32-linux-amd64.tar.gz -C mx-panel-install
+tar -xzf mxioc-go-v0.1.33-linux-amd64.tar.gz -C mx-panel-install
 cd mx-panel-install
 
 sudo bash install-go.sh fresh
@@ -241,3 +241,5 @@ Agent 三模式采样、公开监控与三种 DNS 证书验证见 [接入指南]
 服务器「地域与续费」支持 [快速登记续费](docs/go/SERVER-RENEWAL.md)：预览新到期日、确认后保存、防重复提交，并提供服务商网站入口。
 
 外部订阅流量支持按来源开启 1/6/12/24 小时自动刷新，失败退避且重启保留计划；默认关闭。
+
+Agent 接入新增 [保留配置升级](docs/go/AGENT-AND-PROBE.md)：通过 SSH 单台升级到固定校验的 Agent v0.1.32，失败尝试恢复旧程序。面板不会自动升级远端。
