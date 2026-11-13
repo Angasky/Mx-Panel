@@ -13,6 +13,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/links"
 	"github.com/Angasky/dingzhi-ban/internal/netguard"
@@ -260,6 +261,9 @@ func (m *Manager) templatePayload(server string, record, payload Record) (Record
 	if err != nil {
 		return nil, "", err
 	}
+	m.mu.Lock()
+	baselines, baselineErr := m.loadSNICatalog()
+	m.mu.Unlock()
 	scanner := m.sniState()
 	revision := certificateRevision(record)
 	scanner.mu.Lock()
@@ -275,8 +279,18 @@ func (m *Manager) templatePayload(server string, record, payload Record) (Record
 			}
 		}
 	}
+	if address == "" && baselineErr == nil {
+		if baseline, exists := baselines[domain]; exists {
+			key := sniCacheKey{server, revision, domain, baseline.Address}
+			entry, ok := scanner.tcpCache[key]
+			age := scanner.now().Sub(entry.at)
+			if ok && entry.ok && age >= 0 && age < 10*time.Minute && (value(prepared["sniAddress"]) == "" || value(prepared["sniAddress"]) == baseline.Address) {
+				address = baseline.Address
+			}
+		}
+	}
 	if address == "" {
-		return nil, "", errors.New("SNI 实测结果缺失或已过期，请扫描并选择通过的域名")
+		return nil, "", errors.New("SNI 测试结果缺失或已过期，请重新测试 TCP 延迟并选择站点")
 	}
 	return prepared, address, nil
 }

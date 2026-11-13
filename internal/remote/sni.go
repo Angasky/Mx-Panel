@@ -41,12 +41,13 @@ type sniServerSlot struct {
 }
 
 type sniScanner struct {
-	mu      sync.Mutex
-	slots   chan struct{}
-	servers map[string]*sniServerSlot
-	cache   map[sniCacheKey]sniCached
-	now     func() time.Time
-	open    func(context.Context, Connection) (sniSession, error)
+	mu       sync.Mutex
+	slots    chan struct{}
+	servers  map[string]*sniServerSlot
+	cache    map[sniCacheKey]sniCached
+	tcpCache map[sniCacheKey]sniCached
+	now      func() time.Time
+	open     func(context.Context, Connection) (sniSession, error)
 }
 
 func newSNIScanner() *sniScanner {

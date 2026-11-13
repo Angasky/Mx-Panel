@@ -14,6 +14,7 @@ func (s *Server) sniRoutes(w http.ResponseWriter, r *http.Request) bool {
 		ServerID   string `json:"serverId"`
 		Candidates []string
 		Force      bool
+		Mode       string
 	}
 	if err := readJSON(w, r, &input); err != nil {
 		problem(w, 400, err.Error())
@@ -24,7 +25,18 @@ func (s *Server) sniRoutes(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 400, err.Error())
 		return true
 	}
-	result, err := manager.ScanSNI(r.Context(), input.ServerID, input.Candidates, input.Force)
+	var result map[string]any
+	switch input.Mode {
+	case "catalog":
+		result, err = manager.SNICatalog()
+	case "baseline":
+		result, err = manager.BuildSNICatalog(r.Context(), input.ServerID, input.Candidates)
+	case "tcp", "":
+		result, err = manager.ScanSNITCP(r.Context(), input.ServerID, input.Candidates)
+	default:
+		problem(w, 400, "SNI 测试模式无效")
+		return true
+	}
 	if err != nil {
 		problem(w, 400, err.Error())
 		return true

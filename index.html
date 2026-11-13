@@ -3255,7 +3255,7 @@ function remoteNodeForm(relay) {
     ${singRelay ? '<div><label for="rnRelayTemplate">中转入口协议</label><select id="rnRelayTemplate"><option value="vmess-tcp">VMess + TCP</option><option value="vless-reality">VLESS + Reality / Vision</option></select></div>' : ''}
     <div><label for="rnPort">监听端口</label><input id="rnPort" type="number" min="1" max="65535" ${standalone ? 'placeholder="留空自动分配"' : `required value="${randomPort}"`}><p class="hint">默认随机使用 20001–65535，可手动修改；创建时检查冲突。</p></div>
     ${relay ? '' : '<div class="span2"><label for="rnTemplate">节点模板</label><select id="rnTemplate"><option value="vless-reality">VLESS + Reality / Vision（免证书）</option><option value="vmess-tcp">VMess + TCP</option><option value="trojan-tls">Trojan + TLS（自动证书）</option><option value="vless-ws-tls">VLESS + WebSocket + TLS（自动证书）</option></select><p class="hint">模板按所选服务器内核提供。同一入站可供多个订阅使用；每个订阅拥有独立用户、用量和有效期。共用入站暂不支持单用户带宽限制。</p></div>'}
-    <div class="span2 ${singRelay ? 'hidden' : ''}" id="rnSniFields"><label id="rnSniLabel" for="rnSni">Reality 伪装域名</label><div class="sni-field"><input id="rnSni" value="raw.githubusercontent.com" ${singRelay ? '' : 'required'}><datalist id="rnTlsDomains">${remoteTlsDomains().map(domain=>`<option value="${esc(domain)}"></option>`).join('')}</datalist><button id="rnSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button></div><p class="hint" id="rnSniHint">Reality 可扫描并选择内置候选域名。</p></div>
+    <div class="span2 ${singRelay ? 'hidden' : ''}" id="rnSniFields"><label id="rnSniLabel" for="rnSni">Reality 伪装域名</label><div class="sni-field"><input id="rnSni" value="raw.githubusercontent.com" ${singRelay ? '' : 'required'}><datalist id="rnTlsDomains">${remoteTlsDomains().map(domain=>`<option value="${esc(domain)}"></option>`).join('')}</datalist><button id="rnSniTest" type="button" class="btn">${uiIcon('gauge')}测试 TCP 并选择 SNI</button></div><p class="hint" id="rnSniHint">Reality 可从固定站点库测试 TCP 延迟并选择域名。</p></div>
     ${relay ? '' : '<div id="rnTlsFields" class="span2 hidden"><label for="rnCertMode">证书方式</label><select id="rnCertMode"><option value="auto">自动申请并续期（推荐）</option><option value="manual">使用已有证书（高级）</option></select><p class="hint" id="rnAutoCertHint">填写你自己的域名，A/AAAA 解析到这台服务器并关闭 CDN 代理。自动通过 TCP 80 验证，请确保端口开放且未占用；不会停止已有网站。续期后会自动刷新对应节点服务。</p><div id="rnDNSOptions"><label for="rnDNSProvider">自动签发验证方式</label><select id="rnDNSProvider"><option value="">HTTP 验证（TCP 80）</option><option value="dns_cf">Cloudflare DNS API</option><option value="dns_ali">阿里云 DNS API</option><option value="dns_dp">DNSPod API</option></select><div id="rnDNSCredentials"></div><p class="hint">DNS 验证无需开放 80 端口。凭据仅发送到该服务器，保存在 root 专用 ACME 目录供自动续期；请使用仅有目标域名 DNS 权限的密钥。</p></div><div class="grid hidden" id="rnManualCertFields"><div><label for="rnCert">远端证书绝对路径</label><input id="rnCert" placeholder="/etc/ssl/certs/server.pem"></div><div><label for="rnKey">远端私钥绝对路径</label><input id="rnKey" placeholder="/etc/ssl/private/server.key"></div></div><div id="rnWsField"><label id="rnPathLabel" for="rnPath">WebSocket 路径</label><input id="rnPath" value="/vpn"><label for="rnTransportHost">Host（可选）</label><input id="rnTransportHost" maxlength="256" placeholder="留空使用服务器地址"></div><div id="rnXhttpField" class="hidden"><label for="rnXhttpMode">XHTTP 模式</label><select id="rnXhttpMode"><option value="stream-up">stream-up</option><option value="packet-up">packet-up</option><option value="stream-one">stream-one</option><option value="auto">auto</option></select></div><div id="rnAlpnField" class="hidden"><label for="rnAlpn">ALPN（高级）</label><input id="rnAlpn" maxlength="32" placeholder="h2,http/1.1"><p class="hint">按优先顺序以逗号分隔。gRPC 仅允许 h2；XHTTP 必须包含 h2。</p></div><div id="rnGrpcField" class="hidden"><label for="rnGrpcService">gRPC 服务名</label><input id="rnGrpcService" value="vpn" maxlength="128" pattern="[A-Za-z0-9._\\-]+"></div><p class="hint">自动签发失败时显示原因，不会创建不可用节点。私钥始终留在节点服务器。</p></div>'}
     ${relay ? `<div class="span2"><label for="rnLanding">落地节点分享链接</label><textarea id="rnLanding" required placeholder="${singRelay ? '支持 HY2、TUIC、VLESS、VMess、Trojan、SS、SOCKS5、HTTP' : 'vless://、vmess://、trojan://、ss://、socks5:// 或 http://'}"></textarea><div class="note">将创建 ${singRelay ? 'VMess TCP' : 'Reality'} 入口、落地出站和专属路由。</div></div>` : ''}
   </div>${standalone ? '<p class="note">创建会重启内核。统计接口验证通过后，后台才会为当前订阅创建独立用户。</p>' : ''}<label class="inlinecheck"><input id="rnImport" type="checkbox" checked disabled>创建后添加到当前订阅</label><div id="remoteError" class="error" role="alert"></div><button id="rnSave" class="btn primary">创建${relay ? '中转' : '节点'}</button></form>`);
@@ -3379,42 +3379,71 @@ function openSniScanner(serverId,targetId) {
   closeSniScanner();
   const target=$(targetId); if(!target) return;
   const dialog=document.createElement('dialog'); dialog.id='sniScanner'; dialog.className='sni-dialog';
-  const view={dialog,target,focus:document.activeElement,controller:new AbortController(),results:[],running:false};
+  const view={dialog,target,focus:document.activeElement,controller:new AbortController(),results:[],running:false,entries:[]};
   S.sniScan=view;
-  dialog.innerHTML=`<div class="sni-dialog-head"><div><h3>${uiIcon('gauge')}SNI 延迟扫描</h3><p class="hint">先检测 TLS，再用隔离内核完成两次 Reality 实测。失败目标默认隐藏，不使用生产节点或计费端口。</p></div><button type="button" class="btn" id="sniClose" aria-label="关闭 SNI 扫描">${uiIcon('x')}</button></div><div class="sni-dialog-body"><details><summary>自定义扫描列表 · 内置 ${sniCandidates().length} 个候选</summary><label for="sniScanList">每行一个域名，最多 200 个</label><textarea id="sniScanList" rows="5">${esc(sniCandidates().join('\n'))}</textarea></details><div class="panel-head"><span id="sniProgress" role="status" aria-live="polite">准备扫描</span><button class="btn" type="button" id="sniRescan">${uiIcon('refresh-cw')}重新扫描</button></div><progress id="sniScanProgress" max="100" value="0" aria-label="扫描进度"></progress><div class="sni-results" id="sniScanResults"></div></div><div class="sni-dialog-foot"><span class="hint">仅 Reality 实测通过的目标可选；结果不保证所有客户端和未来网络状态。关闭窗口即停止后续批次。</span><button class="btn" type="button" id="sniCancel">取消</button></div>`;
+  dialog.innerHTML=`<div class="sni-dialog-head"><div><h3>${uiIcon('gauge')}伪装站点 · TCP 延迟</h3><p class="hint">复用参考服务器验证过的固定站点，当前服务器仅测试 TCP 443 连接延迟，不重复完整扫描。</p></div><button type="button" class="btn" id="sniClose" aria-label="关闭站点测试">${uiIcon('x')}</button></div><div class="sni-dialog-body"><p id="sniCatalogInfo" class="hint">正在读取固定站点库…</p><details id="sniCatalogSettings"><summary>维护固定站点库 · 仅首次或更新站点时使用</summary><label for="sniReference">用于完整验证的参考服务器</label><select id="sniReference"><option value="">正在读取服务器…</option></select><label for="sniScanList">候选域名，每行一个，最多 200 个</label><textarea id="sniScanList" rows="5">${esc(sniCandidates().join('\n'))}</textarea><p class="hint">参考服务器需要可用的验证内核。完整验证通过后保存域名及 IP，所有服务器复用；重新验证失败的候选会从固定库移除。不会自动定时重扫。</p><button class="btn" type="button" id="sniRebuild" disabled>在参考服务器完整验证并保存</button></details><div class="panel-head"><span id="sniProgress" role="status" aria-live="polite">准备测试</span><button class="btn" type="button" id="sniRescan" disabled>${uiIcon('refresh-cw')}重测 TCP 延迟</button></div><progress id="sniScanProgress" max="100" value="0" aria-label="测试进度"></progress><div class="sni-results" id="sniScanResults"></div></div><div class="sni-dialog-foot"><span class="hint">TCP 延迟不包含 TLS / Reality 握手。参考站点验证不代表所有服务器、客户端及未来网络均兼容。</span><button class="btn" type="button" id="sniCancel">取消</button></div>`;
   document.body.append(dialog); dialog.showModal();
   dialog.addEventListener('cancel',event=>{event.preventDefault();closeSniScanner();});
   $('sniClose').onclick=$('sniCancel').onclick=closeSniScanner;
   const valid=()=>S.sniScan===view && target.isConnected && dialog.open;
+  const usable=r=>r.ok && r.baselineVerified;
   const render=()=>{
     const sorted=[...view.results].sort((a,b)=>(a.latencyMs??Infinity)-(b.latencyMs??Infinity));
-    const usable=sorted.filter(r=>r.ok && r.realityVerified), failed=sorted.filter(r=>!r.ok || !r.realityVerified);
-    const row=r=>`<div class="sni-result"><div><strong>${esc(r.domain)}</strong><small>${r.ok && r.realityVerified ? esc(r.tls)+' · Reality 双次实测通过'+(r.cached?' · 缓存':'') : esc(r.error || '未通过实际 Reality 验证')}</small></div><span class="${r.ok && r.realityVerified?'sni-latency':'hint'}">${r.ok && r.realityVerified?esc(r.latencyMs)+' ms':'不可选'}</span><button type="button" class="btn small" data-sni-domain="${esc(r.domain)}" data-sni-address="${esc(r.verifiedAddress || '')}" ${r.ok && r.realityVerified?'':'disabled'}>选择</button></div>`;
-    $('sniScanResults').innerHTML=usable.map(row).join('')+(failed.length?`<details class="sni-failures"><summary>已隐藏 ${failed.length} 个未通过验证的目标 · 查看原因</summary>${failed.map(row).join('')}</details>`:'');
+    const good=sorted.filter(usable),failed=sorted.filter(r=>!usable(r));
+    const row=r=>`<div class="sni-result"><div><strong>${esc(r.domain)}</strong><small>${usable(r)?'参考服务器已验证 · 当前 TCP 可达':esc(r.error || 'TCP 不可达')}</small></div><span class="${usable(r)?'sni-latency':'hint'}">${usable(r)?esc(r.latencyMs)+' ms':'不可选'}</span><button type="button" class="btn small" data-sni-domain="${esc(r.domain)}" data-sni-address="${esc(r.verifiedAddress || '')}" ${usable(r)?'':'disabled'}>选择</button></div>`;
+    $('sniScanResults').innerHTML=good.map(row).join('')+(failed.length?`<details class="sni-failures"><summary>${failed.length} 个不可达目标 · 查看原因</summary>${failed.map(row).join('')}</details>`:'');
     dialog.querySelectorAll('[data-sni-domain]').forEach(button=>button.onclick=()=>{
       if(valid()) {target.value=button.dataset.sniDomain;target.dataset.sniVerified=button.dataset.sniDomain;target.dataset.sniAddress=button.dataset.sniAddress;target.dispatchEvent(new Event('input',{bubbles:true}));closeSniScanner();}
     });
   };
-  const scan=async(force=false)=>{
+  const loadCatalog=async()=>{
+    const data=await api('/servers/sni',{...jsonOpt('POST',{mode:'catalog'}),signal:view.controller.signal});
+    if(!valid())return;
+    view.entries=data.entries || [];
+    const sources=[...new Set(view.entries.map(e=>e.serverName))].join('、');
+    const latest=Math.max(0,...view.entries.map(e=>e.verifiedAt || 0));
+    $('sniCatalogInfo').textContent=view.entries.length?`固定站点 ${view.entries.length} 个 · 参考服务器：${sources} · 最近验证：${new Date(latest*1000).toLocaleString()}`:'尚无固定站点，请先在下方选择一台参考服务器完整验证一次。';
+    $('sniCatalogSettings').open=!view.entries.length;
+  };
+  const controls=()=>{if(valid()){$('sniRescan').disabled=view.running || !view.entries.length;$('sniRebuild').disabled=view.running || !$('sniReference').value;$('sniReference').disabled=view.running;$('sniScanList').disabled=view.running;}};
+  const scan=async(mode='tcp')=>{
     if(view.running || !valid()) return;
-    const candidates=[...new Set($('sniScanList').value.split(/\s+/).filter(Boolean))];
-    if(!candidates.length || candidates.length>200) { $('sniProgress').textContent='请填写 1–200 个候选域名'; return; }
-    view.running=true;view.results=[];view.errors=[];render();$('sniRescan').disabled=true;
-    const queue=[];for(let i=0;i<candidates.length;i+=14)queue.push(candidates.slice(i,i+14));
-    let completed=0;
-    const progress=()=>{$('sniProgress').textContent=`已测试 ${completed} / ${candidates.length} · Reality 可用 ${view.results.filter(r=>r.ok && r.realityVerified).length}${view.errors.length?' · '+view.errors.join('；'):''}`;$('sniScanProgress').value=completed/candidates.length*100;};
+    const candidates=mode==='baseline'?[...new Set($('sniScanList').value.split(/\s+/).filter(Boolean))]:view.entries.map(e=>e.domain);
+    if(!candidates.length || candidates.length>200) { $('sniProgress').textContent='请先保存 1–200 个候选站点'; return; }
+    const reference=$('sniReference').value;
+    if(mode==='baseline' && !reference)return;
+    view.running=true;view.results=[];view.errors=[];render();controls();
+    const queue=[];for(let i=0;i<candidates.length;i+=20)queue.push(candidates.slice(i,i+20));
+    let completed=0,passed=0;
+    const progress=()=>{$('sniProgress').textContent=`${mode==='baseline'?'参考服务器完整验证':'TCP 测速'} ${completed} / ${candidates.length} · 通过 ${passed}${view.errors.length?' · '+view.errors.join('；'):''}`;$('sniScanProgress').value=completed/candidates.length*100;};
     progress();
-    await Promise.all(Array.from({length:Math.min(2,queue.length)},async()=>{
+    await Promise.all(Array.from({length:Math.min(mode==='baseline'?1:2,queue.length)},async()=>{
       while(queue.length && valid()) {
         const batch=queue.shift();
-        try {const data=await api('/servers/sni',{...jsonOpt('POST',{serverId,candidates:batch,force}),signal:view.controller.signal});if(!valid())return;view.results.push(...data.results);}
+        try {const data=await api('/servers/sni',{...jsonOpt('POST',{serverId:mode==='baseline'?reference:serverId,candidates:batch,mode}),signal:view.controller.signal});if(!valid())return;passed+=data.results.filter(r=>r.ok).length;if(mode==='tcp')view.results.push(...data.results);}
         catch(error){if(!valid())return;view.errors.push(error.message);}
         completed+=batch.length;if(valid()){progress();render();}
       }
     }));
-    view.running=false;if(valid())$('sniRescan').disabled=false;
+    view.running=false;
+    if(!valid())return;
+    if(mode==='baseline') {
+      try {await loadCatalog();} catch(e){if(valid())$('sniProgress').textContent=e.message;}
+      controls();
+      if(view.entries.length && !view.errors.length)void scan('tcp');
+    } else controls();
   };
-  $('sniRescan').onclick=()=>scan(true);void scan();
+  $('sniRescan').onclick=()=>scan('tcp');$('sniRebuild').onclick=()=>scan('baseline');
+  void (async()=>{
+    try {
+      const [,data]=await Promise.all([loadCatalog(),api('/servers',{signal:view.controller.signal})]);
+      if(!valid())return;
+      $('sniReference').innerHTML=(data.servers || []).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+      const preferred=view.entries[0]?.serverId || serverId;
+      if([...$('sniReference').options].some(o=>o.value===preferred))$('sniReference').value=preferred;
+      controls();if(view.entries.length)void scan();
+    }catch(e){if(valid())$('sniProgress').textContent=e.message;}
+  })();
 }
 
 
@@ -4896,7 +4925,7 @@ async function chainModal(index) {
         </div>
       </div>
     </fieldset>
-    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div><div id="chainSingTemplateField" class="hidden"><label for="chainSingTemplate">sing-box 入口协议</label><select id="chainSingTemplate"><option value="vless-reality">VLESS + Reality / Vision</option><option value="vmess-tcp">VMess + TCP</option></select></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}扫描并选择 SNI</button><p class="hint">新入口拥有专属路由，并绑定当前订阅的流量与到期限制。Reality 入口须先在入口服务器实测 SNI。</p></fieldset>
+    <fieldset id="chainServerFields" class="section hidden"><legend>服务器入口</legend><div class="grid"><div><label for="chainPort">新入站端口</label><input id="chainPort" type="number" min="1" max="65535" placeholder="留空自动分配"></div><div><label for="chainSni">Reality SNI</label><input id="chainSni" value="raw.githubusercontent.com"></div><div id="chainSingTemplateField" class="hidden"><label for="chainSingTemplate">sing-box 入口协议</label><select id="chainSingTemplate"><option value="vless-reality">VLESS + Reality / Vision</option><option value="vmess-tcp">VMess + TCP</option></select></div></div><button id="chainSniTest" type="button" class="btn">${uiIcon('gauge')}测试 TCP 并选择 SNI</button><p class="hint">新入口拥有专属路由，并绑定当前订阅的流量与到期限制。Reality 入口须先在入口服务器测试固定站点的 TCP 可达性。</p></fieldset>
     <fieldset class="section">
       <legend>加入策略组</legend>
       <p class="hint">默认自动勾选非广告组，保存后该链式节点会自动添加至对应策略组中。</p>
