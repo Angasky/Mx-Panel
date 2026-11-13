@@ -1780,6 +1780,12 @@ body:has(#app.hidden) .skip-link{display:none}
 }
 @media(max-width:380px){html[data-theme] .main{padding-inline:12px}html[data-theme] .panel{padding:14px}html[data-theme] .workspace-actions .current-profile{border:0;background:transparent;padding-inline:4px}.workspace-actions .current-profile>span:last-child{display:none}}
 
+
+/* Preserve the Craft primary button bevel after the shared console rules. */
+html[data-theme="craft"] .btn.primary:not(:disabled){box-shadow:inset 2px 2px #71a355,inset -2px -3px #203e18,2px 2px #31313130}
+html[data-theme="craft"] .btn.primary:not(:disabled):hover{box-shadow:inset 2px 2px #87b66a,inset -2px -3px #203e18,2px 2px #31313130}
+html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px 2px #203e18,inset -1px -1px #71a355;transform:translateY(1px)}
+
 </style>
 </head>
 <body>
