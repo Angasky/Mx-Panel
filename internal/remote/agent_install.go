@@ -39,8 +39,10 @@ func (m *Manager) StartAgentInstall(id string, config []byte, revision string) (
 //go:embed scripts/upgrade-agent-remote.sh
 var agentUpgradeShell string
 
+const AgentUpgradeVersion = "v0.1.35"
+
 func (m *Manager) StartAgentUpgrade(id, revision string) (Record, error) {
-	return m.startAgentJob(id, agentUpgradeShell, revision, "v0.1.32")
+	return m.startAgentJob(id, agentUpgradeShell, revision, AgentUpgradeVersion)
 }
 func (m *Manager) startAgentJob(id, script, revision, targetVersion string) (Record, error) {
 	m.mu.Lock()

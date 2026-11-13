@@ -47,6 +47,7 @@ type Target struct {
 	Writable bool   `json:"writable"`
 }
 type Report struct {
+	Version      string            `json:"version,omitempty"`
 	Probes       []netprobe.Result `json:"probes,omitempty"`
 	Sample       string            `json:"sample"`
 	Capabilities []string          `json:"capabilities,omitempty"`

@@ -35,6 +35,7 @@ type agentRegistration struct {
 	Digest     string `json:"digest"`
 }
 type agentObservation struct {
+	Version      string
 	Probes       []netprobe.Result
 	Capabilities []string
 	View         remote.Record
@@ -184,7 +185,7 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 		os.Remove(s.taskPath(id))
 	}
 	observation := s.agentViews[id]
-	result := map[string]any{"deployJob": entries[id].DeployJob, "configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
+	result := map[string]any{"version": observation.Version, "deployJob": entries[id].DeployJob, "configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
 	if !observation.At.IsZero() {
 		result["lastSeen"] = observation.At.Unix()
 	}
@@ -210,7 +211,19 @@ func (s *Server) agentAuthorized(id, token string) (string, bool) {
 	digest, e := hex.DecodeString(entry.Digest)
 	return entry.Digest, e == nil && entry.Enabled && subtle.ConstantTimeCompare(sum[:], digest) == 1
 }
-func (s *Server) acceptAgent(ctx context.Context, id, digest, raw, mode string) error {
+func (s *Server) acceptAgent(ctx context.Context, id, digest, raw, mode string, versions ...string) error {
+	version := ""
+	if len(versions) > 0 {
+		version = versions[0]
+	}
+	if len(version) > 64 || strings.ContainsAny(version, "\r\n\t ") {
+		return errors.New("Agent 版本格式无效")
+	}
+	for _, c := range version {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-' || c == '+' || c == '_') {
+			return errors.New("Agent 版本格式无效")
+		}
+	}
 	s.agentMu.Lock()
 	defer s.agentMu.Unlock()
 	entries, e := s.readAgents()
@@ -239,7 +252,7 @@ func (s *Server) acceptAgent(ctx context.Context, id, digest, raw, mode string) 
 	if e != nil {
 		return e
 	}
-	s.agentViews[id] = agentObservation{View: view, At: s.now(), Digest: digest, Mode: mode}
+	s.agentViews[id] = agentObservation{Version: version, View: view, At: s.now(), Digest: digest, Mode: mode}
 	return nil
 }
 func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
@@ -279,7 +292,7 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 			problem(w, 400, "采样请求无效")
 			return true
 		}
-		if e := s.acceptAgent(r.Context(), id, digest, input.Sample, "http"); e != nil {
+		if e := s.acceptAgent(r.Context(), id, digest, input.Sample, "http", input.Version); e != nil {
 			problem(w, 400, "采样被拒绝")
 			return true
 		}
@@ -303,7 +316,7 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 				if websocket.JSON.Receive(ws, &input) != nil {
 					return
 				}
-				if len(input.Sample) > 512<<10 || s.acceptAgent(r.Context(), id, digest, input.Sample, "websocket") != nil {
+				if len(input.Sample) > 512<<10 || s.acceptAgent(r.Context(), id, digest, input.Sample, "websocket", input.Version) != nil {
 					return
 				}
 				if websocket.JSON.Send(ws, s.agentAcknowledgement(id, digest, input)) != nil {
@@ -362,7 +375,7 @@ func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, e
 			if json.NewDecoder(io.LimitReader(res.Body, 600<<10)).Decode(&payload) != nil {
 				return nil, errors.New("Pull 数据无效")
 			}
-			if e = s.acceptAgent(ctx, id, entry.Digest, payload.Sample, "pull"); e != nil {
+			if e = s.acceptAgent(ctx, id, entry.Digest, payload.Sample, "pull", payload.Version); e != nil {
 				return nil, e
 			}
 			s.agentAcknowledgement(id, entry.Digest, payload)

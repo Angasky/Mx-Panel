@@ -29,6 +29,8 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+var releaseVersion = "dev"
+
 type configuration struct {
 	Probes      []netprobe.Target              `json:"probes,omitempty"`
 	Targets     map[string]agentcontrol.Target `json:"targets,omitempty"`
@@ -46,7 +48,12 @@ func main() {
 	local := flag.Bool("local-development", false, "allow loopback HTTP for isolated tests")
 	check := flag.Bool("check", false, "validate configuration without starting service")
 	paths := flag.Bool("systemd-paths", false, "print locally authorized writable directories")
+	version := flag.Bool("version", false, "print Agent release version")
 	flag.Parse()
+	if *version {
+		fmt.Println(releaseVersion)
+		return
+	}
 	if e := run(*path, *local, *check || *paths); e != nil {
 		log.Fatal(e)
 	}
@@ -160,7 +167,7 @@ func run(path string, local, check bool) error {
 				probes = netprobe.Measure(ctx, c.Probes)
 				lastProbe = time.Now()
 			}
-			payload := agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities(), Result: previous, Probes: probes}
+			payload := agentcontrol.Report{Version: releaseVersion, Sample: sample, Capabilities: controller.Capabilities(), Result: previous, Probes: probes}
 			var response agentcontrol.Ack
 			sent := false
 			if c.Mode != "http" && (ws != nil || time.Now().After(nextWS)) {
@@ -294,7 +301,7 @@ func servePull(ctx context.Context, c configuration, local bool) error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(agentcontrol.Report{Sample: sample, Capabilities: controller.Capabilities(), Probes: netprobe.Measure(r.Context(), c.Probes)})
+		json.NewEncoder(w).Encode(agentcontrol.Report{Version: releaseVersion, Sample: sample, Capabilities: controller.Capabilities(), Probes: netprobe.Measure(r.Context(), c.Probes)})
 	})
 	server := &http.Server{Addr: c.Listen, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	done := make(chan struct{})

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,14 +21,15 @@ type rolloutItem struct {
 	Finished int64  `json:"finished,omitempty"`
 }
 type agentRollout struct {
-	ID      string        `json:"id"`
-	Owner   string        `json:"owner,omitempty"`
-	Status  string        `json:"status"`
-	Message string        `json:"message"`
-	Created int64         `json:"created"`
-	Updated int64         `json:"updated"`
-	Index   int           `json:"index"`
-	Items   []rolloutItem `json:"items"`
+	TargetVersion string        `json:"targetVersion"`
+	ID            string        `json:"id"`
+	Owner         string        `json:"owner,omitempty"`
+	Status        string        `json:"status"`
+	Message       string        `json:"message"`
+	Created       int64         `json:"created"`
+	Updated       int64         `json:"updated"`
+	Index         int           `json:"index"`
+	Items         []rolloutItem `json:"items"`
 }
 
 func rolloutActive(status string) bool {
@@ -175,7 +177,7 @@ func (s *Server) agentRolloutRoute(w http.ResponseWriter, r *http.Request) bool 
 				name, _ := record["name"].(string)
 				items = append(items, rolloutItem{ID: id, Name: name, Revision: entry.Revision, Digest: entry.Digest, Status: "queued"})
 			}
-			state = agentRollout{ID: rand.Text(), Owner: s.rolloutOwner, Status: "queued", Message: "等待执行第一台；首台验证后需手动确认剩余批次。", Created: s.now().Unix(), Items: items}
+			state = agentRollout{TargetVersion: remote.AgentUpgradeVersion, ID: rand.Text(), Owner: s.rolloutOwner, Status: "queued", Message: "等待执行第一台；首台验证后需手动确认剩余批次。", Created: s.now().Unix(), Items: items}
 		case "continue":
 			if in.ID != state.ID || state.Status != "canary" {
 				problem(w, 409, "批次已变化或不在首台验收阶段")
@@ -227,16 +229,16 @@ func rolloutObserve(r *agentRollout, status string, finished int64, observation 
 	}
 	item.Status = "waiting"
 	r.Status = "waiting"
-	r.Message = "远端进程检查通过，等待任务完成之后的新上报。"
-	if observation.Digest == item.Digest && observation.At.Unix() > item.Finished && now.Sub(observation.At) <= 90*time.Second && !observation.At.After(now) {
+	r.Message = "远端进程检查通过，等待任务完成之后的新上报及目标版本确认。"
+	if r.TargetVersion != "" && observation.Version == r.TargetVersion && observation.Digest == item.Digest && observation.At.Unix() > item.Finished && now.Sub(observation.At) <= 90*time.Second && !observation.At.After(now) {
 		item.Status = "verified"
 		r.Index++
 		if r.Index == len(r.Items) {
 			r.Status = "succeeded"
-			r.Message = "全部服务器逐台完成程序检查及新上报验证。"
+			r.Message = "全部服务器逐台完成程序检查、新上报及目标版本确认。"
 		} else if r.Index == 1 {
 			r.Status = "canary"
-			r.Message = "首台已有新上报，请验收后确认继续剩余服务器。"
+			r.Message = "首台已有目标版本的新上报，请验收后确认继续剩余服务器。"
 		} else {
 			r.Status = "queued"
 			r.Message = "当前服务器验证通过，等待下一台。"
@@ -244,7 +246,7 @@ func rolloutObserve(r *agentRollout, status string, finished int64, observation 
 	} else if now.Unix()-item.Finished >= 180 {
 		item.Status = "unverified"
 		r.Status = "failed"
-		r.Message = "3 分钟内未收到任务完成后的有效上报，停止后续派发；请检查连接。"
+		r.Message = "3 分钟内未收到任务完成后的目标版本有效上报，停止后续派发；请检查连接与运行版本。"
 	}
 }
 func (s *Server) pollAgentRollout() {

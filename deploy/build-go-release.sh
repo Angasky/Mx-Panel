@@ -13,7 +13,7 @@ for arch in amd64 arm64; do
     stage=$(mktemp -d)
     trap 'rm -rf -- "$stage"' EXIT
     CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "${MXIOC_GO_BIN:-go}" build -buildvcs=false -trimpath -ldflags "-s -w -X main.releaseVersion=$version" -o "$stage/mxioc" ./cmd/mxioc
-    CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "${MXIOC_GO_BIN:-go}" build -buildvcs=false -trimpath -ldflags "-s -w" -o "$stage/mxioc-agent" ./cmd/mxioc-agent
+    CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "${MXIOC_GO_BIN:-go}" build -buildvcs=false -trimpath -ldflags "-s -w -X main.releaseVersion=$version" -o "$stage/mxioc-agent" ./cmd/mxioc-agent
     cp index.html deploy/mxioc-go-release.service deploy/install-go.sh "$stage/"
     printf '%s\n' "$version" > "$stage/VERSION"
     printf '%s\n' "$arch" > "$stage/ARCH"
