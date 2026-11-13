@@ -3,7 +3,6 @@ package remote
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -67,11 +66,9 @@ func parseProbeInventory(record Record, out string) (Record, error) {
 		if e != nil {
 			return nil, errors.New("节点配置编码无效")
 		}
-		var doc Record
-		dec := json.NewDecoder(strings.NewReader(string(raw)))
-		dec.UseNumber()
-		if e = dec.Decode(&doc); e != nil {
-			warnings = append(warnings, "配置 "+string(path)+" 不是标准 JSON，未解析")
+		doc, e := decodeProbeJSON(raw)
+		if e != nil {
+			warnings = append(warnings, "配置 "+string(path)+" 无法解析（已兼容注释与尾逗号），请检查文件语法")
 			continue
 		}
 		native, ok := doc["inbounds"].([]any)
