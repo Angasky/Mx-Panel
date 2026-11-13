@@ -9,6 +9,7 @@ import (
 	"github.com/Angasky/dingzhi-ban/internal/monitorhistory"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
 	"math"
+	"net"
 	"net/url"
 	"sort"
 	"time"
@@ -198,7 +199,13 @@ func (s *Server) probeMetrics(ctx context.Context, row remote.Record) (remote.Re
 	if v.Disk.Total > 0 && v.Disk.Used >= 0 && v.Disk.Used <= v.Disk.Total {
 		disks = append(disks, remote.Record{"mount": "探针汇总", "filesystem": "Komari", "total": v.Disk.Total, "used": v.Disk.Used, "available": v.Disk.Total - v.Disk.Used, "percent": usagePercent(v.Disk.Used, v.Disk.Total)})
 	}
-	view := remote.Record{"source": "komari", "sourceLabel": "Komari 探针（复用已有上报）", "serverId": row["id"], "managementIp": row["host"], "hostname": row["name"], "os": info.OS, "kernel": info.Kernel, "cpuModel": cpuName, "cores": cores, "sampledAt": float64(v.Updated.UnixMilli()) / 1000, "stale": stale, "warmingUp": false, "uptime": v.Uptime, "cpuPercent": metricValue(v.CPU.Usage, 100), "memory": memory, "load": []*float64{v.Load.Load1, v.Load.Load5, v.Load.Load15}, "interfaces": []remote.Record{}, "addresses": []remote.Record{}, "perCpu": []remote.Record{}, "summaryInterfaces": []string{"Komari 汇总"}, "disks": disks, "network": remote.Record{"rxBytes": v.Network.TotalDown, "txBytes": v.Network.TotalUp, "rxBytesPerSecond": metricValue(v.Network.Down, math.MaxFloat64), "txBytesPerSecond": metricValue(v.Network.Up, math.MaxFloat64)}}
+	addresses := []remote.Record{}
+	for _, raw := range []string{info.IPv4, info.IPv6} {
+		if ip := net.ParseIP(raw); ip != nil {
+			addresses = append(addresses, remote.Record{"interface": "探针报告 IP", "address": ip.String()})
+		}
+	}
+	view := remote.Record{"source": "komari", "sourceLabel": "Komari 探针（复用已有上报）", "serverId": row["id"], "managementIp": row["host"], "hostname": row["name"], "os": info.OS, "kernel": info.Kernel, "cpuModel": cpuName, "cores": cores, "sampledAt": float64(v.Updated.UnixMilli()) / 1000, "stale": stale, "warmingUp": false, "uptime": v.Uptime, "cpuPercent": metricValue(v.CPU.Usage, 100), "memory": memory, "load": []*float64{v.Load.Load1, v.Load.Load5, v.Load.Load15}, "interfaces": []remote.Record{}, "addresses": addresses, "perCpu": []remote.Record{}, "summaryInterfaces": []string{"Komari 汇总"}, "disks": disks, "network": remote.Record{"rxBytes": v.Network.TotalDown, "txBytes": v.Network.TotalUp, "rxBytesPerSecond": metricValue(v.Network.Down, math.MaxFloat64), "txBytesPerSecond": metricValue(v.Network.Up, math.MaxFloat64)}}
 	if stale {
 		view["error"] = "原探针上报已超过 90 秒，显示最后数据；不会回退 SSH 采样"
 	}

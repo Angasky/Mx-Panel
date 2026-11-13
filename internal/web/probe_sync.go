@@ -128,6 +128,9 @@ func probeHTTPClient() *http.Client {
 type probeAPIError struct{ Status int }
 
 func (e *probeAPIError) Error() string {
+	if e.Status == 429 {
+		return "探针请求频率受到限制（HTTP 429），请稍后刷新；无需重新配置 API Key"
+	}
 	return "探针接口拒绝请求（HTTP " + strconv.Itoa(e.Status) + "），请检查 API Key、接口权限和二次验证设置"
 }
 func probeDispatchRejected(err error) bool {

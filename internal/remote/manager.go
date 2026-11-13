@@ -222,6 +222,7 @@ func publicServer(record Record) Record {
 	if result["installType"] == nil {
 		result["installType"] = "3x-ui"
 	}
+	result["probeDiscovery"] = probeInventoryOnly(record)
 	result["hasSSHKey"] = value(record["sshPrivateKey"]) != ""
 	result["hasSSHPassword"] = value(record["sshPassword"]) != ""
 	kind := value(result["installType"])

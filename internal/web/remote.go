@@ -109,6 +109,10 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {
+				if result["inventoryOnly"] == true {
+					respond(w, 200, result)
+					return true
+				}
 				controller, e := s.subscriptionController()
 				if e == nil {
 					var cleanup map[string]any
@@ -135,6 +139,7 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 				}
 			}
 			s.metadataMu.Unlock()
+			s.attachProbeRegions(r.Context(), servers)
 			respond(w, 200, map[string]any{"servers": servers})
 		}
 		return true

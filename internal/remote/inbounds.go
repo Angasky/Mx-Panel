@@ -269,6 +269,9 @@ func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Reco
 	if err != nil {
 		return nil, err
 	}
+	if withStats && probeInventoryOnly(record) {
+		return m.probeInbounds(ctx, record)
+	}
 	if _, err := corePath(value(record["installType"])); err == nil {
 		return m.standaloneInbounds(ctx, id, withStats)
 	}
