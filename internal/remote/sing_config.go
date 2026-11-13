@@ -31,7 +31,7 @@ func safeSingPath(p string) bool {
 	return strings.HasPrefix(p, "/") && path.Clean(p) == p && p != "/" && len(p) < 2048 && !strings.ContainsAny(p, "\x00\r\n\t")
 }
 
-const singDiscoverScript = `set -eu
+const singDiscoverScript = `set -Eeuo pipefail
 systemctl is-active --quiet sing-box
 pid=$(systemctl show --property=MainPID --value sing-box)
 case "$pid" in ''|0|*[!0-9]*) exit 1;; esac
@@ -115,7 +115,7 @@ func (l singLayout) fileListScript() string {
 		s += "printf '%s\\n' " + quote(p) + "\n"
 	}
 	for _, p := range l.Dirs {
-		s += "test -d " + quote(p) + "\nfor f in " + quote(p) + "/*.json; do test ! -f \"$f\" || printf '%s\\n' \"$f\"; done\n"
+		s += "test -d " + quote(p) + " || exit 76\nfor f in " + quote(p) + "/*.json; do test ! -f \"$f\" || printf '%s\\n' \"$f\"; done\n"
 	}
 	return s + "} | LC_ALL=C sort\n"
 }
@@ -148,7 +148,7 @@ func newSingConfig(ctx context.Context, run coreRunner) (*singConfig, error) {
 	return &singConfig{Layout: l}, nil
 }
 func (s *singConfig) read(ctx context.Context, run coreRunner) ([]byte, Record, error) {
-	script := "set -eu\n" + s.Layout.identityScript() + "files=$(\n" + s.Layout.fileListScript() + ")\ntotal=0; count=0\nwhile IFS= read -r f; do\n" + `test -f "$f" && test ! -L "$f"
+	script := "set -Eeuo pipefail\n" + s.Layout.identityScript() + "files=$(\n" + s.Layout.fileListScript() + ")\ntotal=0; count=0\nwhile IFS= read -r f; do\n" + `test -f "$f" && test ! -L "$f"
 size=$(wc -c < "$f"); total=$((total+size)); count=$((count+1))
 test "$size" -le 2097152 && test "$total" -le 10485760 && test "$count" -le 64
 printf 'FILE\t';printf '%s' "$f" | base64 -w0;printf '\t';base64 -w0 < "$f";printf '\n'

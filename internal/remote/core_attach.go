@@ -95,7 +95,7 @@ func (m *Manager) finishSingAttachment(ctx context.Context, id string, record Re
 	for _, file := range config.Files {
 		files = append(files, file.Path)
 	}
-	if _, err := run(ctx, "set -eu\n"+config.guardScript()+config.Layout.checkCommand(files), 64<<10); err != nil {
+	if _, err := run(ctx, "set -Eeuo pipefail\n"+config.guardScript()+config.Layout.checkCommand(files), 64<<10); err != nil {
 		return nil, errors.New("现有 sing-box 整套配置校验失败，未接管或修改配置")
 	}
 	m.mu.Lock()
