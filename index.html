@@ -1792,6 +1792,28 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
 .ai-messages{min-height:280px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:16px;padding:4px 2px 18px}.ai-message{border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;background:var(--bg-input);min-width:0}.ai-user{border-color:var(--border-focus);background:var(--blue-soft)}.ai-message-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.ai-prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85}.ai-message pre,.ai-preview{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--border);padding:14px;border-radius:8px;max-height:420px;overflow:auto}.ai-message code{white-space:pre-wrap}.ai-context-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:18px}.ai-context-row select{flex:1;min-width:130px}.ai-context-row label{margin:0}.ai-send{justify-content:flex-end;margin-top:12px}.ai-send span{margin-right:auto}.ai-empty{margin:auto;text-align:center;padding:24px;color:var(--text-muted)}.ai-empty h3{color:var(--text)}#aiMessage{min-height:110px;max-height:300px;resize:vertical}#aiTestStatus{overflow-wrap:anywhere}
 @media(max-width:800px){.ai-workspace{grid-template-columns:minmax(0,1fr)}.ai-starters{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}.ai-starters h4{grid-column:1/-1;margin:0}.ai-message{padding:12px}.ai-messages{max-height:55vh}.ai-header .toolbar{flex-wrap:wrap}.ai-context-row label{width:100%}}
 
+
+.ai-launcher{position:fixed!important;right:24px;bottom:24px;z-index:75;width:60px;height:60px;min-width:60px;padding:8px!important;border-radius:20px!important;display:flex;flex-direction:column;gap:2px!important;touch-action:none;user-select:none;cursor:grab;box-shadow:0 8px 24px rgb(var(--shadow-rgb)/.25)!important}.ai-launcher:active{cursor:grabbing}.ai-launcher span{font-size:12px;font-weight:800}.ai-launcher .icon{width:23px;height:23px}
+.ai-float-window{position:fixed;right:24px;bottom:96px;z-index:76;width:min(480px,calc(100vw - 16px));height:min(700px,calc(100dvh - 112px));min-height:160px;display:flex;flex-direction:column;background:var(--bg-card);color:var(--text);border:1px solid var(--border-focus);border-radius:16px;box-shadow:0 16px 60px rgb(var(--shadow-rgb)/.25);overflow:hidden}
+.ai-float-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:var(--bg-input);border-bottom:1px solid var(--border);touch-action:none;user-select:none;cursor:grab;flex-shrink:0}.ai-float-head:active{cursor:grabbing}.ai-float-head small{font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px}.ai-float-head button{touch-action:manipulation;cursor:pointer}
+.ai-float-content{padding:12px;overflow:auto;min-height:0;overscroll-behavior:contain}.ai-float-content .panel{padding:12px;margin-bottom:10px;box-shadow:none}.ai-float-content .panel-head{flex-wrap:wrap;gap:8px;margin:0}.ai-float-content .panel-head h3{display:none}.ai-float-content .panel-head p{font-size:12px;margin:0}.ai-float-content .toolbar{flex-wrap:wrap;gap:6px}.ai-float-content .ai-workspace{display:flex;flex-direction:column;gap:0}.ai-float-content .ai-history,.ai-float-content .ai-chat{width:100%}.ai-float-content .ai-history summary{cursor:pointer;font-size:13px;font-weight:600}.ai-float-content .ai-history label{margin-top:12px}.ai-float-content .ai-starters{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px}.ai-float-content .ai-starters h4{grid-column:1/-1}.ai-float-content .ai-messages{min-height:170px;max-height:32dvh}.ai-float-content .ai-empty{padding:12px}.ai-float-content .ai-empty h3{font-size:16px}.ai-float-content .ai-empty p{font-size:13px}.ai-float-content #aiMessage{min-height:76px;height:76px}.ai-float-content .hint{font-size:11px;line-height:1.6}.ai-float-content .ai-context-row label{width:100%}.ai-float-content .ai-context-row select{min-width:0}.ai-float-content .ai-message{padding:10px}.ai-float-content .btn{font-size:12px}.ai-float-content .ai-send span{flex-basis:100%}
+@media(max-width:600px){.ai-launcher{right:16px;bottom:16px;width:54px;height:54px;min-width:54px}.ai-float-window{right:8px;bottom:80px;height:calc(100dvh - 96px)}.ai-float-head{padding:10px 12px}}
+
+
+.ai-float-content{display:flex;flex-direction:column;overflow:hidden;flex:1}.ai-float-content .ai-header{flex-shrink:0}.ai-float-content .ai-header .panel-head{padding-bottom:0;border-bottom:0}.ai-float-content .ai-workspace{flex:1;min-height:0}.ai-float-content .ai-history{flex-shrink:0;max-height:160px;overflow:auto}.ai-float-content .ai-chat{display:flex;flex-direction:column;flex:1;min-height:0;margin-bottom:0}.ai-float-content .ai-messages{flex:1;min-height:70px;max-height:none;padding-bottom:8px}.ai-float-content #aiComposer{flex-shrink:0}.ai-float-content #aiMessage{height:60px;min-height:60px;max-height:110px}.ai-float-content .ai-context-row{padding-top:8px;gap:6px}.ai-float-content .ai-context-row label{font-size:12px;width:auto}.ai-float-content .ai-context-row select{font-size:12px;padding:6px;min-height:32px}.ai-float-content .hint{margin:4px 0}.ai-float-content .ai-send{margin-top:6px}.ai-float-content .ai-chat>p:last-child{display:none}.ai-float-content .ai-header .panel-head>div:first-child{flex-basis:100%}.ai-float-content .ai-empty{padding:6px}
+@media(max-height:480px){.ai-float-content{overflow:auto;display:block}.ai-float-content .ai-messages{min-height:100px;max-height:180px}}
+
+
+#aiFloatContent .panel{padding:10px;margin-bottom:8px;border-radius:10px}
+#aiFloatContent .ai-header .panel-head{padding:0;margin:0;gap:6px}
+#aiFloatContent .ai-header .panel-head>div:first-child{flex-basis:auto;flex:1;min-width:100px}
+#aiFloatContent .ai-header .panel-head p{line-height:1.4}
+#aiFloatContent .ai-chat{margin-bottom:0}
+#aiFloatContent .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#aiFloatContent #aiMessage{margin:4px 0;padding:8px}
+#aiFloatContent .ai-send .btn{min-height:32px;padding:6px 12px}
+#aiFloatContent .ai-send span{flex-basis:auto;font-size:10px}
+#aiFloatContent .ai-context-row .btn{padding:6px;min-height:32px}
 </style>
 </head>
 <body>
@@ -2072,6 +2094,12 @@ SOFTWARE.
   </main>
 </div>
 
+<button id="aiLauncher" class="btn primary ai-launcher hidden" type="button" aria-label="AI 协助：点击聊天，拖动可移动位置" aria-controls="aiFloatWindow" aria-expanded="false" title="点击聊天 · 拖动移动"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"/></svg><span>AI</span></button>
+<section id="aiFloatWindow" class="ai-float-window hidden" role="dialog" aria-modal="false" aria-labelledby="aiFloatTitle">
+ <header id="aiFloatHead" class="ai-float-head"><strong id="aiFloatTitle" tabindex="-1">AI 协助 <small>拖动标题栏移动</small></strong><button id="aiFloatMinimize" type="button" class="btn small" aria-label="收起 AI 对话" title="收起，保留当前对话">−</button></header>
+ <div id="aiFloatContent" class="ai-float-content"></div>
+</section>
+
 <!-- MODAL DIALOG -->
 <div id="modal" class="modal hidden">
   <div class="modalbox" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
@@ -2142,7 +2170,7 @@ function notice(text) {
 }
 
 function showLogin() {
- S.aiView?.controller?.abort();S.aiView=null;S.aiConversation='';
+ aiResetWidget();
  setNavigationOpen(false, false);
  document.body.classList.remove('member-mode');
  clearTimeout(S.probeBatchTimer);
@@ -2185,6 +2213,7 @@ function showLogin() {
 async function showAuthenticatedApp() {
   const account = await api('/account');
   S.role = account.role;
+  aiShowLauncher();
   document.body.classList.toggle('member-mode', S.role === 'user');
   if (S.role === 'user') {
     document.querySelector('#app .nav-group').classList.add('hidden');
@@ -2409,8 +2438,8 @@ const pageSections = {
 const sectionFor = page => Object.keys(pageSections).find(key => pageSections[key].includes(page)) || 'overview';
 
 async function go(page) {
-  if (S.role === "user") return page==='assistant'?aiAssistant():memberPortal();
-  if(page!=='assistant')S.aiView?.controller?.abort();
+  if(page==='assistant'){setNavigationOpen(false,false);return aiOpenWindow();}
+  if (S.role === "user") return memberPortal();
   if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring','probeSync','assistant'].includes(page)) {
     page = 'profiles';
     notice('请先创建一份订阅，再管理节点和规则');
@@ -2556,7 +2585,6 @@ function editPanelUser(u, profiles) {
   };
 }
 async function memberPortal() {
- S.aiView?.controller?.abort();
   const data=await api('/portal'); S.page='portal'; $('content').dataset.page='portal';
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
   $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><button class="btn primary" onclick="aiAssistant().catch(e=>notice(e.message))">AI 协助</button><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
@@ -2591,22 +2619,77 @@ async function aiSettingsManager(){
   const saveButton=$('aiSaveSettings'),testButton=$('aiTestConnection'),error=$('aiSettingsError'),status=$('aiTestStatus');saveButton.disabled=testButton.disabled=true;error.textContent='';
   const payload={enabled:$('aiEnabled').checked,protocol:val('aiProtocol'),baseUrl:val('aiBaseURL'),model:val('aiModel'),key:$('aiKey').value,clearKey:$('aiClearKey').checked,maxTokens:Number(val('aiMaxTokens')),legacyTokens:$('aiLegacyTokens').checked,prompt:$('aiPrompt').value};
   try{
-   await api('/ai/settings',jsonOpt('PUT',payload));if(!valid())return;if(S.page==='assistant')await aiAssistant();if(!valid())return;$('aiKey').value='';$('aiClearKey').checked=false;status.textContent='已保存';
+   await api('/ai/settings',jsonOpt('PUT',payload));if(!valid())return;if(S.aiView)await aiOpenWindow(true);if(!valid())return;$('aiKey').value='';$('aiClearKey').checked=false;status.textContent='已保存';
    if(test){status.textContent='正在发送一条简短测试消息，请稍候…';const data=await api('/ai/test',jsonOpt('POST',{}));if(!valid())return;status.textContent=`连接成功 · ${data.model} · ${Math.round(data.elapsedMs)} ms`;}
    else{closeModal();notice('AI 设置已保存');}
   }catch(e){if(valid())error.textContent=e.message;}finally{if(valid())saveButton.disabled=testButton.disabled=false;}
  };
  form.onsubmit=e=>{e.preventDefault();void save();};$('aiTestConnection').onclick=()=>save(true);
 }
-async function aiAssistant(){
+function aiViewport(){const v=window.visualViewport;return {x:v?.offsetLeft||0,y:v?.offsetTop||0,w:v?.width||innerWidth,h:v?.height||innerHeight};}
+function aiPlace(el,x,y){
+ const v=aiViewport(),r=el.getBoundingClientRect();
+ el.style.left=Math.max(v.x+8,Math.min(x,v.x+v.w-r.width-8))+'px';
+ el.style.top=Math.max(v.y+8,Math.min(y,v.y+v.h-r.height-8))+'px';
+ el.style.right='auto';el.style.bottom='auto';
+}
+function aiFit(){
+ const v=aiViewport();$('aiFloatWindow').style.maxHeight=Math.max(160,v.h-16)+'px';
+ for(const id of ['aiLauncher','aiFloatWindow']){const el=$(id);if(!el.classList.contains('hidden')){const r=el.getBoundingClientRect();aiPlace(el,r.left,r.top);}}
+}
+function aiDrag(handle,el,key){
+ let drag=null,suppress=false;
+ handle.addEventListener('pointerdown',e=>{
+  if(e.button!==0||e.target.closest('button')&&e.target.closest('button')!==handle)return;
+  const r=el.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,moved:false};suppress=false;handle.setPointerCapture(e.pointerId);
+ });
+ handle.addEventListener('pointermove',e=>{
+  if(!drag||drag.id!==e.pointerId)return;
+  if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>6)drag.moved=true;
+  if(drag.moved){e.preventDefault();aiPlace(el,drag.left+e.clientX-drag.x,drag.top+e.clientY-drag.y);}
+ });
+ const end=e=>{if(!drag||drag.id!==e.pointerId)return;suppress=drag.moved;if(drag.moved){const r=el.getBoundingClientRect();try{localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top}));}catch{}}drag=null;if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
+ handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);handle.addEventListener('lostpointercapture',()=>{drag=null;});
+ handle.addEventListener('click',e=>{if(suppress){e.preventDefault();e.stopImmediatePropagation();suppress=false;}},true);
+}
+function aiRestorePosition(el,key){try{const p=JSON.parse(localStorage.getItem(key));if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))aiPlace(el,p.x,p.y);}catch{}aiFit();}
+function aiShowLauncher(){if(!S.role)return;$('aiLauncher').classList.remove('hidden');aiRestorePosition($('aiLauncher'),'mx-ai-launcher-position');}
+function aiMinimize(){
+ $('aiFloatWindow').classList.add('hidden');$('aiLauncher').setAttribute('aria-expanded','false');$('aiLauncher').focus({preventScroll:true});
+}
+async function aiOpenWindow(refresh=false){
+ if(!S.role)return;
+ aiShowLauncher();const box=$('aiFloatWindow'),wasHidden=box.classList.contains('hidden');box.classList.remove('hidden');$('aiLauncher').setAttribute('aria-expanded','true');
+ if(wasHidden)aiRestorePosition(box,'mx-ai-window-position');
+ if(refresh||!S.aiView){
+  const epoch=S.aiWidgetEpoch||0;try{await aiAssistantRender();}catch(e){if(S.role&&(S.aiWidgetEpoch||0)===epoch){S.aiView=null;$('aiFloatContent').innerHTML='<p class="error">'+esc(e.message)+'</p><button class="btn" id="aiFloatRetry">重试</button>';$('aiFloatRetry').onclick=()=>aiOpenWindow();}}
+ }
+ if(!box.classList.contains('hidden'))$('aiFloatTitle').focus({preventScroll:true});
+}
+function aiResetWidget(){
+ S.aiWidgetEpoch=(S.aiWidgetEpoch||0)+1;
+ S.aiView?.controller?.abort();S.aiView=null;S.aiConversation='';
+ $('aiFloatContent').replaceChildren();$('aiFloatWindow').classList.add('hidden');$('aiLauncher').classList.add('hidden');$('aiLauncher').setAttribute('aria-expanded','false');
+}
+function aiInitWidget(){
+ aiDrag($('aiLauncher'),$('aiLauncher'),'mx-ai-launcher-position');aiDrag($('aiFloatHead'),$('aiFloatWindow'),'mx-ai-window-position');
+ $('aiLauncher').onclick=()=>{if($('aiFloatWindow').classList.contains('hidden'))void aiOpenWindow();else aiMinimize();};
+ $('aiFloatMinimize').onclick=aiMinimize;
+ $('aiFloatWindow').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').classList.contains('hidden')){e.stopPropagation();aiMinimize();}});
+ // Keyboard users can reposition the launcher without a pointer.
+ $('aiLauncher').addEventListener('keydown',e=>{const d={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[e.key];if(!d)return;e.preventDefault();const r=$('aiLauncher').getBoundingClientRect();aiPlace($('aiLauncher'),r.left+d[0],r.top+d[1]);});
+ window.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('scroll',aiFit);
+}
+async function aiAssistant(){return aiOpenWindow();}
+
+async function aiAssistantRender(){
  S.aiView?.controller?.abort();
- const view={controller:new AbortController(),conversation:S.aiConversation||'',messages:[],busy:false};S.aiView=view;S.page='assistant';
- $('title').textContent='AI 协助';$('subtitle').textContent='使用自己的模型，分析配置与排查问题';$('titleBreadcrumb').textContent='AI 协助';$('content').dataset.page='assistant';['add','importNode'].forEach(id=>$(id).classList.add('hidden'));
- $('content').innerHTML='<section class="panel"><p class="empty">正在读取你的 AI 助手…</p></section>';
- const valid=()=>S.aiView===view&&S.page==='assistant'&&S.role;
+ const view={controller:new AbortController(),conversation:S.aiConversation||'',messages:[],busy:false};S.aiView=view;
+ $('aiFloatContent').innerHTML='<section class="panel"><p class="empty">正在读取你的 AI 助手…</p></section>';
+ const valid=()=>S.aiView===view&&S.role;
  const [settings,chats,context]=await Promise.all([api('/ai/settings'),api('/ai/conversations'),api('/ai/context')]);if(!valid())return;
  view.settings=settings;view.chats=chats.conversations||[];
- $('content').innerHTML=`<section class="panel ai-header"><div class="panel-head"><div><h3>${uiIcon('cpu')} AI 协助</h3><p class="muted">${settings.enabled&&settings.hasKey?esc(aiProtocols[settings.protocol]?.label)+' · '+esc(settings.model):'尚未启用，请先填写自己的 API Key 和模型。'}</p></div><div class="toolbar">${S.role==='user'?'<button class="btn" onclick="memberPortal().catch(e=>notice(e.message))">返回我的订阅</button>':''}<button class="btn" id="aiOpenSettings">接入设置</button><button class="btn primary" id="aiNewChat">${uiIcon('circle-plus')}新对话</button></div></div></section><div class="ai-workspace"><aside class="panel ai-history"><label for="aiConversation">我的对话</label><select id="aiConversation" aria-label="选择对话"></select><div class="toolbar"><button class="btn small" id="aiRenameChat">重命名</button><button class="btn small danger" id="aiDeleteChat">删除</button></div><p class="hint">每个账号最多保存 20 个对话，每个对话保留最近 15 轮，并按长度截断。</p><div class="ai-starters"><h4>开始分析</h4>${['国内 App 开启代理后无法联网，应该如何排查？','帮我检查策略组和分流规则是否合理。','解释 sing-box 原生入站与托管节点的区别。','给我一份节点连接失败的排查步骤。'].map((p,i)=>`<button type="button" class="btn" data-ai-starter="${i}">${esc(p)}</button>`).join('')}</div></aside><section class="panel ai-chat"><div id="aiMessages" class="ai-messages" aria-live="polite"></div><form id="aiComposer"><div class="ai-context-row"><label for="aiContextProfile">附带配置摘要</label><select id="aiContextProfile"><option value="">不附带，仅发送对话</option>${(context.profiles||[]).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button type="button" class="btn small" id="aiPreviewContext">预览摘要</button></div><p class="hint">选择附带后，摘要将发送给你配置的 AI 服务。节点地址、Key、密码和订阅链接不会自动附带；普通用户仅附带授权订阅用量。</p><label class="sr-only" for="aiMessage">发给 AI 的消息</label><textarea id="aiMessage" rows="4" maxlength="24000" placeholder="描述问题，或粘贴已去除密码与密钥的配置片段…" required></textarea><div id="aiChatError" class="error" role="alert"></div><div class="toolbar ai-send"><span id="aiStatus" class="hint" role="status">Ctrl / ⌘ + Enter 发送</span><button type="button" class="btn hidden" id="aiStop">停止</button><button type="submit" class="btn primary" id="aiSend">发送</button></div></form><p class="hint">AI 回复是建议，不代表已执行测试或修改。重要配置请先核对；代码块可复制后自行使用。</p></section></div>`;
+ $('aiFloatContent').innerHTML=`<section class="panel ai-header"><div class="panel-head"><div><h3>${uiIcon('cpu')} AI 协助</h3><p class="muted">${settings.enabled&&settings.hasKey?esc(aiProtocols[settings.protocol]?.label)+' · '+esc(settings.model):'尚未启用，请先填写自己的 API Key 和模型。'}</p></div><div class="toolbar"><button class="btn" id="aiOpenSettings">接入设置</button><button class="btn primary" id="aiNewChat">${uiIcon('circle-plus')}新对话</button></div></div></section><div class="ai-workspace"><details class="panel ai-history"><summary>对话记录与快捷问题</summary><label for="aiConversation">我的对话</label><select id="aiConversation" aria-label="选择对话"></select><div class="toolbar"><button class="btn small" id="aiRenameChat">重命名</button><button class="btn small danger" id="aiDeleteChat">删除</button></div><p class="hint">每个账号最多保存 20 个对话，每个对话保留最近 15 轮，并按长度截断。</p><div class="ai-starters"><h4>开始分析</h4>${['国内 App 开启代理后无法联网，应该如何排查？','帮我检查策略组和分流规则是否合理。','解释 sing-box 原生入站与托管节点的区别。','给我一份节点连接失败的排查步骤。'].map((p,i)=>`<button type="button" class="btn" data-ai-starter="${i}">${esc(p)}</button>`).join('')}</div></details><section class="panel ai-chat"><div id="aiMessages" class="ai-messages" aria-live="polite"></div><form id="aiComposer"><div class="ai-context-row"><label for="aiContextProfile">附带配置摘要</label><select id="aiContextProfile"><option value="">不附带，仅发送对话</option>${(context.profiles||[]).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button type="button" class="btn small" id="aiPreviewContext">预览摘要</button></div><p class="hint">仅发送对话和你选择的脱敏摘要；可先预览再发送。</p><label class="sr-only" for="aiMessage">发给 AI 的消息</label><textarea id="aiMessage" rows="4" maxlength="24000" placeholder="描述问题，或粘贴已去除密码与密钥的配置片段…" required></textarea><div id="aiChatError" class="error" role="alert"></div><div class="toolbar ai-send"><span id="aiStatus" class="hint" role="status">Ctrl / ⌘ + Enter 发送</span><button type="button" class="btn hidden" id="aiStop">停止</button><button type="submit" class="btn primary" id="aiSend">发送</button></div></form><p class="hint">AI 回复是建议，不代表已执行测试或修改。重要配置请先核对；代码块可复制后自行使用。</p></section></div>`;
  const form=$('aiComposer'),input=$('aiMessage');
  const renderMessages=()=>{
   if(!valid())return;
@@ -6869,6 +6952,7 @@ $('add').onclick = () => ({
   dns: dnsModal
 }[S.page])();
 
+aiInitWidget();
 void bootstrap();
 </script>
 </body>
