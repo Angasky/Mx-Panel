@@ -330,6 +330,17 @@ func (s *Server) agentPublic(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, error) {
+	manager, err := s.remoteManager()
+	if err != nil {
+		return nil, err
+	}
+	row, err := manager.Record(id)
+	if err != nil {
+		return nil, err
+	}
+	if probeLinked(row) {
+		return s.probeMetrics(ctx, row)
+	}
 	s.agentMu.Lock()
 	entries, e := s.readAgents()
 	entry := entries[id]

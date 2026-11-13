@@ -30,10 +30,25 @@ func (s *Server) monitorHistoryRoute(w http.ResponseWriter, r *http.Request) boo
 		problem(w, 500, "服务器数据读取失败")
 		return true
 	}
-	if _, err = manager.Record(id); err != nil {
+	record, err := manager.Record(id)
+	if err != nil {
 		problem(w, 404, "服务器不存在")
 		return true
 	}
+	if probeLinked(record) {
+		if r.Method != "GET" {
+			problem(w, 409, "该服务器历史直接读取 Komari，请在原探针管理采样与保留策略")
+			return true
+		}
+		state, e := s.probeHistory(r.Context(), record)
+		if e != nil {
+			problem(w, 502, e.Error())
+			return true
+		}
+		respond(w, 200, map[string]any{"source": "komari", "enabled": true, "points": state.Points, "days": state.Days, "interval": 0, "timezone": "UTC", "readOnly": true})
+		return true
+	}
+
 	switch r.Method {
 	case "PUT":
 		var input struct {
@@ -95,6 +110,20 @@ func metricHistoryPoint(view remote.Record, now time.Time) (monitorhistory.Point
 func (s *Server) startMonitorHistory(ctx context.Context) {
 	s.historyOnce.Do(func() {
 		s.historyDone = make(chan struct{})
+		batchDone := make(chan struct{})
+		go func() {
+			defer close(batchDone)
+			ticker := time.NewTicker(3 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					s.pollProbeBatch(ctx)
+				}
+			}
+		}()
 		externalDone := make(chan struct{})
 		go func() {
 			defer close(externalDone)
@@ -112,7 +141,7 @@ func (s *Server) startMonitorHistory(ctx context.Context) {
 		}()
 		go func() {
 			defer close(s.historyDone)
-			defer func() { <-externalDone }()
+			defer func() { <-externalDone; <-batchDone }()
 			ticker := time.NewTicker(30 * time.Second)
 			defer ticker.Stop()
 			for {
@@ -148,6 +177,9 @@ func (s *Server) sampleMonitorHistory(ctx context.Context) {
 	slots := make(chan struct{}, 3)
 	var wg sync.WaitGroup
 	for _, row := range rows {
+		if probeLinked(row) {
+			continue
+		}
 		id, _ := row["id"].(string)
 		state, e := s.history.Read(id, s.now())
 		if e != nil {

@@ -209,7 +209,13 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 	respond(w, 200, result)
 	return true
 }
-func (s *Server) sharedMetrics(c monitorShare) sharedReport {
+func (s *Server) sharedMetrics(c monitorShare, parents ...context.Context) sharedReport {
+	parent := context.Background()
+	if len(parents) > 0 {
+		parent = parents[0]
+	}
+	ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+	defer cancel()
 	report := sharedReport{Appearance: monitorAppearanceDefaults(c.Appearance), GeneratedAt: s.now().Unix(), Servers: []sharedMetric{}}
 	manager, err := s.remoteManager()
 	if err != nil {
@@ -237,7 +243,7 @@ func (s *Server) sharedMetrics(c monitorShare) sharedReport {
 			}
 		}
 		s.agentMu.Unlock()
-		state, e := s.history.Read(item.ID, s.now())
+		state, e := s.monitorState(ctx, item.ID, false)
 		if e == nil {
 			switch {
 			case !state.Enabled:
@@ -352,7 +358,7 @@ func (s *Server) monitorSharePublic(w http.ResponseWriter, r *http.Request) bool
 				allowed := readErr == nil && current.Enabled && (current.Public && token == "" || token != "" && decodeErr == nil && subtle.ConstantTimeCompare(digest[:], expected) == 1)
 				var report sharedReport
 				if allowed {
-					report = s.sharedMetrics(current)
+					report = s.sharedMetrics(current, ctx)
 				}
 				s.shareMu.Unlock()
 				if !allowed {
@@ -376,10 +382,12 @@ func (s *Server) monitorSharePublic(w http.ResponseWriter, r *http.Request) bool
 		s.shareMu.Unlock()
 		return true
 	}
-	report := s.sharedMetrics(c)
+	report := s.sharedMetrics(c, r.Context())
 	if !api {
+		historyCtx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		defer cancel()
 		for i := range report.Servers {
-			state, e := s.history.Read(c.Servers[report.Servers[i].Index].ID, s.now())
+			state, e := s.monitorState(historyCtx, c.Servers[report.Servers[i].Index].ID, true)
 			if e == nil {
 				report.Servers[i].History = state.Points
 			}
@@ -506,7 +514,7 @@ func (s *Server) sharedSeries(w http.ResponseWriter, r *http.Request, c monitorS
 		respond(w, 200, map[string]any{"label": c.Servers[index].Label, "method": method, "source": "agent", "points": points, "generatedAt": s.now().Unix()})
 		return
 	}
-	state, e := s.history.Read(c.Servers[index].ID, s.now())
+	state, e := s.monitorState(r.Context(), c.Servers[index].ID, true)
 	if e != nil {
 		problem(w, 503, "历史记录暂不可用")
 		return

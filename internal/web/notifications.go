@@ -225,7 +225,10 @@ func (s *Server) notificationConditions(c notificationConfig, now time.Time) (ma
 		if name == "" {
 			name = id
 		}
-		if c.Monitor {
+		if c.Monitor && probeLinked(row) {
+			out["unknown:"+id] = "1"
+		}
+		if c.Monitor && !probeLinked(row) {
 			h, e := s.history.Read(id, now)
 			if e != nil {
 				return nil, e
@@ -252,7 +255,7 @@ func (s *Server) notificationConditions(c notificationConfig, now time.Time) (ma
 				out["unknown:"+id] = "1"
 			}
 		}
-		if c.Probes {
+		if c.Probes && !probeLinked(row) {
 			h, e := s.history.Read(id, now)
 			if e != nil {
 				return nil, e

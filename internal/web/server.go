@@ -47,6 +47,8 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	probeCacheMu         sync.Mutex
+	probeCache           map[string]*probeCacheEntry
 	probeSyncMu          sync.Mutex
 	probeHTTP            *http.Client
 	rolloutMu            sync.Mutex
@@ -274,6 +276,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.clientOptionsRoute(w, r) {
+		return
+	}
+	if s.probeBatchRoute(w, r) {
 		return
 	}
 	if s.probeSyncRoute(w, r) {

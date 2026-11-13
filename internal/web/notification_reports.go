@@ -97,6 +97,9 @@ func (s *Server) notificationDailyReport(now time.Time) (string, error) {
 	rx, tx, seconds := float64(0), float64(0), float64(0)
 	gaps := 0
 	for _, r := range rows {
+		if probeLinked(r) {
+			continue
+		}
 		id, _ := r["id"].(string)
 		h, e := s.history.Read(id, now)
 		if e != nil {

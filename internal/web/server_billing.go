@@ -19,10 +19,20 @@ func (s *Server) billingRoute(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 500, "服务器数据不可用")
 		return true
 	}
-	if _, e = manager.Record(id); e != nil {
+	row, e := manager.Record(id)
+	if e != nil {
 		problem(w, 404, "服务器不存在")
 		return true
 	}
+	if probeLinked(row) {
+		if r.Method != "GET" {
+			problem(w, 409, "关联服务器使用原探针流量统计，不开启本地重复计量")
+			return true
+		}
+		respond(w, 200, map[string]any{"source": "komari", "message": "该服务器使用原探针监控；请在 Komari 查看周期流量与告警，本地旧日汇总不继续更新。"})
+		return true
+	}
+
 	now := s.now()
 	if r.Method == "PUT" {
 		var c monitorhistory.BillingConfig
