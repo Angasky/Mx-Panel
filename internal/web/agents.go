@@ -101,6 +101,14 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 404, "服务器不存在")
 		return true
 	}
+	if r.Method != "GET" {
+		s.rolloutMu.Lock()
+		defer s.rolloutMu.Unlock()
+		if s.rolloutContains(id) {
+			problem(w, 409, "此服务器在升级批次中，请先停止或完成批次")
+			return true
+		}
+	}
 	s.agentMu.Lock()
 	defer s.agentMu.Unlock()
 	entries, e := s.readAgents()

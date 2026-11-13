@@ -105,6 +105,7 @@ func (s *Server) startMonitorHistory(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
+					s.pollAgentRollout()
 					s.pollExternalTraffic(ctx)
 				}
 			}

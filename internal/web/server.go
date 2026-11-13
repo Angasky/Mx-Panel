@@ -47,6 +47,8 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	rolloutMu            sync.Mutex
+	rolloutOwner         string
 	externalMu           sync.Mutex
 	fetchExternalTraffic func(context.Context, string) (subsource.Traffic, error)
 	notificationMu       sync.Mutex
@@ -291,6 +293,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.metadataRoute(w, r) {
+		return
+	}
+	if s.agentRolloutRoute(w, r) {
 		return
 	}
 	if s.agentDeploy(w, r) {

@@ -66,6 +66,12 @@ func (s *Server) agentDeploy(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 400, "探测或服务授权配置无效")
 		return true
 	}
+	s.rolloutMu.Lock()
+	defer s.rolloutMu.Unlock()
+	if s.rolloutContains(input.ID) {
+		problem(w, 409, "此服务器已在升级批次中，请先停止或完成批次")
+		return true
+	}
 	s.agentMu.Lock()
 	defer s.agentMu.Unlock()
 	entries, e := s.readAgents()
@@ -120,6 +126,12 @@ func (s *Server) agentUpgrade(w http.ResponseWriter, r *http.Request) bool {
 	record, e := m.Record(input.ID)
 	if e != nil {
 		problem(w, 404, "服务器不存在")
+		return true
+	}
+	s.rolloutMu.Lock()
+	defer s.rolloutMu.Unlock()
+	if s.rolloutContains(input.ID) {
+		problem(w, 409, "此服务器已在升级批次中，请先停止或完成批次")
 		return true
 	}
 	s.agentMu.Lock()
