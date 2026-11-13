@@ -40,6 +40,9 @@ func validateCoreAttachment(kind, command string) error {
 
 func (m *Manager) attachCore(ctx context.Context, id string) (Record, error) {
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
+		if kind == "sing-box" {
+			return m.finishSingAttachment(ctx, id, record, run)
+		}
 		binary := "/usr/local/bin/xray"
 		check := "run -test -config"
 		if kind == "sing-box" {
@@ -72,4 +75,48 @@ tr '\000' '\n' < /proc/$pid/cmdline
 		record["existingVerifiedAt"] = time.Now().Unix()
 		return Record{"server": publicServer(record), "message": "已有独立内核验证成功，未安装、重启或修改远端配置"}, nil
 	})
+}
+
+// AttachDetectedSingBox verifies the live service before changing local ownership.
+func (m *Manager) AttachDetectedSingBox(ctx context.Context, id string) (Record, error) {
+	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
+		return m.finishSingAttachment(ctx, id, record, run)
+	}, true)
+}
+func (m *Manager) finishSingAttachment(ctx context.Context, id string, record Record, run coreRunner) (Record, error) {
+	config, ok := ctx.Value(singConfigKey{}).(*singConfig)
+	if !ok {
+		return nil, errors.New("sing-box 配置通道未就绪")
+	}
+	if _, _, err := readCore(ctx, "sing-box", run); err != nil {
+		return nil, err
+	}
+	files := []string{}
+	for _, file := range config.Files {
+		files = append(files, file.Path)
+	}
+	if _, err := run(ctx, "set -eu\n"+config.guardScript()+config.Layout.checkCommand(files), 64<<10); err != nil {
+		return nil, errors.New("现有 sing-box 整套配置校验失败，未接管或修改配置")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data, err := m.load()
+	if err != nil {
+		return nil, err
+	}
+	current, err := find(data, id)
+	if err != nil {
+		return nil, err
+	}
+	if certificateRevision(current) != certificateRevision(record) {
+		return nil, errors.New("服务器连接资料已变化，请重试")
+	}
+	current["installType"] = "sing-box"
+	current["connectionMode"] = "existing"
+	current["existingVerifiedAt"] = time.Now().Unix()
+	current["lastError"] = ""
+	if err = m.flush(data); err != nil {
+		return nil, err
+	}
+	return Record{"server": publicServer(current), "message": "sing-box 已接管，原文件结构与节点配置保持不变；可管理原生入站或创建托管节点", "configFiles": len(files)}, nil
 }

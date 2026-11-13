@@ -2795,7 +2795,7 @@ function serverForm(encoded = '', existing = false) {
     $('rsPanelPasswordLabel').textContent = `${existing ? '现有' : '预设'} ${title} 面板密码${s.id ? '（留空保留）' : ''}`;
     $('rsCoreBox').classList.toggle('hidden', !core || existing);
     $('rsInstallNote').textContent = core ? (existing
-      ? '通过 SSH 读取已有内核配置，并验证内核与 systemd 服务，不安装、不重启、不修改远端配置。默认位置：Xray /usr/local/bin/xray、/usr/local/etc/xray/config.json；sing-box /usr/bin/sing-box、/etc/sing-box/config.json。验证成功后可创建总控受管节点，原有未受管节点不会自动导入。'
+      ? '通过 SSH 读取已有内核配置，并验证内核与 systemd 服务，不安装、不重启、不修改远端配置。Xray 使用标准配置路径；sing-box 自动识别运行中 systemd 服务的程序、工作目录及 -c / -C 配置，支持多文件和 JSONC。接管后可编辑原生入站或创建托管节点；原生入站不会自动变成独立订阅用户。'
       : '安装固定版本的独立内核：Xray 26.10.31 或 sing-box 1.14.4，不提供 Web 面板。先验证配置再替换，失败尝试恢复旧程序、配置及服务状态。安装会重启服务，请检查端口冲突。当前 sing-box 客户端连接此 Xray 版本的 Reality 不兼容，请使用已验证的客户端与协议组合。') : panelNote;
     ['rsPanelUser', 'rsPanelPassword', 'rsMode'].forEach(id => {
       $(id).parentElement.classList.toggle('hidden', core);
@@ -2836,6 +2836,16 @@ function serverForm(encoded = '', existing = false) {
       } else { if (stillOpen()) closeModal(); await servers(); notice('服务器已保存，可测试连接或发起安装'); }
     } catch (error) { if (stillOpen()) { $('rsError').textContent = error.message; $('rsSave').disabled = false; } else notice(error.message); }
   };
+}
+
+async function attachDetectedSingBox(button) {
+ const id=S.serverId;button.disabled=true;
+ try {
+  const result=await api('/servers/attach',jsonOpt('POST',{id,kind:'sing-box'}));
+  const index=S.servers.findIndex(s=>s.id===id);if(index>=0)S.servers[index]=result.server;
+  if(S.serverId===id && S.page==='serverNodes'){S.remoteServer=result.server;await serverNodes(true);}
+  notice(result.message);
+ }catch(error){notice(error.message);}finally{if(button.isConnected)button.disabled=false;}
 }
 
 async function serverAttach(encoded, button) {
@@ -3157,12 +3167,13 @@ function renderRemoteNodes() {
   const canImport=row=>readOnly ? row.provisionable === true : remoteSupportsIndependentUser(row)&&row.enable!==false;
   const q = S.filters.remoteNodes || '', s = S.remoteServer;
   const page = tableSlice(S.remoteRows.filter(x => `${x.remark} ${x.protocol} ${x.port}`.toLowerCase().includes(q.toLowerCase())), 'serverNodes');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。探针接入的现有配置可自动识别展示。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${S.remoteInventoryOnly ? `<button class="btn" onclick="serverNodes(true).catch(e=>notice(e.message))">重新识别节点</button><button class="btn primary" onclick="serverForm(encodeURIComponent(S.serverId))">连接设置 / 接入已有内核</button>` : readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${['xray','sing-box'].includes(s.installType) ? '<button class="btn primary" onclick="remoteNodeForm(true)">添加中转</button>' : ''}${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn" onclick="rawPanelInboundForm(true)">创建单密码 SS</button><button class="btn" onclick="rawPanelInboundForm()">原始入站新增</button><button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>${esc(s.name)} · ${esc(s.host)}</h3><p class="muted">${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')} · 复用入站，为每个订阅分配独立用户。探针接入的现有配置可自动识别展示。</p></div><div class="toolbar"><button class="btn" onclick="go('nodes')">返回总控节点</button><button class="btn" onclick="chooseNodeServer()">切换服务器</button><button class="btn" onclick="go('traffic')">流量与有效期</button>${S.remoteInventoryOnly ? `<button class="btn" onclick="serverNodes(true).catch(e=>notice(e.message))">重新识别节点</button>${S.remoteRows.some(row=>(row.source||'').startsWith('sing-box'))?'<button class="btn primary" onclick="attachDetectedSingBox(this)">接管现有 sing-box</button>':''}<button class="btn" onclick="serverForm(encodeURIComponent(S.serverId))">连接设置 / 接入已有内核</button>` : readOnly ? `<button class="btn primary" onclick="editNativeCoreInbound()">管理原生入站</button><button class="btn primary" onclick="remoteNodeForm(false)">创建托管节点</button>${['xray','sing-box'].includes(s.installType) ? '<button class="btn primary" onclick="remoteNodeForm(true)">添加中转</button>' : ''}${S.canEnableCoreStats ? '<button class="btn" onclick="enableCoreStats()">启用用户计量</button>' : ''}` : `<button class="btn" onclick="rawPanelInboundForm(true)">创建单密码 SS</button><button class="btn" onclick="rawPanelInboundForm()">原始入站新增</button><button class="btn primary" onclick="sharedUserPicker()">${uiIcon('circle-plus')}添加订阅节点</button><button class="btn primary" onclick="remoteNodeForm(true)">${uiIcon('circle-plus')}添加中转</button>`}</div></div>
+    ${S.remoteRows.some(row=>row.nativeTag)?'<p class="hint">已接管原生入站，可直接编辑原有配置和用户。需要由本面板分配独立订阅用户、计量和到期管理时，请创建托管节点。</p>':''}
     ${S.remoteInventoryOnly?`<p class="note">${esc(S.remoteDiscoveryMessage)}</p>${S.remoteDiscoveryWarnings.map(w=>`<p class="error">${esc(w)}</p>`).join('')}`:''}
     <div class="toolbar"><button id="remoteBatchImport" class="btn" onclick="remoteNodeBatchLinks()">批量导入订阅</button><button id="remoteSelectionClear" class="btn small">取消节点选择</button><input id="search" aria-label="搜索远端节点" placeholder="搜索节点名称、协议、端口…" value="${esc(q)}"></div>
     <div class="tablewrap"><table><thead><tr><th><input id="remoteNodesAll" type="checkbox" aria-label="全选本页可导入节点"></th><th>ID</th><th>名称</th><th>协议 / 端口</th><th>状态</th><th>上传 / 下载</th><th>订阅联动</th><th>操作</th></tr></thead><tbody>
-    ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${x.id}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.id}</td><td>${esc(x.remark)}${x.source?`<br><small>${esc(x.source)}</small>`:''}${x.coreRelay ? ' <span class="pill">中转</span>' : ''}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : x.editPending ? '编辑待核对' : coreStatus[x.coreStatus] || '') : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
-      ${x.legacyRelayNeedsProof ? `<button class="btn small" onclick="adoptLegacyRelay(${x.id})">核对旧中转归属</button>` : ''}${S.remoteInventoryOnly?'':`<button class="btn small" onclick="bindDedicatedRemoteNode(${x.id})">绑定专属入站</button>`}${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${x.id})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${x.id})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${x.id})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${x.id})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${x.id})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${x.id})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${x.id})" ${remoteSupportsIndependentUser(x) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${x.id})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${x.id})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${x.id})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
+    ${page.rows.map(x => `<tr><td><input type="checkbox" class="remoteNodeChoice" value="${esc(x.id)}" ${canImport(x)?'':'disabled'} ${S.remoteNodeSelection.has(x.id)?'checked':''} aria-label="选择 ${esc(x.remark)}"></td><td>${x.nativeTag?'原生':esc(x.id)}</td><td>${esc(x.remark)}${x.source?`<br><small>${esc(x.source)}</small>`:''}${x.coreRelay ? ' <span class="pill">中转</span>' : ''}</td><td><code>${esc(x.protocol)} : ${x.port}</code></td><td>${readOnly ? esc(x.deletePending ? '删除待核对' : x.editPending ? '编辑待核对' : coreStatus[x.coreStatus] || (x.nativeTag?'原生入站 · 可编辑':'')) : x.enable ? '启用' : '停用'}</td><td>${readOnly && x.up == null ? '&mdash;' : formatBytes(x.up || 0) + ' / ' + formatBytes(x.down || 0)}</td><td>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? '<span class="pill">已绑定当前订阅</span>' : '<span class="muted">未绑定当前订阅</span>'}</td><td>
+      ${x.legacyRelayNeedsProof ? `<button class="btn small" onclick="adoptLegacyRelay(${esc(x.id)})">核对旧中转归属</button>` : ''}${S.remoteInventoryOnly||x.nativeTag?'':`<button class="btn small" onclick="bindDedicatedRemoteNode(${esc(x.id)})">绑定专属入站</button>`}${x.nativeTag?`<button class="btn small primary" onclick="editNativeCoreInbound('${encodeURIComponent(x.nativeTag).replace(/'/g,'%27')}')">编辑原生入站</button>`:''}${readOnly ? `${x.provisionable ? `<button class="btn small" onclick="remoteNodeLinks(${esc(x.id)})">加入订阅</button>` : ''}${x.shareLinks?.length ? `<button class="btn small" onclick="showVerifiedCoreLinks(${esc(x.id)})">查看链接</button>` : ''}${x.editToken ? `<button class="btn small" onclick="remoteNodeEditManaged(${esc(x.id)})">${x.editPending ? '重试保存' : '编辑'}</button>` : ''}${x.deleteToken ? `<button class="btn small danger" onclick="remoteNodeDelete(${esc(x.id)})">${x.deletePending?'重试删除':'删除'}</button>` : ''}` : `<button class="btn small" onclick="remoteNodeEdit(${esc(x.id)})">编辑</button><button class="btn small" onclick="remoteNodeToggle(${esc(x.id)})">${x.enable ? '停用整个入站' : '启用整个入站'}</button><button class="btn small" onclick="remoteNodeLinks(${esc(x.id)})" ${remoteSupportsIndependentUser(x) ? '' : 'disabled title="此协议模板暂不支持独立用户"'}>批量加入订阅</button>${(S.data?.profile?.traffic?.bindings || []).some(b=>b.serverId===S.serverId && b.inboundId===x.id && b.status==='active') ? `<button class="btn small" onclick="nodeBandwidthModal('${encodeURIComponent(S.serverId).replace(/'/g,'%27')}',${esc(x.id)})">节点限速</button>` : ''}<button class="btn small" onclick="remoteNodeLinks(${esc(x.id)})" ${!x.shareLinks?.length ? 'disabled' : ''}>链接 / 导入</button><button class="btn small danger" onclick="remoteNodeDelete(${esc(x.id)})">删除</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">暂无匹配的远端入站</td></tr>'}
     </tbody></table></div>${pagination(page)}</section>`;
   const updateSelection=()=>{const selected=S.remoteNodeSelection.size,available=page.rows.filter(canImport);$('remoteBatchImport').disabled=!selected;$('remoteBatchImport').textContent=`将所选 ${selected} 个节点导入订阅`;$('remoteSelectionClear').disabled=!selected;$('remoteNodesAll').checked=!!available.length&&available.every(row=>S.remoteNodeSelection.has(row.id));$('remoteNodesAll').indeterminate=available.some(row=>S.remoteNodeSelection.has(row.id))&&!$('remoteNodesAll').checked;};
   document.querySelectorAll('.remoteNodeChoice').forEach(input=>input.onchange=()=>{const id=Number(input.value);if(input.checked&&S.remoteNodeSelection.size>=50){input.checked=false;return notice('一次最多选择 50 个节点');}input.checked?S.remoteNodeSelection.add(id):S.remoteNodeSelection.delete(id);updateSelection();});
@@ -3833,7 +3844,7 @@ async function enableCoreStats() {
   };
 }
 
-async function editNativeCoreInbound() {
+async function editNativeCoreInbound(encodedTag = '') {
   const serverId = S.serverId;
   openModal('独立内核入站', '<p id="nativeCoreLoading" class="muted">正在读取服务器配置…</p>');
   const loading = $('nativeCoreLoading');
@@ -3841,7 +3852,7 @@ async function editNativeCoreInbound() {
     const data = await api('/servers/core?id=' + encodeURIComponent(serverId));
     if (!loading.isConnected || S.serverId !== serverId) return;
     const entries = (data.config.inbounds || []).filter(row => typeof row.tag === 'string' && row.tag && !row.tag.startsWith('mxioc-inbound-'));
-    openModal('独立内核入站', '<form id="nativeCoreForm"><label for="nativeCoreChoice">入站</label><select id="nativeCoreChoice"><option value="">新建入站</option></select><p class="muted">使用当前内核的原生 JSON。保存已有入站时保留 tag。</p><textarea id="nativeCoreJSON" class="raw" spellcheck="false" required></textarea><div id="nativeCoreError" class="error"></div><button id="nativeCoreSave" class="btn primary">校验并保存</button> <button id="nativeCoreDelete" class="btn danger" formnovalidate>删除入站</button></form>');
+    openModal('独立内核入站', '<form id="nativeCoreForm"><label for="nativeCoreChoice">入站</label><select id="nativeCoreChoice"><option value="">新建入站</option></select><p class="muted">使用当前内核的原生 JSON，保留原 tag。sing-box 多文件配置会写回入站所属文件；保存会校验整套配置并重启内核，失败自动回滚。</p><textarea id="nativeCoreJSON" class="raw" spellcheck="false" required></textarea><div id="nativeCoreError" class="error"></div><button id="nativeCoreSave" class="btn primary">校验并保存</button> <button id="nativeCoreDelete" class="btn danger" formnovalidate>删除入站</button></form>');
     const form = $('nativeCoreForm'), choice = $('nativeCoreChoice'), editor = $('nativeCoreJSON');
     const save = $('nativeCoreSave'), remove = $('nativeCoreDelete'), errorBox = $('nativeCoreError');
     entries.forEach((row, index) => choice.add(new Option(row.tag, String(index))));
@@ -3852,6 +3863,8 @@ async function editNativeCoreInbound() {
       errorBox.textContent = '';
     };
     choice.onchange = populate;
+    const selectedTag=decodeURIComponent(encodedTag);
+    if(selectedTag){const index=entries.findIndex(row=>row.tag===selectedTag);if(index>=0)choice.value=String(index);}
     populate();
     form.onsubmit = async event => {
       event.preventDefault();
@@ -3865,6 +3878,7 @@ async function editNativeCoreInbound() {
         const tag = creating ? config.tag : entries[Number(choice.value)].tag;
         await api('/servers/core/inbound', jsonOpt('PUT', {serverId, version:data.version, operation:deleting ? 'delete' : creating ? 'create' : 'update', tag, config}));
         if (form.isConnected) closeModal();
+        if(S.serverId===serverId && S.page==='serverNodes')await serverNodes(true);
         notice(deleting ? '独立内核入站已删除' : '独立内核入站已保存');
       } catch (error) {
         if (form.isConnected) errorBox.textContent = error.message;
@@ -4473,7 +4487,7 @@ async function overview() {
 }
 
 function remoteSupportsIndependentUser(row) {
-  return !!row && row.discoveryOnly !== true && (['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol) || row.protocol==='shadowsocks' && row.provisionable===true);
+  return !!row && row.discoveryOnly !== true && !row.nativeTag && (['vless','vmess','trojan','hysteria','hysteria2','tuic'].includes(row.protocol) || row.protocol==='shadowsocks' && row.provisionable===true);
 }
 
 function nodeSubscriptionBinding(node) {

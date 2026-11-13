@@ -180,7 +180,7 @@ func parseProbeInventory(record Record, out string) (Record, error) {
 		}
 	}
 	sort.Strings(sources)
-	message := fmt.Sprintf("已识别 %d 个配置中的 %d 个现有入站。探针同步仅关联 SSH 和监控，不会自动接管 VPN。标准独立内核可在连接设置验证接入；X-ui 需验证原面板账号；多文件配置目录、容器和非标准路径暂不支持直接接管，请勿通过重新安装覆盖现有配置。", len(sources), len(rows))
+	message := fmt.Sprintf("已识别 %d 个配置中的 %d 个现有入站。探针同步仅关联 SSH 和监控，不会自动接管 VPN。标准独立内核可在连接设置验证接入；X-ui 需验证原面板账号；sing-box 支持按实际启动参数接管多文件配置，可点击“接管现有 sing-box”；容器暂不支持直接接管。", len(sources), len(rows))
 	if len(sources) == 0 {
 		message = "SSH 已接入，但未发现支持的节点配置。仅安装探针不会自动生成 VPN 节点；容器内、非标准路径或未运行的内核需手动接入。"
 	}

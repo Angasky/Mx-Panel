@@ -29,7 +29,7 @@ server_binary="$binary"; server_flag='-config'; server_config='stdin:'
 `
 	if kind == "sing-box" {
 		script += `server_binary=''
-for candidate in /usr/bin/sing-box /usr/local/bin/sing-box; do
+for candidate in /usr/bin/sing-box /usr/local/bin/sing-box /etc/sing-box/sing-box; do
  if test -f "$candidate" && test -x "$candidate"; then server_binary="$candidate"; break; fi
 done
 test -n "$server_binary" || { printf 'MXIOC_REALITY_ERROR kernel\n'; exit 0; }

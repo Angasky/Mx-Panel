@@ -217,6 +217,30 @@ func (m *Manager) standaloneInbounds(ctx context.Context, id string, withStats b
 				inventory["coreStatsError"] = err.Error()
 			}
 		}
+		if withStats && kind == "sing-box" {
+			if config, ok := ctx.Value(singConfigKey{}).(*singConfig); ok {
+				sources := map[string]string{}
+				for _, file := range config.Files {
+					for _, row := range anyRecords(file.Doc["inbounds"]) {
+						sources[value(row["tag"])] = file.Path
+					}
+				}
+				rows, _ := inventory["inbounds"].([]any)
+				for _, native := range anyRecords(doc["inbounds"]) {
+					tag := value(native["tag"])
+					if tag == "" || strings.HasPrefix(tag, "mxioc-inbound-") {
+						continue
+					}
+					protocol := value(native["type"])
+					if protocol == "tun" || protocol == "direct" {
+						continue
+					}
+					rows = append(rows, Record{"id": "native:" + tag, "nativeTag": tag, "remark": tag, "protocol": protocol, "port": native["listen_port"], "coreStatus": "native", "source": sources[tag], "enable": true, "provisionable": false, "shareLinks": []any{}})
+				}
+				inventory["inbounds"] = rows
+				inventory["configFiles"] = len(config.Files)
+			}
+		}
 		return inventory, nil
 	})
 }

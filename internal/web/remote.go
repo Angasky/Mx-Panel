@@ -186,7 +186,13 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 	if path == "/admin/api/servers/attach" {
 		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 		defer cancel()
-		result, err := manager.AttachPanel(ctx, id)
+		var result remote.Record
+		var err error
+		if payload["kind"] == "sing-box" {
+			result, err = manager.AttachDetectedSingBox(ctx, id)
+		} else {
+			result, err = manager.AttachPanel(ctx, id)
+		}
 		if err != nil {
 			problem(w, 400, err.Error())
 		} else {

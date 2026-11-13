@@ -22,6 +22,11 @@ func corePath(kind string) (string, error) {
 }
 
 func readCore(ctx context.Context, kind string, run func(context.Context, string, int) (string, error)) ([]byte, Record, error) {
+	if kind == "sing-box" {
+		if config, ok := ctx.Value(singConfigKey{}).(*singConfig); ok {
+			return config.read(ctx, run)
+		}
+	}
 	path, err := corePath(kind)
 	if err != nil {
 		return nil, nil, err
@@ -80,6 +85,11 @@ func applyCore(ctx context.Context, kind string, raw []byte, next Record, manage
 
 func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record, managedTag, verify string, run coreRunner, cancelKey ...string) (Record, error) {
 	script, err := coreWriteScript(kind, raw, next, managedTag, verify, cancelKey...)
+	if err == nil && kind == "sing-box" {
+		if config, ok := ctx.Value(singConfigKey{}).(*singConfig); ok {
+			script, err = config.writeScript(raw, next, managedTag, verify, cancelKey...)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +150,7 @@ func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Reco
 
 type coreRunner func(context.Context, string, int) (string, error)
 
-func (m *Manager) withCore(ctx context.Context, id string, action func(context.Context, string, Record, coreRunner) (Record, error)) (Record, error) {
+func (m *Manager) withCore(ctx context.Context, id string, action func(context.Context, string, Record, coreRunner) (Record, error), detectSing ...bool) (Record, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	m.mu.Lock()
@@ -155,6 +165,13 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		return nil, err
 	}
 	kind := value(record["installType"])
+	if len(detectSing) > 0 && detectSing[0] {
+		if kind != "sing-box" && !probeInventoryOnly(record) {
+			m.mu.Unlock()
+			return nil, errors.New("此服务器已接管其他内核，请勿自动更换类型")
+		}
+		kind = "sing-box"
+	}
 	if _, err = corePath(kind); err != nil {
 		m.mu.Unlock()
 		return nil, err
@@ -207,7 +224,15 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		case <-done:
 		}
 	}()
-	return action(ctx, kind, record, func(ctx context.Context, script string, limit int) (string, error) {
+	run := coreRunner(func(ctx context.Context, script string, limit int) (string, error) {
 		return executeClient(ctx, client, connection, script, limit)
 	})
+	if kind == "sing-box" {
+		config, e := newSingConfig(ctx, run)
+		if e != nil {
+			return nil, e
+		}
+		ctx = context.WithValue(ctx, singConfigKey{}, config)
+	}
+	return action(ctx, kind, record, run)
 }

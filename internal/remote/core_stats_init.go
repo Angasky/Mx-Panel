@@ -186,7 +186,11 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 func checkCoreStatsTools(ctx context.Context, kind string, run coreRunner) error {
 	check := "test -x /usr/local/bin/xray"
 	if kind == "sing-box" {
-		check = "test -x /usr/bin/sing-box && /usr/bin/sing-box version"
+		binary := "/usr/bin/sing-box"
+		if config, ok := ctx.Value(singConfigKey{}).(*singConfig); ok {
+			binary = config.Layout.Binary
+		}
+		check = "test -x " + quote(binary) + " && " + quote(binary) + " version"
 	}
 	output, err := run(ctx, check, 64<<10)
 	if err != nil || (kind == "sing-box" && !strings.Contains(output, "with_v2ray_api")) {
