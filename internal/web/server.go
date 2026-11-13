@@ -47,6 +47,8 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	probeSyncMu          sync.Mutex
+	probeHTTP            *http.Client
 	rolloutMu            sync.Mutex
 	rolloutOwner         string
 	externalMu           sync.Mutex
@@ -272,6 +274,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.clientOptionsRoute(w, r) {
+		return
+	}
+	if s.probeSyncRoute(w, r) {
 		return
 	}
 	if s.externalTrafficRoute(w, r) {

@@ -1558,6 +1558,20 @@ html[data-theme="craft"] :is(.pagination,.pill,.node-card-meta,.node-card-addres
 @media(max-width:900px){html[data-theme="craft"] .craft-hero{gap:18px;padding:18px}}
 @media(max-width:600px){html[data-theme="craft"] .craft-hero{grid-template-columns:1fr;padding:16px;gap:18px;margin-bottom:20px}.craft-hero-copy h2{font-size:26px}.craft-hero-note{margin-top:10px}.craft-landscape>span{font-size:10px}}
 
+
+.nav-section {margin:5px 0;border-radius:var(--radius-sm)}
+.nav-section summary {display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;cursor:pointer;color:var(--text);font-size:14px;font-weight:650;list-style:none}
+.nav-section summary::-webkit-details-marker {display:none}
+.nav-section summary .icon {width:20px;height:20px;flex-shrink:0}
+.nav-chevron {margin-left:auto;transition:transform .15s}
+.nav-section:not([open]) .nav-chevron {transform:rotate(-90deg)}
+.nav-section summary:focus-visible,.nav-child:focus-visible {outline:2px solid var(--blue);outline-offset:-2px}
+.nav-children {border-left:1px solid var(--border);margin-left:21px;padding-left:8px}
+.nav.nav-child {min-height:38px;padding:8px 10px;font-size:13px;white-space:normal;line-height:1.4}
+.nav-section.current>summary {color:var(--blue-bright)}
+@media(min-width:601px) and (max-width:768px){html .side,html[data-theme="pink"] .side {width:200px}.nav.nav-child {justify-content:flex-start}.nav.nav-child span {display:block}.main {min-width:0}}
+@media(max-width:600px){.nav-group {display:block;overflow-y:auto;max-height:38vh}.side .nav-section {margin:2px 0}.nav-section summary {min-height:38px;padding:7px 10px}.nav-children {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-left:12px}.nav.nav-child {width:100%;justify-content:flex-start;margin:0}.nav-group>.nav {width:100%;justify-content:flex-start}.side {position:relative}.nav-section summary span {display:block}}
+
 </style>
 </head>
 <body>
@@ -1796,10 +1810,10 @@ SOFTWARE.
     <div class="nav-group">
       <div class="nav-section-title">工作空间</div>
       <button class="nav active" type="button" data-page="overview" title="总览"><i aria-hidden="true"><svg class="icon"><use href="#icon-layout-dashboard"/></svg></i><span>总览</span></button>
-      <button class="nav" type="button" data-page="profiles" title="订阅管理"><i aria-hidden="true"><svg class="icon"><use href="#icon-folders"/></svg></i><span>订阅管理</span></button>
-      <button class="nav" type="button" data-page="servers" title="服务器管理"><i aria-hidden="true"><svg class="icon"><use href="#icon-server"/></svg></i><span>服务器管理</span></button>
-      <button class="nav" type="button" data-page="nodes" title="节点管理"><i aria-hidden="true"><svg class="icon"><use href="#icon-network"/></svg></i><span>节点管理</span></button>
-      <button class="nav" type="button" data-page="settings" title="设置"><i aria-hidden="true"><svg class="icon"><use href="#icon-palette"/></svg></i><span>设置</span></button>
+<details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
+<details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
+<details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
+<details class="nav-section" data-nav-section="settings" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-palette"/></svg><span>系统设置</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="settings" title="主题与外观"><span>主题与外观</span></button><button class="nav nav-child" type="button" data-nav-action="userManager" title="用户与权限"><span>用户与权限</span></button><button class="nav nav-child" type="button" data-nav-action="notificationManager" title="通知中心"><span>通知中心</span></button><button class="nav nav-child" type="button" data-page="system" title="账号与备份"><span>账号与备份</span></button><button class="nav nav-child" type="button" data-page="maintenance" title="升级与卸载"><span>升级与卸载</span></button></div></details>
     </div>
     <div class="side-status">
       <span class="status-indicator"></span>
@@ -2111,6 +2125,7 @@ async function reload(render = true) {
 const pageInfo = {
   overview: ['总览', '综合订阅配置状态与核心运行指标'],
   profiles: ['订阅管理', '搜索、切换和管理所有订阅配置与分享链接'],
+  probeSync: ['同步探针服务器', '复用 Komari Agent 授权，免重复填写 SSH 密码，两边独立管理'],
   servers: ['服务器管理', '通过 SSH 选择安装 3x-ui、Xray 或 sing-box'],
   monitoring: ['硬件监控', '查看已登记服务器的 CPU、内存、磁盘和实时网速'],
   serverNodes: ['服务器节点', '管理面板与独立内核的入站、中转和节点分享链接'],
@@ -2130,7 +2145,7 @@ const pageInfo = {
 const pageSections = {
   overview: ['overview'],
   profiles: ['profiles', 'traffic', 'subscriptions'],
-  servers: ['servers', 'monitoring', 'serverNodes'],
+  servers: ['servers', 'monitoring', 'serverNodes', 'probeSync'],
   nodes: ['nodes', 'chains', 'groups', 'rules', 'dns', 'raw'],
   settings: ['settings', 'system', 'maintenance']
 };
@@ -2138,7 +2153,7 @@ const sectionFor = page => Object.keys(pageSections).find(key => pageSections[ke
 
 async function go(page) {
   if (S.role === "user") return memberPortal();
-  if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring'].includes(page)) {
+  if (!S.profiles.length && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring','probeSync'].includes(page)) {
     page = 'profiles';
     notice('请先创建一份订阅，再管理节点和规则');
   }
@@ -2151,10 +2166,11 @@ async function go(page) {
     `<button type="button" data-page="${p}" class="btn small ${p === page ? 'primary' : ''}" ${p === page ? 'aria-current="page"' : ''} onclick="${p === 'monitoring' ? "S.monitorId='';" : ''}go('${p}').catch(error=>notice(error.message))">${esc(pageInfo[p][0])}</button>`).join('');
   $('sectionTabs').classList.toggle('hidden', pageSections[section].length === 1);
   document.querySelectorAll('.nav').forEach(n => {
-    n.classList.toggle('active', n.dataset.page === section);
-    if (n.dataset.page === section) n.setAttribute('aria-current', 'page');
+    n.classList.toggle('active', n.dataset.page === page);
+    if (n.dataset.page === page) n.setAttribute('aria-current', 'page');
     else n.removeAttribute('aria-current');
   });
+  document.querySelectorAll('[data-nav-section]').forEach(d=>{d.classList.toggle('current',d.dataset.navSection===section);if(d.dataset.navSection===section)d.open=true});
   if (matchMedia('(max-width: 600px)').matches) {
     const active = document.querySelector('.nav[aria-current="page"]'), group = document.querySelector('.nav-group');
     if (active && group) group.scrollLeft = Math.max(0, active.offsetLeft - group.offsetLeft - (group.clientWidth - active.clientWidth) / 2);
@@ -2165,7 +2181,7 @@ async function go(page) {
   $('add').classList.toggle('hidden', !['nodes', 'chains', 'groups', 'rules', 'dns'].includes(page));
   $('importNode').classList.toggle('hidden', page !== 'nodes');
   if (!S.profiles.length) await loadProfiles();
-  if (!S.data && !['profiles', 'settings', 'system', 'maintenance', 'servers', 'serverNodes', 'monitoring'].includes(page)) await reload(false);
+  if (!S.data && !['profiles', 'settings', 'system', 'maintenance', 'servers', 'serverNodes', 'monitoring', 'probeSync'].includes(page)) await reload(false);
   if (S.page !== page) return;
   draw();
 }
@@ -2177,7 +2193,7 @@ function draw() {
     $('content').innerHTML = `<section class="panel"><h3>页面加载失败</h3><p class="muted">${esc(error.message)}</p><button class="btn" onclick="draw()">重试</button></section>`;
   };
   try {
-    Promise.resolve(({ overview, profiles, servers, serverNodes, monitoring, nodes, chains, groups, rules, dns, subscriptions, traffic, raw, system, settings, maintenance }[page] || overview)()).catch(failed);
+    Promise.resolve(({ overview, profiles, servers, serverNodes, monitoring, probeSync, nodes, chains, groups, rules, dns, subscriptions, traffic, raw, system, settings, maintenance }[page] || overview)()).catch(failed);
   } catch (error) { failed(error); }
 }
 
@@ -2496,7 +2512,7 @@ function serverForm(encoded = '', existing = false) {
     <div class="span2"><label for="rsNodeAddress">节点连接地址（可选域名或 IP）</label><input id="rsNodeAddress" value="${esc(s.nodeAddress || '')}" placeholder="${esc(s.domain || s.host || 'node.example.com')}"><p class="hint">留空沿用已绑定域名，未绑定时使用服务器 IP。只填写客户端实际连接的主机名或 IP；面板完整地址和 Reality / TLS SNI 单独设置。修改后新建、导入的节点使用此地址；已有订阅节点需重新导入或编辑地址。</p></div>
     <div><label for="rsPort">SSH 端口</label><input id="rsPort" type="number" min="1" max="65535" required value="${s.sshPort || 22}"></div>
     <div><label for="rsUser">SSH 账号</label><input id="rsUser" required maxlength="64" autocomplete="off" value="${esc(s.sshUser || 'root')}"></div>
-    <div class="span2"><label for="rsPassword">SSH 密码${s.id ? '（留空保留）' : ''}</label><input id="rsPassword" type="password" autocomplete="new-password" ${s.id ? '' : 'required'}><p class="hint">非 root 账号会使用此密码执行 sudo。密码加密保存在总面板服务器，不会回显。</p></div>
+    <div class="span2"><label for="rsPassword">SSH 密码${s.id ? '（留空保留）' : ''}</label><input id="rsPassword" type="password" autocomplete="new-password" ${s.id ? '' : 'required'}><p class="hint">${s.hasSSHKey?'已配置独立 SSH 密钥，密码可留空。探针同步来源：'+esc(s.probeSource||'手动配置'):'非 root 账号会使用此密码执行 sudo。密码加密保存在总面板服务器，不会回显。'}</p></div>
     <div class="span2"><div class="toolbar"><button id="rsProbe" type="button" class="btn">检测 SSH 主机指纹</button><code id="rsFingerprint" style="overflow-wrap:anywhere;white-space:normal">${esc(s.fingerprint || '尚未检测')}</code></div>
     <label class="inlinecheck"><input id="rsTrust" type="checkbox" ${s.fingerprint ? 'checked' : ''} required>我已核对该 SSH 指纹属于目标服务器</label></div>
     <div class="span2"><label for="rsInstallType">${existing ? '已有软件类型' : '安装类型'}</label><select id="rsInstallType" ><option value="3x-ui">3x-ui 面板（含 Xray，支持节点 / 中转）</option>${existing ? '<option value="x-ui">现有 X-ui</option><option value="x-panel">现有 X-Panel（xeefei/X-Panel）</option>' : ''}<option value="xray">独立 Xray 内核</option><option value="sing-box">独立 sing-box 内核</option></select></div>
@@ -3209,6 +3225,18 @@ async function serverMetadataManager(id){
  $('serverMetadataForm').onsubmit=async event=>{event.preventDefault();const payload={latitude:$('smLatitude').value===''?null:Number($('smLatitude').value),longitude:$('smLongitude').value===''?null:Number($('smLongitude').value),region:$('smRegion').value.trim(),provider:$('smProvider').value.trim(),providerURL:$('smURL').value.trim(),expires:$('smExpires').value,price:$('smPrice').value===''?null:Number($('smPrice').value),currency:$('smCurrency').value,cycle:$('smCycle').value,public:$('smPublic').checked};if(payload.public&&(!data.public||payload.latitude!==(data.latitude??null)||payload.longitude!==(data.longitude??null))&&!confirm('确认在监控分享中公开地域、经纬度、服务商、到期日期及价格？'))return;try{await api(path,jsonOpt('PUT',payload));if(S.servers){const server=S.servers.find(s=>s.id===id);if(server)server.metadata=payload}closeModal();notice('地域与续费信息已保存')}catch(e){$('smError').textContent=e.message}};
  $('smRenew').onclick=()=>{if(confirm('将按已保存的周期和到期日预览；当前未保存的表单修改不会计入。继续？'))serverRenewalManager(id).catch(e=>notice(e.message))};
  $('smClear').onclick=async()=>{if(!confirm('清空这台服务器的地域与续费信息？'))return;try{await api(path,jsonOpt('DELETE',{}));await serverMetadataManager(id)}catch(e){$('smError').textContent=e.message}};
+}
+
+
+async function probeSync(){
+ const data=await api('/probe-sync');if(S.page!=='probeSync')return;
+ const bindings=new Map((data.bindings||[]).map(v=>[v.uuid,v])),labels={dispatching:'派发状态待核对',unknown:'派发结果未知，请核对原探针',pending:'授权任务已发送，等待确认',failed:'授权失败，请核对原探针任务',bound:'已接入服务器管理'};
+ $('content').innerHTML=`<section class="panel"><h3>同步 Komari 探针服务器</h3><p class="note">先连接探针，再选择服务器接入。不需要重新填写 SSH 密码：原探针 Agent 将为本面板添加独立 SSH 公钥，核对主机指纹并验证连接后登记。原探针不受影响，两边可管理同一台服务器。</p><form id="probeConfig"><label for="psURL">探针地址</label><input id="psURL" type="url" required value="${esc(data.url||'https://monitor.mxioc.com')}" autocomplete="url"><label for="psKey">Komari 管理 API Key</label><input id="psKey" type="password" autocomplete="new-password" placeholder="${data.configured?'已加密保存，留空保留':'在 Komari 管理设置中获取'}"><p class="hint">API Key 加密保存在服务器，页面不回显。使用公网 HTTPS 地址；接口不跟随跳转。</p><button class="btn primary">保存并读取服务器</button></form></section><section class="panel"><div class="panel-head"><h3>探针服务器 · ${(data.clients||[]).length} 台</h3><button class="btn" id="psRefresh">刷新列表</button></div><p class="hint">接入要求：Linux、root 权限 Agent、允许 root 公钥登录的 SSH，以及本面板能连接其公网 SSH 端口。接入仅增加密钥，不安装代理内核、不修改已有节点、不重启服务器。请避免两边同时修改同一份服务配置。</p><div class="tablewrap"><table><thead><tr><th>服务器</th><th>地址</th><th>状态</th><th>操作</th></tr></thead><tbody>${(data.clients||[]).map(c=>{const b=bindings.get(c.uuid);return `<tr><td>${esc(c.name)}<br><small>${esc(c.os||'')} · ${esc(c.region||'')}</small></td><td>${esc(c.ipv4||c.ipv6||'暂无公网地址')}</td><td>${b?esc(labels[b.status]||b.status):'尚未接入'}${b?.keyFingerprint?`<details><summary>授权密钥指纹</summary><small>${esc(b.keyFingerprint)}</small></details>`:''}</td><td>${b?.status==='bound'?`<button class="btn" data-ps-open="${esc(b.serverId)}">管理服务器</button>`:b?`${b.status==='failed'?`<button class="btn" data-ps-retry="${esc(c.uuid)}">修复后重试授权</button>`:!b.task?`<button class="btn" data-ps-recover="${esc(c.uuid)}">恢复任务关联</button>`:''}<button class="btn" data-ps-check="${esc(c.uuid)}" ${b.task?'':'disabled'}>核对接入结果</button>`:`<button class="btn primary" data-ps-bind="${esc(c.uuid)}">授权并接入</button>`}</td></tr>`}).join('')||'<tr><td colspan="4">保存探针连接后显示服务器，无需重复手动绑定。</td></tr>'}</tbody></table></div><p id="psError" class="error" role="alert">${esc(data.connectionError||'')}</p><p class="hint">删除本面板服务器记录不会撤销远端公钥；需要停用访问时，请从远端 /root/.ssh/authorized_keys 删除标记 mx-panel-probe-sync 的对应公钥。接入失败的任务不会自动重发，可在原探针核对原因。</p></section>`;
+ const run=async body=>{const el=$('psError');document.querySelectorAll('#content button').forEach(b=>b.disabled=true);try{await api('/probe-sync',jsonOpt('POST',body));if(S.page==='probeSync')await probeSync()}catch(e){if(el.isConnected){el.textContent=e.message;document.querySelectorAll('#content button').forEach(b=>b.disabled=false)}}};
+ $('probeConfig').onsubmit=e=>{e.preventDefault();void run({action:'configure',url:$('psURL').value,key:$('psKey').value})};$('psRefresh').onclick=()=>probeSync().catch(e=>notice(e.message));
+ document.querySelectorAll('[data-ps-bind]').forEach(b=>b.onclick=()=>{const port=prompt('此服务器的 SSH 端口','22');if(port===null)return;if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535){notice('请输入 1–65535 的 SSH 端口');return}if(confirm('允许原探针 Agent 为 Mx-Panel 添加独立 root SSH 公钥？这将授权本面板管理此服务器，保留原探针。'))void run({action:'bind',uuid:b.dataset.psBind,port:Number(port),confirmed:true})});
+ document.querySelectorAll('[data-ps-retry]').forEach(b=>b.onclick=()=>{if(confirm('确认已修复探针授权失败原因？将复用同一把公钥重新发送授权任务。'))void run({action:'retry',uuid:b.dataset.psRetry,confirmed:true})});document.querySelectorAll('[data-ps-recover]').forEach(b=>b.onclick=()=>{const task=prompt('输入 Komari 原探针任务记录中的授权任务编号');if(task)void run({action:'recover',uuid:b.dataset.psRecover,task,confirmed:true})});
+ document.querySelectorAll('[data-ps-check]').forEach(b=>b.onclick=()=>void run({action:'check',uuid:b.dataset.psCheck}));document.querySelectorAll('[data-ps-open]').forEach(b=>b.onclick=()=>{S.serverId=b.dataset.psOpen;go('servers').catch(e=>notice(e.message))});
 }
 
 async function agentRolloutManager(){
@@ -6351,7 +6379,8 @@ $('loginForm').onsubmit = async e => {
   }
 };
 
-document.querySelectorAll('.nav').forEach(n => n.onclick = () => { if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
+document.querySelectorAll('.nav').forEach(n => n.onclick = () => { if(n.dataset.navAction){const actions={clientOptionsManager,externalTrafficManager,agentRolloutManager,monitorShareManager,userManager,notificationManager};return Promise.resolve(actions[n.dataset.navAction]()).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
+document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(localStorage.getItem('mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);localStorage.setItem('mx-nav-expanded',JSON.stringify(state))}catch{}})});
 $('modalClose').onclick = closeModal;
 $('modal').onclick = e => { if (e.target === $('modal')) e.stopPropagation(); };
 document.addEventListener('keydown', e => {
@@ -6379,6 +6408,8 @@ $('refresh').onclick = async () => {
       await refreshHostMetrics();
     } else if (S.page === 'servers') {
       await servers();
+    } else if (S.page === 'probeSync') {
+      await probeSync();
     } else if (S.page === 'serverNodes') {
       await serverNodes(true);
     } else if (S.page === 'profiles') {

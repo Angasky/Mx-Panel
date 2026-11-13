@@ -19,6 +19,7 @@ import (
 
 type Connection struct {
 	Host, User, Password, Fingerprint string
+	PrivateKey                        string
 	Port                              int
 	AllowLoopback                     bool
 }
@@ -106,11 +107,21 @@ func Probe(ctx context.Context, c Connection) (string, error) {
 	return "", errors.New("SSH 主机未返回指纹")
 }
 func Connect(ctx context.Context, c Connection) (*ssh.Client, error) {
-	if c.User == "" || c.Password == "" || !strings.HasPrefix(c.Fingerprint, "SHA256:") {
+	if c.User == "" || (c.Password == "" && c.PrivateKey == "") || !strings.HasPrefix(c.Fingerprint, "SHA256:") {
 		return nil, errors.New("SSH 账号、密码或主机指纹缺失")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
+	auth := []ssh.AuthMethod{}
+	if c.PrivateKey != "" {
+		signer, e := ssh.ParsePrivateKey([]byte(c.PrivateKey))
+		if e != nil {
+			return nil, errors.New("SSH 私钥无效")
+		}
+		auth = append(auth, ssh.PublicKeys(signer))
+	} else {
+		auth = append(auth, ssh.Password(c.Password))
+	}
 	algorithms := preferredHostKeys()
 	mismatched := false
 	for len(algorithms) > 0 && ctx.Err() == nil {
@@ -123,7 +134,7 @@ func Connect(ctx context.Context, c Connection) (*ssh.Client, error) {
 			}
 			matched = true
 			return nil
-		}, []ssh.AuthMethod{ssh.Password(c.Password)}, algorithms...)
+		}, auth, algorithms...)
 		if err == nil {
 			return client, nil
 		}
@@ -256,7 +267,12 @@ func executeClientObserved(ctx context.Context, client *ssh.Client, c Connection
 		return "", errors.New("远端命令超时或已取消，远端进程状态需诊断确认")
 	}
 	result, overflow := output.result()
-	result = strings.ReplaceAll(result, c.Password, "[REDACTED]")
+	if c.Password != "" {
+		result = strings.ReplaceAll(result, c.Password, "[REDACTED]")
+	}
+	if c.PrivateKey != "" {
+		result = strings.ReplaceAll(result, c.PrivateKey, "[REDACTED]")
+	}
 	if overflow {
 		return result, errors.New("远端输出超过读取大小限制")
 	}

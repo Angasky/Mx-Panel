@@ -178,7 +178,7 @@ func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, 
 	if err != nil {
 		return nil, err
 	}
-	binding := []any{record["host"], record["sshPort"], record["sshUser"], record["sshPassword"], record["fingerprint"], record["panelUser"], record["panelPassword"], record["panelAddress"], record["panelUrl"], token}
+	binding := []any{record["host"], record["sshPort"], record["sshUser"], record["sshPassword"], record["sshPrivateKey"], record["fingerprint"], record["panelUser"], record["panelPassword"], record["panelAddress"], record["panelUrl"], token}
 	encoded, _ := json.Marshal(binding)
 	identity := sha256.Sum256(encoded)
 	m.mu.Lock()

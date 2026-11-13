@@ -398,16 +398,11 @@ func (m *Manager) Metrics(ctx context.Context, id string) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	password, err := m.Secret(record, "sshPassword")
+	connection, err := m.connectionRecord(record)
 	if err != nil {
 		return nil, err
 	}
-	port, err := parsedPort(record["sshPort"], 22)
-	if err != nil {
-		return nil, err
-	}
-	connection := Connection{Host: value(record["host"]), Port: port, User: value(record["sshUser"]), Password: password, Fingerprint: value(record["fingerprint"])}
-	keyData, _ := json.Marshal([]any{id, connection.Host, port, connection.User, connection.Password, connection.Fingerprint, record["name"]})
+	keyData, _ := json.Marshal([]any{id, connection.Host, connection.Port, connection.User, connection.Password, connection.PrivateKey, connection.Fingerprint, record["name"]})
 	key := sha256.Sum256(keyData)
 	m.mu.Lock()
 	if m.monitor == nil {

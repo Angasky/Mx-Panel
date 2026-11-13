@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
+	"golang.org/x/crypto/ssh"
 )
 
 type Manager struct {
@@ -213,7 +214,7 @@ func (m *Manager) Secret(record Record, key string) (string, error) {
 }
 func publicServer(record Record) Record {
 	result := Record{}
-	for _, key := range []string{"id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
+	for _, key := range []string{"probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
 		if v, ok := record[key]; ok {
 			result[key] = v
 		}
@@ -221,6 +222,7 @@ func publicServer(record Record) Record {
 	if result["installType"] == nil {
 		result["installType"] = "3x-ui"
 	}
+	result["hasSSHKey"] = value(record["sshPrivateKey"]) != ""
 	result["hasSSHPassword"] = value(record["sshPassword"]) != ""
 	kind := value(result["installType"])
 	result["hasPanelPassword"] = (kind == "3x-ui" || kind == "x-ui" || kind == "x-panel") && value(record["panelPassword"]) != ""
@@ -294,9 +296,9 @@ func (m *Manager) sameRegistration(existing, submitted Record, panel bool) bool 
 	if panel && existing["panelUser"] != submitted["panelUser"] {
 		return false
 	}
-	keys := []string{"sshPassword", "coreConfig"}
+	keys := []string{"sshPassword", "sshPrivateKey", "coreConfig"}
 	if panel {
-		keys = []string{"sshPassword", "panelPassword"}
+		keys = []string{"sshPassword", "sshPrivateKey", "panelPassword"}
 	}
 	for _, key := range keys {
 		if value(existing[key]) == "" && value(submitted[key]) == "" {
@@ -347,7 +349,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if previousKind == "" {
 		previousKind = "3x-ui"
 	}
-	for _, key := range []string{"name", "host", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "installType", "connectionMode"} {
+	for _, key := range []string{"probeSource", "probeUUID", "name", "host", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "installType", "connectionMode"} {
 		if v, ok := payload[key]; ok {
 			if _, ok := v.(string); !ok {
 				return nil, errors.New("服务器字段必须为字符串")
@@ -490,6 +492,18 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if payload["clearCoreConfig"] == true {
 		delete(record, "coreConfig")
 	}
+	if raw, ok := payload["sshPrivateKey"]; ok && value(raw) != "" {
+		if len(value(raw)) > 16384 {
+			return nil, errors.New("SSH 私钥过大")
+		}
+		if _, e := ssh.ParsePrivateKey([]byte(value(raw))); e != nil {
+			return nil, errors.New("SSH 私钥无效")
+		}
+		record["sshPrivateKey"], err = legacycrypto.EncryptFernet(m.key, []byte(value(raw)))
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, key := range []string{"sshPassword", "panelPassword"} {
 		if key == "panelPassword" && !panel {
 			delete(record, key)
@@ -507,7 +521,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 			if err != nil {
 				return nil, err
 			}
-		} else if value(record[key]) == "" {
+		} else if value(record[key]) == "" && !(key == "sshPassword" && value(record["sshPrivateKey"]) != "") {
 			return nil, errors.New("请填写 SSH / 面板密码")
 		}
 	}
@@ -549,13 +563,16 @@ func (m *Manager) Connection(id string) (Connection, error) {
 	return m.connectionRecord(record)
 }
 func (m *Manager) connectionRecord(record Record) (Connection, error) {
-	password, err := m.Secret(record, "sshPassword")
+	c := Connection{Host: value(record["host"]), User: value(record["sshUser"]), Fingerprint: value(record["fingerprint"])}
+	var err error
+	if value(record["sshPrivateKey"]) != "" {
+		c.PrivateKey, err = m.Secret(record, "sshPrivateKey")
+	} else {
+		c.Password, err = m.Secret(record, "sshPassword")
+	}
 	if err != nil {
 		return Connection{}, err
 	}
-	port, err := parsedPort(record["sshPort"], 22)
-	if err != nil {
-		return Connection{}, err
-	}
-	return Connection{Host: value(record["host"]), Port: port, User: value(record["sshUser"]), Password: password, Fingerprint: value(record["fingerprint"])}, nil
+	c.Port, err = parsedPort(record["sshPort"], 22)
+	return c, err
 }

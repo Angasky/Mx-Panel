@@ -245,7 +245,7 @@ func (m *Manager) runInstall(parent context.Context, connection Connection, scri
 		}
 		scrub(doc)
 	}
-	for _, secret := range []string{connection.Password, config, base64.StdEncoding.EncodeToString([]byte(config))} {
+	for _, secret := range []string{connection.Password, connection.PrivateKey, config, base64.StdEncoding.EncodeToString([]byte(config))} {
 		if secret != "" {
 			output = strings.ReplaceAll(output, secret, "[已隐藏]")
 		}
