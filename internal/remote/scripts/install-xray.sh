@@ -135,7 +135,7 @@ fi
 stage=config
 printf 'MXIOC_STAGE=config\n'
 mkdir -p /usr/local/etc/xray
-candidate=$(mktemp /usr/local/etc/xray/config.json.mxioc.XXXXXXXX)
+candidate=$(mktemp /usr/local/etc/xray/config.mxioc.XXXXXXXX.json)
 cp "$workdir/check.json" "$candidate"
 chmod 600 "$candidate"
 env XRAY_LOCATION_ASSET=/usr/local/share/xray /usr/local/bin/xray run -test -config "$candidate" >/dev/null 2>&1 || { echo 'Core configuration validation failed; configuration was not applied'; exit 22; }

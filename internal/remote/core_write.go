@@ -57,7 +57,7 @@ flock -n 9 || exit 75
 test -f "$config" && test ! -L "$config"
 actual=$(sha256sum "$config")
 test "${actual%% *}" = "$expected" || exit 76
-candidate=$(mktemp "$config.mxioc.XXXXXXXX")
+candidate=$(mktemp "$config.mxioc.XXXXXXXX.json")
 backup=$(mktemp "$config.backup.XXXXXXXX")
 applied=0
 cleanup() {
