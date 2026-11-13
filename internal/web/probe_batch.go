@@ -92,6 +92,22 @@ func (s *Server) probeBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 			}
 			cfg.Batch = &probeBatch{ID: rand.Text(), Status: "running", Items: items, Created: s.now().Unix()}
 
+		case "resync":
+			if cfg.Batch != nil && cfg.Batch.Status == "running" {
+				problem(w, 409, "已有活动批次，请稍后重新同步")
+				return true
+			}
+			items := []probeBatchItem{}
+			for _, b := range cfg.Bindings {
+				if b.Status == "bound" {
+					items = append(items, probeBatchItem{UUID: b.UUID, Port: b.Port, Status: "queued", Action: "resync"})
+				}
+			}
+			if len(items) == 0 {
+				problem(w, 400, "暂无已接入服务器")
+				return true
+			}
+			cfg.Batch = &probeBatch{ID: rand.Text(), Status: "running", Items: items, Created: s.now().Unix()}
 		case "retry":
 			if cfg.Batch != nil && cfg.Batch.Status == "running" {
 				problem(w, 409, "已有活动批次，请等待或停止")
@@ -177,6 +193,29 @@ func (s *Server) pollProbeBatch(ctx context.Context) {
 				binding = &cfg.Bindings[j]
 				break
 			}
+		}
+
+		if item.Action == "resync" {
+			if item.Status != "queued" {
+				item.Status = "failed"
+				item.Error = "同步过程被中断，请重新同步；不会派发授权"
+				_ = s.writeProbeSync(cfg)
+				return
+			}
+			item.Status = "starting"
+			if s.writeProbeSync(cfg) != nil {
+				return
+			}
+			e = s.probeSyncAction(ctx, &cfg, probeSyncInput{Action: "resync", UUID: item.UUID, Confirmed: true})
+			if e != nil {
+				item.Status = "failed"
+				item.Error = e.Error()
+			} else {
+				item.Status = "bound"
+				item.Error = ""
+			}
+			_ = s.writeProbeSync(cfg)
+			return
 		}
 		if binding != nil && binding.Status == "bound" {
 			item.Status = "bound"

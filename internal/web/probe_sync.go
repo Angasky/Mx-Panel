@@ -36,6 +36,7 @@ type probeClient struct {
 	Region  string `json:"region"`
 }
 type probeBinding struct {
+	Synced         int64  `json:"synced,omitempty"`
 	ScriptVersion  int    `json:"scriptVersion,omitempty"`
 	RepairSSH      bool   `json:"repairSSH,omitempty"`
 	Error          string `json:"error,omitempty"`
@@ -279,6 +280,20 @@ func (s *Server) probeSyncAction(ctx context.Context, cfg *probeSyncConfig, in p
 		return (e)
 	}
 	switch in.Action {
+	case "resync":
+		if !in.Confirmed {
+			return errors.New("请确认从探针重新同步管理地址")
+		}
+		e := s.resyncProbe(ctx, cfg, in.UUID)
+		if e != nil {
+			for i := range cfg.Bindings {
+				if cfg.Bindings[i].UUID == in.UUID {
+					cfg.Bindings[i].Error = e.Error()
+				}
+			}
+			_ = s.writeProbeSync(*cfg)
+		}
+		return e
 	case "configure":
 		u, e := url.Parse(strings.TrimRight(strings.TrimSpace(in.URL), "/"))
 		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
