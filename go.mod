@@ -1,19 +1,19 @@
 module github.com/Angasky/dingzhi-ban
 
-go 1.26.0
+go 1.26.11
 
 require go.yaml.in/yaml/v3 v3.0.6
 
 require (
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.60.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/net v0.62.0
 	google.golang.org/protobuf v1.36.11
 )
 
 require (
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
 
 // v3.0.6 with a bounded emitter event queue; see third_party/yaml/PATCHES.md.

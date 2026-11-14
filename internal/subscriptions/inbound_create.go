@@ -95,3 +95,18 @@ func (c *Controller) createInbound(ctx context.Context, profile, server string, 
 	result["reusedInbound"] = created["reused"]
 	return result, nil
 }
+
+// CreateReviewedInbound checks an approval after acquiring the same server lock
+// used by SaveServer, before any provisioning side effect.
+func (c *Controller) CreateReviewedInbound(ctx context.Context, profile, server string, payload Record, relay bool, expected string) (Record, error) {
+	return c.createInbound(ctx, profile, server, payload, relay, nil, func() error {
+		record, err := c.Backend.Record(server)
+		if err != nil {
+			return err
+		}
+		if expected == "" || remote.RegistrationFingerprint(record) != expected {
+			return errors.New("服务器连接资料已变更，请重新生成操作计划")
+		}
+		return nil
+	})
+}

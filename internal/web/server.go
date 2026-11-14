@@ -49,6 +49,7 @@ type failure struct {
 type Server struct {
 	aiMu                 sync.Mutex
 	aiActive             map[string]bool
+	aiExecuting          map[string]string
 	aiHTTP               *http.Client
 	probeCacheMu         sync.Mutex
 	probeCache           map[string]*probeCacheEntry

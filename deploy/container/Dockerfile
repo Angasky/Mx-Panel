@@ -1,5 +1,5 @@
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata openssh-client && \
+RUN apk add --no-cache ca-certificates tzdata openssh-client bash iproute2 procps && \
     addgroup -g 10001 mxpanel && adduser -D -u 10001 -G mxpanel mxpanel && \
     mkdir -p /var/lib/mx-panel /var/lib/mx-panel-access /etc/mx-panel/certificates /usr/local/lib/mx-panel && \
     chown mxpanel:mxpanel /var/lib/mx-panel /var/lib/mx-panel-access /etc/mx-panel/certificates

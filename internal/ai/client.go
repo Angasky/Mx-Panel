@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,8 +55,17 @@ func Normalize(c Config) (Config, error) {
 		c.BaseURL = strings.TrimSuffix(c.BaseURL, suffix)
 	}
 	u, e := url.Parse(c.BaseURL)
-	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || len(c.BaseURL) > 2048 || strings.ContainsAny(u.Hostname(), "%\\\x00\r\n") {
+	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" || len(c.BaseURL) > 2048 || strings.ContainsAny(u.Hostname(), "%\\\x00\r\n") {
 		return c, errors.New("API 地址须为完整 HTTPS 基础地址，不能包含密钥、账号或查询参数")
+	}
+	if strings.HasSuffix(u.Host, ":") {
+		return c, errors.New("AI API 端口无效")
+	}
+	if port := u.Port(); port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 {
+			return c, errors.New("AI API 端口应为 1–65535")
+		}
 	}
 	if ip, e := netip.ParseAddr(u.Hostname()); e == nil && !netguard.PublicAddress(ip) {
 		return c, errors.New("AI API 地址必须是公网地址")
