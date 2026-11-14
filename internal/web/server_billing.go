@@ -55,6 +55,19 @@ func (s *Server) billingRoute(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 500, "流量记录读取失败")
 		return true
 	}
+	if r.Method == "GET" && (r.URL.Query().Has("start") || r.URL.Query().Has("end")) {
+		mode := r.URL.Query().Get("mode")
+		if mode == "" {
+			mode = "sum"
+		}
+		view, err := monitorhistory.RangeSummary(state, r.URL.Query().Get("start"), r.URL.Query().Get("end"), mode, now)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, view)
+		}
+		return true
+	}
 	respond(w, 200, monitorhistory.BillingSummary(state, now))
 	return true
 }
