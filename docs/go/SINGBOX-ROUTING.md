@@ -66,3 +66,16 @@ PROCESS-PATH 支持桌面系统绝对路径，包含 Windows 路径与空格。M
 当前支持 SS、Trojan、VMess、VLESS、SOCKS5、HTTP 落地节点，节点其他参数仍须通过原完整出站转换器检查。暂拒绝 Hysteria2/TUIC 等 QUIC 落地通过 detour 的组合，也拒绝链路落地同时启用 TFO。链路上的 UDP 可用性仍受每一跳协议及客户端限制，不保证 TCP 可用就代表 UDP 可用。面板远端主备/服务器链路记录、代理提供者、fallback/load-balance 策略组及 DNS/TUN 全量配置仍未转换。
 
 验证包括直接节点、嵌套选择组、测速组、DIRECT 引用，节点与组混合循环、未知引用、unsupported 组合、源数据不变和 GET/HEAD 下载。实际 sing-box 内核检查通过；隔离双 SOCKS5 代理的真实 HTTP 请求确认入口连接落地、落地连接目标，没有绕过入口。为保持导出器的地址限制，真实通信测试仅将生成配置中的测试服务器地址替换为回环地址并指定空闲入口端口，其余 detour 和策略保持生成结果。未完成手机端或所有协议组合的真实联网验收。
+
+
+## v0.2.25：通配域名条件
+
+新增 DOMAIN-WILDCARD，转换为完整字符串匹配且忽略大小写的 domain_regex。支持 `*`（零个或多个 ASCII 字符）和 `?`（恰好一个 ASCII 字符）；点、连字符等按字面量处理，不把用户输入当作正则。可用于顶层、AND/OR/NOT 子条件及 inline classical 规则集。
+
+例如 `*.example.com` 匹配 a.example.com 和 a.b.example.com，但不匹配 example.com；`api?.example.com` 匹配 api1.example.com，不匹配 api12.example.com。星号可跨越点，不将它误改为“恰好一层子域名”。
+
+当前限定 ASCII 域名，国际域名请使用 Punycode；输入 1–253 字节，只允许字母、数字、点、连字符、下划线、星号及问号，不接受 no-resolve。原 Mihomo 通配实现按字节匹配，不能将其直接放宽为 Unicode 字符正则，因此不承诺原始 Unicode 主机名的等价匹配。
+
+此功能是 DOMAIN-WILDCARD 条件，不改变 inline domain 提供者的专用语法；该提供者仍只接受精确域名及 +. 后缀。使用通配条件时选择 classical 集合。Surge 不会因为共享解析器而误接受尚未适配的通配条件，仍整份拒绝。
+
+测试覆盖根域/多级子域、问号长度、大小写、正则字面量转义、锚定、非法字符/长度、逻辑与 classical 引用、源配置不变、下载接口及跨格式拒绝。真实 sing-box 内核 check 通过；没有手机客户端实际联网验收。

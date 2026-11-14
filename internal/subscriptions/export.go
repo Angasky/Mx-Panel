@@ -19,7 +19,7 @@ type Format struct {
 
 var formats = []Format{
 	{"surge-routing", "Surge 分流配置（实验性）", "保留手动/测速/故障切换策略组、域名/IP、源地址、端口范围/集合、TCP/UDP、AND/OR/NOT 及内嵌规则集、节点中转；不支持项整份拒绝。不转换 DNS、防泄露、远端主备或远程规则集；测速组须使用同一 URL。", true, false},
-	{"sing-box-routing", "sing-box 分流配置（实验性）", "保留 select/url-test 组及基础域名/源与目标 IP/端口/网络规则及 AND/OR/NOT、内嵌规则集、端口范围、桌面进程路径；不支持项拒绝整份导出。支持部分节点中转引用；不转换 DNS、防泄露或远端主备；本地 mixed 2080。", false, true},
+	{"sing-box-routing", "sing-box 分流配置（实验性）", "保留 select/url-test 组及基础域名/源与目标 IP/端口/网络规则及 AND/OR/NOT、内嵌规则集、端口范围、桌面进程路径、通配域名；不支持项拒绝整份导出。支持部分节点中转引用；不转换 DNS、防泄露或远端主备；本地 mixed 2080。", false, true},
 	{"xray", "Xray 客户端配置（实验性）", "每个节点一份 JSON；本地 SOCKS/HTTP 10808/10809，不继承 Mihomo 分流、DNS 或防泄露设置。", false, false},
 	{"quantumult-x", "Quantumult X 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
 	{"stash", "Stash 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},

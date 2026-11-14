@@ -268,6 +268,28 @@ func singBoxBasicCondition(kind, value string, noResolve bool) (Record, error) {
 		}
 		key := map[string]string{"DOMAIN": "domain", "DOMAIN-SUFFIX": "domain_suffix", "DOMAIN-KEYWORD": "domain_keyword"}[kind]
 		rule[key] = []string{parts[1]}
+	case "DOMAIN-WILDCARD":
+		if noResolve || len(value) == 0 || len(value) > 253 {
+			return nil, errors.New("通配域名须为 1–253 字节且不含额外选项")
+		}
+		// Mihomo wildcard matches bytes. Restrict both pattern and generated
+		// wildcard classes to ASCII so '?' cannot become a Unicode rune match.
+		var pattern strings.Builder
+		pattern.WriteString("(?i)^")
+		for _, ch := range value {
+			switch {
+			case ch == '*':
+				pattern.WriteString(`[\x00-\x7f]*`)
+			case ch == '?':
+				pattern.WriteString(`[\x00-\x7f]`)
+			case ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '.' || ch == '-' || ch == '_':
+				pattern.WriteString(regexp.QuoteMeta(string(ch)))
+			default:
+				return nil, errors.New("通配域名仅支持 ASCII 字母、数字、点、连字符、下划线及 * ?；国际域名请使用 Punycode")
+			}
+		}
+		pattern.WriteString("$")
+		rule["domain_regex"] = []string{pattern.String()}
 	case "IP-CIDR", "IP-CIDR6":
 		// DNS resolution semantics differ; only explicit no-resolve is lossless.
 		prefix, err := netip.ParsePrefix(parts[1])
