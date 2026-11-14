@@ -5523,6 +5523,19 @@ async function raw() {
   };
 }
 
+function portableBackupManager(){
+ const profile=S.profile,profileName=S.profiles.find(p=>p.id===profile)?.name||profile;
+ openModal('订阅配置 · 加密备份',`<p class="note">当前订阅：<b>${esc(profileName)}</b>。文件包含 YAML 中的节点密码、规则及 DNS 配置，使用独立备份密码加密。请妥善保存密码，遗失无法找回。</p><p class="hint">仅备份当前订阅 YAML，不包括用户、额度、服务器绑定、订阅链接、安全覆盖设置或面板账号。恢复覆盖当前所选订阅，并自动保存恢复前快照；不能用于整机迁移。YAML 最大 768 KiB。</p><form id="pbExportForm"><h4>下载加密备份</h4><div class="grid"><div><label for="pbExportPass">备份密码（至少 12 个字符）</label><input id="pbExportPass" type="password" minlength="12" maxlength="256" required autocomplete="new-password"></div><div><label for="pbExportRepeat">再次输入备份密码</label><input id="pbExportRepeat" type="password" minlength="12" maxlength="256" required autocomplete="new-password"></div></div><button class="btn primary" type="submit">加密并下载</button></form><hr><form id="pbImportForm"><h4>上传并预览</h4><label for="pbFile">加密备份文件</label><input id="pbFile" type="file" accept=".mxbackup" required><label for="pbImportPass">该文件的备份密码</label><input id="pbImportPass" type="password" minlength="12" maxlength="256" required autocomplete="off"><button class="btn" type="submit">解密并预览（不写入）</button></form><div id="pbPreview" aria-live="polite"></div><p id="pbStatus" role="status"></p><p id="pbError" class="error" role="alert"></p>`);
+ const form=$('pbImportForm'),active=()=>form.isConnected&&!$('modal').classList.contains('hidden')&&S.role==='admin'&&S.profile===profile;
+ let preview=null,archive='',busy=false;
+ const invalidate=()=>{preview=null;archive='';if(active())$('pbPreview').textContent='';};
+ $('pbFile').onchange=invalidate;$('pbImportPass').oninput=invalidate;
+ const lock=value=>{busy=value;if(form.isConnected)document.querySelectorAll('#modalBody input,#modalBody button').forEach(e=>e.disabled=value);};
+ const call=body=>api('/backups/portable',{...jsonOpt('POST',body),headers:{'Content-Type':'application/json','X-Profile':profile}});
+ $('pbExportForm').onsubmit=async e=>{e.preventDefault();if(busy||!active())return;const password=$('pbExportPass').value;if(password!==$('pbExportRepeat').value){$('pbError').textContent='两次备份密码不一致';return;}lock(true);$('pbError').textContent='';$('pbStatus').textContent='正在加密…';try{const d=await call({action:'export',password});if(!active())return;const bytes=Uint8Array.from(atob(d.archive),c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'})),a=document.createElement('a');a.href=url;a.download=d.filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);$('pbExportPass').value='';$('pbExportRepeat').value='';$('pbStatus').textContent='已发起下载，请确认文件已保存并保管好密码。';}catch(err){if(active()){$('pbError').textContent=err.message;$('pbStatus').textContent='';}}finally{lock(false);}};
+ form.onsubmit=async e=>{e.preventDefault();if(busy||!active())return;invalidate();const file=$('pbFile').files[0];if(!file||file.size>1048704){$('pbError').textContent='请选择不超过 1 MiB + 128 字节的 .mxbackup 文件';return;}lock(true);$('pbError').textContent='';$('pbStatus').textContent='正在解密并校验…';try{const bytes=new Uint8Array(await file.arrayBuffer());if(!active())return;let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));archive=btoa(binary);const d=await call({action:'preview',archive,password:$('pbImportPass').value});if(!active())return;preview=d;$('pbStatus').textContent='预览完成，尚未修改配置。';$('pbPreview').innerHTML=`<h4>恢复预览</h4><p>备份来源：${esc(d.name)} · ${esc(d.created)}</p><p>覆盖目标：<b>${esc(d.target)}</b></p><p>节点 ${d.nodes} · 策略组 ${d.groups} · 规则 ${d.rules}</p><label class="check"><input type="checkbox" id="pbConfirmed">我已核对目标，确认覆盖该订阅 YAML</label><button class="btn danger" type="button" id="pbRestore">确认恢复配置</button>`;$('pbRestore').onclick=async()=>{if(busy||!active()||!preview)return;if(!$('pbConfirmed').checked){$('pbError').textContent='请先勾选确认覆盖';return;}lock(true);$('pbError').textContent='';try{await call({action:'restore',archive,password:$('pbImportPass').value,revision:preview.revision,confirmed:true});if(!active())return;invalidate();$('pbFile').value='';$('pbImportPass').value='';$('pbStatus').textContent='恢复完成。已有内容变化时，恢复前配置已保存为本地快照。';}catch(err){if(active()){invalidate();$('pbError').textContent=err.message+'；请重新预览后重试。';}}finally{lock(false);}};}catch(err){if(active()){invalidate();$('pbError').textContent=err.message;$('pbStatus').textContent='';}}finally{lock(false);}};
+}
+
 async function system() {
   const profile = S.profile;
   let [d, account] = await Promise.all([S.profiles.length ? api('/backups') : Promise.resolve({backups: []}), api('/account')]);
@@ -5566,6 +5579,7 @@ async function system() {
       <span class="muted" >自动保留最近 100 份</span>
     </div>
     <div class="note">每次执行写入前均会自动备份；执行恢复时亦会预先对当前配置进行瞬时快照。</div>
+    <div class="toolbar"><button class="btn primary" onclick="portableBackupManager()" ${S.profiles.length?'':'disabled'}>加密下载 / 上传恢复</button></div><p class="hint">可移植备份只包含当前订阅 YAML，不含服务器绑定、用户、额度、面板密钥或全局设置。</p>
     ${d.backups.length ? d.backups.map(x => `
       <div class="backup">
         <div>

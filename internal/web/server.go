@@ -47,6 +47,7 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	portableBackupMu     sync.Mutex
 	aiMu                 sync.Mutex
 	aiActive             map[string]bool
 	aiExecuting          map[string]string
@@ -298,6 +299,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.externalTrafficRoute(w, r) {
+		return
+	}
+	if s.portableBackupRoute(w, r) {
 		return
 	}
 	if s.notificationRoute(w, r) {
