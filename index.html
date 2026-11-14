@@ -2584,18 +2584,37 @@ function setTheme(theme) {
 
 
 const accessNotice = '授权控制面板内的订阅访问。禁用用户或撤销授权不会使已复制的订阅链接失效；如需彻底撤销，请同时轮换订阅地址。普通用户不能修改节点、服务器或系统设置。';
-async function userManager() {
+async function userManager(view = {query:'',status:'',page:1}) {
+  const epoch=S.modalEpoch,role=S.role;
   const [data, profiles] = await Promise.all([api('/users'), api('/profiles')]);
-  openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button></div><div id="panelUserList"></div>`);
-  $('panelUserList').innerHTML = data.users.map((u,i)=>`<article class="panel" style="margin-top:12px"><div class="panel-head"><h3>${esc(u.username)}</h3><span class="pill">${u.enabled?'启用':'已禁用'}</span></div><p class="muted">普通用户 · 已授权 ${(u.profiles||[]).length} 份订阅</p><div class="toolbar"><button class="btn" data-user-subscriptions="${i}" ${u.enabled?'':'disabled'}>客户端订阅</button><button class="btn" data-edit-user="${i}">编辑 / 授权 / 重置密码</button><button class="btn danger" data-delete-user="${i}">删除</button></div></article>`).join('') || '<p class="empty">暂无普通用户，请先新建用户并分配订阅。</p>';
-  $('newPanelUser').onclick = ()=>editPanelUser(null, profiles.profiles);
-  document.querySelectorAll('[data-user-subscriptions]').forEach(b=>b.onclick=()=>userSubscriptionsManager(data.users[Number(b.dataset.userSubscriptions)].id).catch(e=>notice(e.message)));
-  document.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>editPanelUser(data.users[Number(b.dataset.editUser)], profiles.profiles));
-  document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=async()=>{
-    const u=data.users[Number(b.dataset.deleteUser)];
-    if (!confirm(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`)) return;
-    try { await api('/users',jsonOpt('DELETE',{id:u.id})); await userManager(); notice('用户已删除'); } catch(e) { notice(e.message); }
-  });
+  if(S.role!==role||role!=='admin'||S.modalEpoch!==epoch)return;
+  openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button><button id="panelUsersRefresh" class="btn">刷新列表</button></div><div class="toolbar"><input id="panelUserSearch" aria-label="搜索用户名" placeholder="搜索用户名…" value="${esc(view.query)}"><select id="panelUserFilter" aria-label="用户状态"><option value="">全部状态</option><option value="enabled">已启用</option><option value="disabled">已禁用</option></select><button class="btn" id="panelUsersClear">清除筛选</button></div><p id="panelUserCount" class="hint" role="status"></p><div id="panelUserList"></div><div class="pagination"><button class="btn small" id="panelUsersPrev">上一页</button><span id="panelUsersPage"></span><button class="btn small" id="panelUsersNext">下一页</button></div>`);
+  const list=$('panelUserList'),search=$('panelUserSearch'),filter=$('panelUserFilter');filter.value=view.status;
+  const render=()=>{
+    const query=view.query.trim().toLocaleLowerCase();
+    const matched=data.users.filter(u=>u.username.toLocaleLowerCase().includes(query)&&(!view.status||u.enabled===(view.status==='enabled')));
+    const pages=Math.max(1,Math.ceil(matched.length/20));view.page=Math.max(1,Math.min(view.page,pages));
+    const rows=matched.slice((view.page-1)*20,view.page*20);
+    $('panelUserCount').textContent=`共 ${data.users.length} 位用户，匹配 ${matched.length} 位 · 每页 20 位`;
+    $('panelUsersPage').textContent=`${view.page} / ${pages}`;$('panelUsersPrev').disabled=view.page===1;$('panelUsersNext').disabled=view.page===pages;
+    list.innerHTML=rows.map((u,i)=>`<article class="panel" style="margin-top:12px"><div class="panel-head"><h3 style="overflow-wrap:anywhere;min-width:0">${esc(u.username)}</h3><span class="pill">${u.enabled?'启用':'已禁用'}</span></div><p class="muted">普通用户 · 已授权 ${(u.profiles||[]).length} 份订阅</p><div class="toolbar"><button class="btn" data-user-subscriptions="${i}" ${u.enabled?'':'disabled'}>客户端订阅</button><button class="btn" data-edit-user="${i}">编辑 / 授权 / 重置密码</button><button class="btn danger" data-delete-user="${i}">删除</button></div></article>`).join('') || `<p class="empty">${data.users.length?'没有匹配用户，请调整搜索或状态筛选。':'暂无普通用户，请先新建用户并分配订阅。'}</p>`;
+    list.querySelectorAll('[data-user-subscriptions]').forEach(b=>b.onclick=()=>userSubscriptionsManager(rows[Number(b.dataset.userSubscriptions)].id).catch(e=>notice(e.message)));
+    list.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>editPanelUser(rows[Number(b.dataset.editUser)], profiles.profiles));
+    list.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=async()=>{
+      const u=rows[Number(b.dataset.deleteUser)];
+      if (!confirm(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`)) return;
+      b.disabled=true;
+      try { await api('/users',jsonOpt('DELETE',{id:u.id})); if(list.isConnected)await userManager(view); notice('用户已删除'); } catch(e) { notice(e.message); }finally{if(b.isConnected)b.disabled=false}
+    });
+  };
+  let composing=false;
+  const applySearch=()=>{view.query=search.value;view.page=1;render()};
+  search.addEventListener('compositionstart',()=>composing=true);search.addEventListener('compositionend',()=>{composing=false;applySearch()});search.oninput=()=>{if(!composing)applySearch()};
+  filter.onchange=()=>{view.status=filter.value;view.page=1;render()};
+  $('panelUsersClear').onclick=()=>{view.query='';view.status='';view.page=1;search.value='';filter.value='';render();search.focus()};
+  $('panelUsersPrev').onclick=()=>{view.page--;render()};$('panelUsersNext').onclick=()=>{view.page++;render()};
+  $('panelUsersRefresh').onclick=async e=>{e.currentTarget.disabled=true;try{await userManager(view)}catch(error){notice(error.message);if(list.isConnected)$('panelUsersRefresh').disabled=false}};
+  $('newPanelUser').onclick=()=>editPanelUser(null,profiles.profiles);render();
 }
 async function userSubscriptionsManager(id) {
   openModal('用户客户端订阅',`<p class="note">只展示当前启用用户获授权的订阅。地址包含下载凭据，多名用户共用同一订阅时地址相同；禁用用户不会使已复制地址失效，彻底撤销需轮换订阅链接。复制后请自行交付给对应用户。</p><label for="userSubscriptionChoice">选择已授权订阅</label><select id="userSubscriptionChoice" disabled></select><div class="toolbar"><button type="button" class="btn" id="userSubscriptionRefresh">重新读取</button><button type="button" class="btn" id="userSubscriptionBack">返回用户管理</button></div><p id="userSubscriptionStatus" role="status">正在读取…</p><div id="userSubscriptionLinks"></div>`);
