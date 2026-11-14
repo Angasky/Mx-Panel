@@ -37,10 +37,23 @@ func splitRoutingParts(raw string) ([]string, error) {
 	parts = append(parts, raw[start:])
 	return parts, nil
 }
-func singBoxCondition(kind, value string, noResolve bool, depth int, count *int) (Record, error) {
+func singBoxCondition(kind, value string, noResolve bool, depth int, count *int, sets ...map[string]routingRuleSet) (Record, error) {
 	*count++
 	if depth > 8 || *count > 128 {
 		return nil, errors.New("逻辑规则最多 8 层、128 个条件")
+	}
+	if kind == "RULE-SET" {
+		if len(sets) == 0 {
+			return nil, errors.New("规则集内部不支持 RULE-SET 嵌套引用")
+		}
+		set, ok := sets[0][value]
+		if !ok {
+			return nil, errors.New("引用的内嵌规则集不存在")
+		}
+		if set.RequiresNoResolve && !noResolve {
+			return nil, errors.New("包含目标 IP 的规则集引用需要显式 no-resolve")
+		}
+		return Record{"rule_set": []string{set.Tag}}, nil
 	}
 	if kind != "AND" && kind != "OR" && kind != "NOT" {
 		return singBoxBasicCondition(kind, value, noResolve)
@@ -77,7 +90,7 @@ func singBoxCondition(kind, value string, noResolve bool, depth int, count *int)
 		if len(parts) == 3 && !nr {
 			return nil, errors.New("子条件选项不支持")
 		}
-		rule, err := singBoxCondition(parts[0], parts[1], nr, depth+1, count)
+		rule, err := singBoxCondition(parts[0], parts[1], nr, depth+1, count, sets...)
 		if err != nil {
 			return nil, err
 		}

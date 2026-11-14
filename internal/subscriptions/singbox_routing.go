@@ -20,7 +20,7 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 	if source.ClientOptions != nil && (source.ClientOptions.WebRTC || source.ClientOptions.DNSProtection) {
 		return fail("分流导出不能等价转换 DNS/WebRTC 防护，请使用完整 Mihomo 配置")
 	}
-	for _, key := range []string{"proxy-providers", "rule-providers", "sub-rules"} {
+	for _, key := range []string{"proxy-providers", "sub-rules"} {
 		if v, ok := source.Document[key]; ok && v != nil {
 			return fail("分流导出暂不支持提供者或子规则：" + key)
 		}
@@ -43,6 +43,10 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 				return fail("节点或策略组必须为对象")
 			}
 		}
+	}
+	ruleSets, setRefs, setErr := singBoxInlineRuleSets(source.Document["rule-providers"])
+	if setErr != nil {
+		return fail(setErr.Error())
 	}
 	names := map[string]string{"DIRECT": "mx-direct"}
 	nodes := objects(source.Document["proxies"])
@@ -176,7 +180,7 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 		if actionIndex != 2 {
 			return fail("规则参数数量不支持")
 		}
-		rule, err := singBoxCondition(kind, parts[1], noResolve, 0, new(int))
+		rule, err := singBoxCondition(kind, parts[1], noResolve, 0, new(int), setRefs)
 		if err != nil {
 			return fail(fmt.Sprintf("第 %d 条规则：%s", i+1, err.Error()))
 		}
@@ -193,7 +197,7 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 	if final == "" {
 		return fail("缺少末尾 MATCH 策略，拒绝猜测默认出口")
 	}
-	doc := Record{"log": Record{"level": "warn"}, "inbounds": []any{Record{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080}}, "outbounds": outbounds, "route": Record{"rules": rules, "final": final}}
+	doc := Record{"log": Record{"level": "warn"}, "inbounds": []any{Record{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080}}, "outbounds": outbounds, "route": Record{"rules": rules, "final": final, "rule_set": ruleSets}}
 	result.Count = len(nodes)
 	var err error
 	result.Body, err = json.MarshalIndent(doc, "", "  ")
