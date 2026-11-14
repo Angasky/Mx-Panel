@@ -3,7 +3,6 @@ package subscriptions
 import (
 	"errors"
 	"fmt"
-	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -159,7 +158,10 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 		if !ok || len(raw) > 8192 {
 			return fail("规则格式无效或超长")
 		}
-		parts := strings.Split(raw, ",")
+		parts, splitErr := splitRoutingParts(raw)
+		if splitErr != nil {
+			return fail("规则括号或长度无效")
+		}
 		if len(parts) == 2 && parts[0] == "MATCH" {
 			if i != len(sourceRules)-1 || names[parts[1]] == "" {
 				return fail("MATCH 必须位于末尾并引用有效策略")
@@ -175,24 +177,22 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 		if names[target] == "" {
 			return fail("规则引用未知策略")
 		}
-		option := ""
-		switch kind {
-		case "DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD":
-			if len(parts) != 3 || !surgeAtom(value) || strings.ContainsAny(value, "/=()*?+") {
-				return fail("域名规则值或选项无效")
-			}
-			value = strings.ToLower(value)
-		case "IP-CIDR", "IP-CIDR6":
-			prefix, e := netip.ParsePrefix(value)
-			if e != nil || prefix.Addr().Is4In6() || (kind == "IP-CIDR") != prefix.Addr().Is4() || len(parts) != 4 || parts[3] != "no-resolve" {
-				return fail("IP 规则需匹配地址族并显式 no-resolve")
-			}
-			value = prefix.Masked().String()
-			option = ",no-resolve"
-		default:
-			return fail("Surge 分流规则类型暂未适配：" + kind)
+		noResolve := len(parts) == 4 && parts[3] == "no-resolve"
+		if len(parts) == 4 && !noResolve {
+			return fail("规则选项暂不支持")
 		}
-		rules = append(rules, kind+","+value+","+names[target]+option)
+		condition, e := surgeRoutingCondition(kind, value, noResolve)
+		if e != nil {
+			return fail(e.Error())
+		}
+		// Basic IP flags belong after the policy, whereas nested flags remain
+		// within each parenthesized condition.
+		option := ""
+		if kind == "IP-CIDR" || kind == "IP-CIDR6" {
+			condition = strings.TrimSuffix(condition, ",no-resolve")
+			option = ",no-resolve"
+		}
+		rules = append(rules, condition+","+names[target]+option)
 	}
 	if !final {
 		return fail("缺少末尾 MATCH，拒绝猜测默认出口")
