@@ -153,16 +153,7 @@ func runGateway(configPath string) error {
 		return err
 	}
 	target, _ := url.Parse("http://127.0.0.1:62578")
-	proxy := &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) {
-		r.SetURL(target)
-		r.Out.Host = r.In.Host
-		r.Out.Header.Del("Forwarded")
-		r.Out.Header.Del("X-Forwarded-For")
-		r.Out.Header.Del("X-Forwarded-Host")
-		r.Out.Header.Del("X-Forwarded-Proto")
-		r.SetXForwarded()
-		r.Out.Header.Set("X-Forwarded-Proto", "https")
-	}}
+	proxy := gatewayProxy(target)
 	service := &http.Server{Addr: net.JoinHostPort("", c.Port), Handler: proxy, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 1 << 20}
 	if c.Domain {
 		m := &autocert.Manager{Prompt: autocert.AcceptTOS, Email: c.Email, HostPolicy: autocert.HostWhitelist(c.Host), Cache: autocert.DirCache(cache)}
@@ -202,4 +193,22 @@ func checkAccessPorts(path string) error {
 		l.Close()
 	}
 	return nil
+}
+
+func gatewayProxy(target *url.URL) *httputil.ReverseProxy {
+	return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) {
+		r.SetURL(target)
+		r.Out.Host = r.In.Host
+		r.Out.Header.Del("Forwarded")
+		r.Out.Header.Del("X-Forwarded-For")
+		r.Out.Header.Del("X-Forwarded-Host")
+		r.Out.Header.Del("X-Forwarded-Proto")
+		r.Out.Header.Del("X-Real-IP")
+		r.Out.Header.Del("CF-Connecting-IP")
+		if host, _, err := net.SplitHostPort(r.In.RemoteAddr); err == nil && net.ParseIP(host) != nil {
+			r.Out.Header.Set("X-Real-IP", host)
+		}
+		r.SetXForwarded()
+		r.Out.Header.Set("X-Forwarded-Proto", "https")
+	}}
 }

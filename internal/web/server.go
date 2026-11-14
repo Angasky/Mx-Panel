@@ -282,6 +282,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.aiRoute(w, r, nil) {
 		return
 	}
+	if s.subscriptionAccessRoute(w, r) {
+		return
+	}
 	if s.clientOptionsRoute(w, r) {
 		return
 	}

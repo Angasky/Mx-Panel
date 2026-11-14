@@ -24,17 +24,17 @@ type Subscription struct {
 
 // PublicSubscription resolves capability tokens only. Profile IDs, old index
 // paths and HTTP profile headers never authorize a public subscription read.
-func (r *Repository) PublicSubscription(slug string, now time.Time) (Subscription, error) {
-	return r.publicSubscription(slug, now, true)
+func (r *Repository) PublicSubscription(slug string, now time.Time, address ...string) (Subscription, error) {
+	return r.publicSubscription(slug, now, true, address...)
 }
 
 // PublicRawSubscription shares authorization and validation with conversion,
 // without cloning a parsed document that a raw download never uses.
-func (r *Repository) PublicRawSubscription(slug string, now time.Time) (Subscription, error) {
-	return r.publicSubscription(slug, now, false)
+func (r *Repository) PublicRawSubscription(slug string, now time.Time, address ...string) (Subscription, error) {
+	return r.publicSubscription(slug, now, false, address...)
 }
 
-func (r *Repository) publicSubscription(slug string, now time.Time, includeDocument bool) (Subscription, error) {
+func (r *Repository) publicSubscription(slug string, now time.Time, includeDocument bool, address ...string) (Subscription, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !slugPattern.MatchString(slug) {
@@ -56,6 +56,13 @@ func (r *Repository) publicSubscription(slug string, now time.Time, includeDocum
 	}
 	if record == nil {
 		return Subscription{}, ErrSubscriptionMissing
+	}
+	clientIP := ""
+	if len(address) > 0 {
+		clientIP = address[0]
+	}
+	if err := subscriptionAddressAllowed(record, clientIP); err != nil {
+		return Subscription{}, err
 	}
 	return r.subscriptionRecordView(record, now, includeDocument)
 }

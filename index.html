@@ -2071,7 +2071,7 @@ SOFTWARE.
     <div class="nav-group">
       <div class="nav-section-title">工作空间</div>
       <button class="nav active" type="button" data-page="overview" title="总览"><i aria-hidden="true"><svg class="icon"><use href="#icon-layout-dashboard"/></svg></i><span>总览</span></button>
-<details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
+<details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="subscriptionAccessManager" title="订阅 IP 白名单"><span>订阅 IP 白名单</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
 <details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="serverNodes" title="服务器节点"><span>服务器节点</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
 <details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
 <button class="nav" type="button" data-page="assistant" title="AI 协助"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"/></svg><span>AI 协助</span></button>
@@ -2784,7 +2784,7 @@ async function aiAssistantRender(){
 
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  const shortcuts=[['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
+  const shortcuts=[['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['shield-check','订阅 IP 白名单','限制订阅下载的 IP 与网段','subscriptionAccessManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>常用设置</h3><p class="muted">按任务选择设置，主题与显示偏好位于下方。</p></div></div><div class="settings-shortcuts">${shortcuts.map(([icon,title,description,action])=>`<button class="settings-shortcut" type="button" onclick="${action}().catch(e=>notice(e.message))">${uiIcon(icon)}<span><strong>${title}</strong><small>${description}</small></span>${uiIcon('chevron-right')}</button>`).join('')}</div></section><section class="panel"><div class="panel-head"><div><h3>主题与外观</h3><p class="muted">六种配色，共用一致的按钮、表单与排版。</p></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
@@ -2804,6 +2804,33 @@ function settings() {
       </button>
     </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
+}
+
+async function subscriptionAccessManager(){
+ if(S.role!=='admin')return;
+ const profile=S.profile;if(!profile){notice('请先创建或选择订阅');return;}
+ const epoch=S.modalEpoch||0,headers={'X-Profile':profile};
+ const data=await api('/subscription-access',{headers});
+ if(S.role!=='admin'||S.profile!==profile||epoch!==(S.modalEpoch||0))return;
+ const name=S.profiles.find(p=>p.id===profile)?.name||profile;
+ openModal('订阅 IP 白名单',`<p class="note">仅作用于订阅「${esc(name)}」的下载和所有客户端转换链接，不限制面板登录，也不会断开已连接的节点。</p><form id="subscriptionAccessForm"><label class="inlinecheck"><input type="checkbox" id="saEnabled" ${data.options.enabled?'checked':''}>仅允许白名单内的 IP 下载订阅</label><label for="saNetworks">允许的 IP 或 CIDR 网段</label><textarea id="saNetworks" rows="7" maxlength="6000" spellcheck="false" placeholder="203.0.113.8\n198.51.100.0/24\n2001:db8::/48">${esc((data.options.networks||[]).join('\n'))}</textarea><p class="hint">每行一项，最多 64 项，支持 IPv4 和 IPv6；关闭后保留列表。手机网络或代理出口变化后，可能需要修改白名单。</p><p>当前识别 IP：<strong id="saCurrentIP">${esc(data.clientIP||'无法识别')}</strong> <button type="button" class="btn small" id="saAddCurrent" ${data.clientIP?'':'disabled'}>加入当前 IP</button></p><p class="hint">${esc(data.ipSource==='trusted-loopback-proxy'?'来源：可信本机反向代理。请确认此地址是实际客户端出口。':data.ipSource==='socket'?'来源：直连地址。若经过 CDN 或容器网关，这可能是代理地址。':'反向代理未提供有效的真实 IP；启用限制后无法识别的请求将被拒绝。')} 使用 Cloudflare/CDN 时，需要反向代理先恢复访客 IP；不能将 CDN 出口网段加入白名单代替访客限制。</p><p id="saPreview" role="status" class="hint"></p><p id="saError" role="alert" class="error"></p><div class="toolbar"><button type="button" id="saCheck" class="btn">校验并预览</button><button type="submit" class="btn primary">保存白名单设置</button></div></form>`);
+ const form=$('subscriptionAccessForm'),active=()=>form.isConnected&&!$('modal').classList.contains('hidden')&&S.role==='admin'&&S.profile===profile;
+ $('saAddCurrent').onclick=()=>{const entries=$('saNetworks').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);if(!entries.includes(data.clientIP))entries.push(data.clientIP);$('saNetworks').value=entries.join('\n');$('saPreview').textContent='已加入当前 IP，尚未保存。';};
+ const run=async save=>{
+  const payload={enabled:$('saEnabled').checked,networks:$('saNetworks').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean)};
+  form.querySelectorAll('button,input,textarea').forEach(e=>e.disabled=true);$('saError').textContent='';
+  try{
+   const result=await api('/subscription-access',{...jsonOpt('POST',payload),headers:{'Content-Type':'application/json',...headers}});
+   if(!active())return;
+   $('saPreview').textContent=(payload.enabled?(result.currentAllowed?'当前识别 IP 在允许范围内。':'当前识别 IP 不在允许范围内，当前网络将无法更新订阅；面板管理不受影响。'):'限制已关闭，持有链接的客户端均可下载。')+' 规范化后 '+result.options.networks.length+' 项。';
+   if(!save)return;
+   if(payload.enabled&&!result.currentAllowed&&!confirm('当前识别 IP 不在白名单中，保存后当前网络可能无法下载此订阅。面板登录不受影响，仍可在这里关闭限制。是否继续保存？'))return;
+   await api('/subscription-access',{...jsonOpt('PUT',result.options),headers:{'Content-Type':'application/json',...headers}});
+   if(active()){closeModal();notice('订阅 IP 白名单已保存，对下一次下载立即生效');}
+  }catch(e){if(active())$('saError').textContent=e.message;}
+  finally{if(active()){form.querySelectorAll('button,input,textarea').forEach(e=>e.disabled=false);$('saAddCurrent').disabled=!data.clientIP;}}
+ };
+ form.onsubmit=e=>{e.preventDefault();void run(true)};$('saCheck').onclick=()=>void run(false);
 }
 
 async function clientOptionsManager() {
@@ -6942,7 +6969,7 @@ $('loginForm').onsubmit = async e => {
   }
 };
 
-document.querySelectorAll('.nav').forEach(n => n.onclick = () => { const wasOpen=document.body.classList.contains('nav-open');setNavigationOpen(false,false);if(wasOpen)$('content').focus({preventScroll:true}); if(n.dataset.navAction){const actions={clientOptionsManager,externalTrafficManager,agentRolloutManager,monitorShareManager,userManager,notificationManager};return Promise.resolve(actions[n.dataset.navAction]()).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
+document.querySelectorAll('.nav').forEach(n => n.onclick = () => { const wasOpen=document.body.classList.contains('nav-open');setNavigationOpen(false,false);if(wasOpen)$('content').focus({preventScroll:true}); if(n.dataset.navAction){const actions={subscriptionAccessManager,clientOptionsManager,externalTrafficManager,agentRolloutManager,monitorShareManager,userManager,notificationManager};return Promise.resolve(actions[n.dataset.navAction]()).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
 document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(localStorage.getItem('mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);localStorage.setItem('mx-nav-expanded',JSON.stringify(state))}catch{}})});
 $('navToggle').onclick = () => setNavigationOpen(!document.body.classList.contains('nav-open'));
 $('navClose').onclick = $('navBackdrop').onclick = () => setNavigationOpen(false);

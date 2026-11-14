@@ -44,9 +44,12 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 	if raw {
 		readSubscription = s.repository.PublicRawSubscription
 	}
-	source, err := readSubscription(parts[1], s.now())
+	clientIP, _ := s.subscriptionClientIP(r)
+	source, err := readSubscription(parts[1], s.now(), clientIP)
 	if err != nil {
-		if errors.Is(err, config.ErrSubscriptionBlocked) {
+		if errors.Is(err, config.ErrSubscriptionIPDenied) {
+			problem(w, 403, "当前 IP 不在订阅访问白名单中，请联系管理员")
+		} else if errors.Is(err, config.ErrSubscriptionBlocked) {
 			problem(w, 403, "订阅已过期或流量已用尽")
 		} else {
 			problem(w, 404, "订阅不存在")
