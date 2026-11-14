@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -158,14 +159,14 @@ func (s *Server) agentRolloutRoute(w http.ResponseWriter, r *http.Request) bool 
 			for _, id := range in.IDs {
 				entry := entries[id]
 				record, e := manager.Record(id)
-				if seen[id] || e != nil || !entry.Enabled || entry.Mode == "pull" || entry.Revision != agentServerRevision(record) {
-					problem(w, 400, "服务器重复、Agent 未启用、身份改变或为 Pull 模式；本批次仅支持主动上报模式")
+				if seen[id] || e != nil || !entry.Enabled || entry.Revision != agentServerRevision(record) {
+					problem(w, 400, "服务器重复、Agent 未启用或身份改变，请先检查连接")
 					return true
 				}
 				seen[id] = true
 				observation := s.agentViews[id]
 				if observation.Digest != entry.Digest || observation.At.IsZero() || s.now().Sub(observation.At) > 90*time.Second || observation.At.After(s.now()) {
-					problem(w, 409, "所选 Agent 必须有最近 90 秒有效上报，请先检查连接")
+					problem(w, 409, "所选 Agent 必须有最近 90 秒有效采样；Pull 模式请先打开服务器监控刷新连接")
 					return true
 				}
 				if entry.DeployJob != "" {
@@ -250,6 +251,7 @@ func rolloutObserve(r *agentRollout, status string, finished int64, observation 
 	}
 }
 func (s *Server) pollAgentRollout() {
+	s.refreshRolloutPull(nil)
 	s.rolloutMu.Lock()
 	defer s.rolloutMu.Unlock()
 	state, e := s.readRollout()
@@ -325,4 +327,33 @@ func (s *Server) pollAgentRollout() {
 	}
 	state.Updated = s.now().Unix()
 	_ = s.writeRollout(state)
+}
+
+// Refresh only the current batch member. Never poll the entire fleet and never
+// hold mutation locks across a remote request. Dispatch rechecks state after it.
+func (s *Server) refreshRolloutPull(client *http.Client) {
+	s.rolloutMu.Lock()
+	state, err := s.readRollout()
+	if err != nil || !rolloutActive(state.Status) || state.Status == "canary" || state.Index >= len(state.Items) {
+		s.rolloutMu.Unlock()
+		return
+	}
+	item := state.Items[state.Index]
+	s.agentMu.Lock()
+	entries, err := s.readAgents()
+	entry := entries[item.ID]
+	observation := s.agentViews[item.ID]
+	s.agentMu.Unlock()
+	s.rolloutMu.Unlock()
+	if err != nil || !entry.Enabled || entry.Mode != "pull" || entry.Digest != item.Digest || entry.Revision != item.Revision {
+		return
+	}
+	if observation.Digest == entry.Digest && !observation.At.IsZero() && s.now().Sub(observation.At) >= 0 && s.now().Sub(observation.At) < 15*time.Second {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	// Failure leaves the last observation untouched. Existing freshness and
+	// post-upgrade deadlines decide whether to wait or stop, never fake success.
+	_ = s.pullAgentSample(ctx, item.ID, entry, client)
 }

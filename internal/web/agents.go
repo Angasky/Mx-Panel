@@ -351,45 +351,9 @@ func (s *Server) serverMetrics(ctx context.Context, id string) (remote.Record, e
 	}
 	if entry.Enabled {
 		if entry.Mode == "pull" && (v.Digest != entry.Digest || v.At.IsZero() || s.now().Sub(v.At) >= 15*time.Second) {
-			m, e := s.remoteManager()
-			if e != nil {
+			if e := s.pullAgentSample(ctx, id, entry, nil); e != nil {
 				return nil, e
 			}
-			record, e := m.Record(id)
-			if e != nil {
-				return nil, e
-			}
-			u, e := url.Parse(entry.URL)
-			if e != nil || !strings.EqualFold(u.Hostname(), strings.Trim(stringField(record, "host"), "[]")) {
-				return nil, errors.New("Pull 主机已变化，请重新登记")
-			}
-			secret, e := m.OpenUser(entry.Secret)
-			if e != nil {
-				return nil, errors.New("Pull 凭据无法解密")
-			}
-			client, transport := agentPullClient()
-			defer transport.CloseIdleConnections()
-			req, e := http.NewRequestWithContext(ctx, "GET", entry.URL, nil)
-			if e != nil {
-				return nil, e
-			}
-			req.Header.Set("Authorization", "Bearer "+stringField(secret, "token"))
-			res, e := client.Do(req)
-			if e != nil {
-				return nil, errors.New("Pull 连接失败")
-			}
-			defer res.Body.Close()
-			if res.StatusCode != 200 {
-				return nil, errors.New("Pull 采样失败")
-			}
-			var payload agentcontrol.Report
-			if json.NewDecoder(io.LimitReader(res.Body, 600<<10)).Decode(&payload) != nil {
-				return nil, errors.New("Pull 数据无效")
-			}
-			if e = s.acceptAgent(ctx, id, entry.Digest, payload.Sample, "pull", payload.Version); e != nil {
-				return nil, e
-			}
-			s.agentAcknowledgement(id, entry.Digest, payload)
 			s.agentMu.Lock()
 			v = s.agentViews[id]
 			s.agentMu.Unlock()
@@ -432,4 +396,58 @@ func agentServerRevision(record remote.Record) string {
 	raw, _ := json.Marshal([]any{record["host"], record["sshPort"], record["sshUser"], record["fingerprint"], record["installType"]})
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
+}
+
+// Pull does network I/O without holding agentMu or rolloutMu. A report still
+// passes acceptAgent's credential, mode and server revision checks afterwards.
+func (s *Server) pullAgentSample(ctx context.Context, id string, entry agentRegistration, client *http.Client) error {
+	if !entry.Enabled || entry.Mode != "pull" {
+		return errors.New("Agent 未启用 Pull 模式")
+	}
+	if client == nil {
+		var transport *http.Transport
+		client, transport = agentPullClient()
+		defer transport.CloseIdleConnections()
+	}
+	m, e := s.remoteManager()
+	if e != nil {
+		return e
+	}
+	record, e := m.Record(id)
+	if e != nil {
+		return e
+	}
+	if entry.Revision != "" && entry.Revision != agentServerRevision(record) {
+		return errors.New("Pull 服务器身份已变化，请重新登记")
+	}
+	u, e := url.Parse(entry.URL)
+	if e != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "/metrics" || !strings.EqualFold(u.Hostname(), strings.Trim(stringField(record, "host"), "[]")) {
+		return errors.New("Pull 主机已变化，请重新登记")
+	}
+	secret, e := m.OpenUser(entry.Secret)
+	if e != nil {
+		return errors.New("Pull 凭据无法解密")
+	}
+	req, e := http.NewRequestWithContext(ctx, "GET", entry.URL, nil)
+	if e != nil {
+		return e
+	}
+	req.Header.Set("Authorization", "Bearer "+stringField(secret, "token"))
+	res, e := client.Do(req)
+	if e != nil {
+		return errors.New("Pull 连接失败")
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return errors.New("Pull 采样失败")
+	}
+	var payload agentcontrol.Report
+	if json.NewDecoder(io.LimitReader(res.Body, 600<<10)).Decode(&payload) != nil {
+		return errors.New("Pull 数据无效")
+	}
+	if e = s.acceptAgent(ctx, id, entry.Digest, payload.Sample, "pull", payload.Version); e != nil {
+		return e
+	}
+	s.agentAcknowledgement(id, entry.Digest, payload)
+	return nil
 }
