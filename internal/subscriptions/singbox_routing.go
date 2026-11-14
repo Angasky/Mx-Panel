@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"net/url"
 	"regexp"
@@ -70,18 +71,40 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 			return fail(err.Error())
 		}
 	}
+	graph := map[string][]string{}
 	outbounds := []any{Record{"type": "direct", "tag": "mx-direct"}}
 	for _, n := range nodes {
-		if n["dialer-proxy"] != nil {
-			return fail("分流导出不支持链式节点")
+		checked := n
+		detour := ""
+		if raw, exists := n["dialer-proxy"]; exists {
+			ref, ok := raw.(string)
+			if !ok || ref == "" || names[ref] == "" {
+				return fail("中转节点引用缺失或不支持的策略")
+			}
+			// QUIC needs packet transport semantics and separate interoperability
+			// validation. Never silently drop a UDP-based transport's detour.
+			switch n["type"] {
+			case "ss", "trojan", "vmess", "vless", "socks5", "http":
+			default:
+				return fail("中转导出暂仅支持 SS、Trojan、VMess、VLESS、SOCKS5、HTTP 落地")
+			}
+			if n["tfo"] == true {
+				return fail("中转节点暂不支持同时启用 TFO")
+			}
+			checked = maps.Clone(n)
+			delete(checked, "dialer-proxy")
+			detour = names[ref]
+			graph[text(n["name"])] = append(graph[text(n["name"])], ref)
 		}
-		outbound, err := remote.SingBoxOutbound(n, names[text(n["name"])])
+		outbound, err := remote.SingBoxOutbound(checked, names[text(n["name"])])
 		if err != nil {
 			return fail("存在不兼容 sing-box 的节点，请先查看基础导出的兼容报告")
 		}
+		if detour != "" {
+			outbound["detour"] = detour
+		}
 		outbounds = append(outbounds, outbound)
 	}
-	graph := map[string][]string{}
 	for _, g := range groups {
 		if g["type"] != "select" && g["type"] != "url-test" {
 			return fail("分流导出当前支持 select 和 url-test 策略组，暂不支持故障切换、负载均衡及链路组")
@@ -143,7 +166,7 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 	}
 	for name := range graph {
 		if !visit(name) {
-			return fail("策略组存在循环引用")
+			return fail("策略组或中转节点存在循环引用")
 		}
 	}
 	rules := []any{}
