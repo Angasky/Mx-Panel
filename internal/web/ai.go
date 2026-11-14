@@ -32,6 +32,7 @@ type aiConversation struct {
 	Count          int    `json:"count"`
 }
 type aiState struct {
+	SealedActions string           `json:"sealedActions,omitempty"`
 	Settings      aiSettings       `json:"settings"`
 	Conversations []aiConversation `json:"conversations"`
 }
@@ -124,6 +125,10 @@ func (s *Server) aiRoute(w http.ResponseWriter, r *http.Request, u *panelUser) b
 	}
 	owner := aiOwner(u)
 	path := strings.TrimPrefix(r.URL.Path, "/admin/api/ai/")
+	if strings.HasPrefix(path, "agent/") {
+		s.aiAgentRoute(w, r, u, owner, path)
+		return true
+	}
 	if path == "context" {
 		if r.Method != "GET" {
 			problem(w, 405, "请求方法不支持")
@@ -259,6 +264,21 @@ func (s *Server) aiRoute(w http.ResponseWriter, r *http.Request, u *panelUser) b
 				return true
 			}
 			if r.Method == "DELETE" {
+				actions, err := s.aiReadActions(st)
+				if err != nil {
+					problem(w, 500, "Agent 记录读取失败")
+					return true
+				}
+				kept := []aiAgentAction{}
+				for _, a := range actions {
+					if a.Conversation != id {
+						kept = append(kept, a)
+					}
+				}
+				if s.aiSealActions(&st, kept) != nil {
+					problem(w, 500, "Agent 记录保存失败")
+					return true
+				}
 				st.Conversations = append(st.Conversations[:index], st.Conversations[index+1:]...)
 			} else {
 				var in struct{ Title string }
@@ -288,6 +308,8 @@ func (s *Server) aiChatRoute(w http.ResponseWriter, r *http.Request, u *panelUse
 		return
 	}
 	var in struct {
+		AgentServer    string `json:"agentServer"`
+		AgentProfile   string `json:"agentProfile"`
 		ConversationID string `json:"conversationId"`
 		Message        string
 		ContextProfile string `json:"contextProfile"`
@@ -298,6 +320,10 @@ func (s *Server) aiChatRoute(w http.ResponseWriter, r *http.Request, u *panelUse
 	}
 	if !test && (strings.TrimSpace(in.Message) == "" || len(in.Message) > 24000 || !utf8.ValidString(in.Message)) {
 		problem(w, 400, "消息不能为空且不能超过 24000 字节")
+		return
+	}
+	if in.AgentServer != "" && u != nil {
+		problem(w, 403, "Agent 机器管理仅限管理员")
 		return
 	}
 	s.aiMu.Lock()
@@ -390,7 +416,13 @@ func (s *Server) aiChatRoute(w http.ResponseWriter, r *http.Request, u *panelUse
 	if test {
 		cfg.MaxTokens = 128
 	}
-	reply, e := ai.Complete(ctx, client, cfg, key, system, msgs)
+	var reply ai.Reply
+	var action *aiAgentAction
+	if !test && in.AgentServer != "" {
+		reply, action, e = s.aiAgentReply(ctx, client, cfg, key, msgs, in.AgentServer, in.AgentProfile)
+	} else {
+		reply, e = ai.Complete(ctx, client, cfg, key, system, msgs)
+	}
 	if e != nil {
 		problem(w, 502, e.Error())
 		return
@@ -414,6 +446,18 @@ func (s *Server) aiChatRoute(w http.ResponseWriter, r *http.Request, u *panelUse
 		if e != nil {
 			problem(w, 500, "AI 已回复但对话加密保存失败")
 			return
+		}
+		if action != nil {
+			action.Conversation = in.ConversationID
+			actions, err := s.aiReadActions(st)
+			if err == nil {
+				actions = append(actions, *action)
+				err = s.aiSealActions(&st, actions)
+			}
+			if err != nil {
+				problem(w, 500, "Agent 计划保存失败，未执行")
+				return
+			}
 		}
 		s.aiMu.Lock()
 		st.Conversations[index].SealedMessages = sealed
