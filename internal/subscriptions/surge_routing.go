@@ -115,11 +115,11 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 	testURL := ""
 	for _, g := range groups {
 		kind, ok := g["type"].(string)
-		if !ok || (kind != "select" && kind != "url-test") {
-			return fail("Surge 分流目前只支持 select 和 url-test 策略组")
+		if !ok || (kind != "select" && kind != "url-test" && kind != "fallback") {
+			return fail("Surge 分流目前支持 select、url-test 和 fallback 策略组")
 		}
 		for key := range g {
-			if key != "name" && key != "type" && key != "proxies" && !(kind == "url-test" && (key == "url" || key == "interval" || key == "tolerance")) {
+			if key != "name" && key != "type" && key != "proxies" && !((kind == "url-test" || kind == "fallback") && (key == "url" || key == "interval")) && !(kind == "url-test" && key == "tolerance") {
 				return fail("策略组含未适配选项：" + key)
 			}
 		}
@@ -130,14 +130,14 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 		members := []string{}
 		for _, r := range refs {
 			name, ok := r.(string)
-			if !ok || names[name] == "" || (kind == "url-test" && name == "REJECT") {
+			if !ok || names[name] == "" || (kind != "select" && name == "REJECT") {
 				return fail("策略组引用缺失或不支持的策略")
 			}
 			members = append(members, names[name])
 			graph[text(g["name"])] = append(graph[text(g["name"])], name)
 		}
 		row := names[text(g["name"])] + " = " + kind + ", " + strings.Join(members, ", ")
-		if kind == "url-test" {
+		if kind == "url-test" || kind == "fallback" {
 			value, ok := g["url"].(string)
 			u, e := url.Parse(value)
 			if !ok || e != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.ContainsAny(value, ",;#\"'[]\\") || strings.ContainsFunc(value, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
@@ -146,18 +146,21 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 			// Current Surge ignores legacy group url=. Use documented global test
 			// settings, and refuse conflicting group URLs instead of silently replacing.
 			if testURL != "" && testURL != value {
-				return fail("当前 Surge 分流导出要求所有测速组使用同一测试 URL")
+				return fail("当前 Surge 分流导出要求所有测速/故障切换组使用同一测试 URL")
 			}
 			testURL = value
 			interval, e := routingInteger(g["interval"], 300, 1, 86400)
 			if e != nil {
 				return fail("测速间隔须为 1–86400 秒")
 			}
-			tolerance, e := routingInteger(g["tolerance"], 50, 0, 65535)
-			if e != nil {
-				return fail("测速容差须为 0–65535 毫秒")
+			row += fmt.Sprintf(", interval=%d", interval)
+			if kind == "url-test" {
+				tolerance, e := routingInteger(g["tolerance"], 50, 0, 65535)
+				if e != nil {
+					return fail("测速容差须为 0–65535 毫秒")
+				}
+				row += fmt.Sprintf(", tolerance=%d", tolerance)
 			}
-			row += fmt.Sprintf(", interval=%d, tolerance=%d", interval, tolerance)
 		}
 		policyRows = append(policyRows, row)
 	}

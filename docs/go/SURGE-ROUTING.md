@@ -1,4 +1,4 @@
-# Surge 分流配置（v0.2.23，实验性）
+# Surge 分流配置（v0.2.24，实验性）
 
 入口：订阅总览 → 客户端订阅与扫码导入 → **Surge 分流配置（实验性）**。独立下载地址为 `/convert/<订阅令牌>/surge-routing`，文件扩展名 `.conf`。原有 `surge` 基础节点导出仍保持原来的独立手动组与兼容节点跳过行为。
 
@@ -21,7 +21,7 @@
 
 Surge 的测试采用 HEAD 请求，并按使用情况和测试结果年龄触发重测，测量及选择算法与 Mihomo 不完全相同。`interval` 是结果有效期，不代表严格定时探测；不保证两个客户端始终选中同一节点。客户端已保存的手动选择可能优先于首个成员。
 
-间隔范围 1–86400 秒，容差范围 0–65535 毫秒。其他策略组选项（lazy、timeout、expected-status、use 等）、fallback/load-balance 等类型暂不支持。URL 中的凭据、片段、配置分隔符或控制字符拒绝导出。
+间隔范围 1–86400 秒，容差范围 0–65535 毫秒。其他策略组选项（lazy、timeout、expected-status、use 等）、load-balance 等类型暂不支持；fallback 自 v0.2.24 起支持，见下文。URL 中的凭据、片段、配置分隔符或控制字符拒绝导出。
 
 ## 仍未转换
 
@@ -120,3 +120,16 @@ HTTP/文件提供者、未知字段、空集合、未知引用、进程等未适
 验证：直接节点、手动组、测速组、三级节点引用、未知和不兼容入口、节点/组混合循环、TFO 拒绝、源数据不变、稳定导出、基础格式兼容、HTTP 下载及 IP 白名单。真实浏览器确认下载配置包含 underlying-proxy 和对应入口出站，六主题四宽度通过。当前环境没有 Surge iOS/macOS，未进行其原生内核检查或真实代理流量验收。
 
 参考（2026-11-14 查阅）：https://manual.nssurge.com/policies/parameters.html 的 Proxy Chain / underlying-proxy。
+
+
+## v0.2.24：故障切换策略组
+
+新增 `fallback` 组转换，保留声明的成员优先顺序、测试 URL 和 interval，支持嵌套组及作为节点 underlying-proxy 的入口。必须有非空成员列表；引用 DIRECT 可显式作为成员，REJECT、未知引用和节点/组混合循环仍拒绝。原 select/url-test 转换保持不变。
+
+Surge 按成员顺序选择最新测试可用的策略；全部不可用时按其官方行为仍使用第一项。interval 表示测试结果有效期，按需重测，并非严格定时探测。首次使用、手动覆盖、网络变化、失败发现与恢复时间均依客户端实现，不承诺与 Mihomo 的切换时刻完全相同。
+
+沿用全局测试 URL，所有 url-test/fallback 组必须使用同一 URL。间隔 1–86400 秒，未填写显式导出 300 秒。仅允许 name/type/proxies/url/interval；timeout、lazy、expected-status、max-failed-times、tolerance 等选项暂拒绝。尤其 Surge timeout 是测试延迟可用性门槛，不能直接当作源客户端连接超时转换。
+
+这属于客户端策略组，不是服务器远端主备创建/接管或跨内核故障切换。测试覆盖成员顺序、默认间隔、参数拒绝、混合组 URL 冲突、引用/循环、原配置不变及作为中转入口；真实浏览器下载确认 fallback 输出，六主题四宽度通过。没有 Surge 实机，未验证实际故障切换或恢复时延。
+
+参考（2026-11-14 查阅）：https://manual.nssurge.com/policy-groups/fallback.html
