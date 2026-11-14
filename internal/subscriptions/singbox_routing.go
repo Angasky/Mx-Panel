@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -76,11 +77,11 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 	}
 	graph := map[string][]string{}
 	for _, g := range groups {
-		if g["type"] != "select" {
-			return fail("分流导出当前仅支持 select 手动策略组")
+		if g["type"] != "select" && g["type"] != "url-test" {
+			return fail("分流导出当前支持 select 和 url-test 策略组，暂不支持故障切换、负载均衡及链路组")
 		}
 		for key := range g {
-			if key != "name" && key != "type" && key != "proxies" {
+			if key != "name" && key != "type" && key != "proxies" && !(g["type"] == "url-test" && (key == "url" || key == "interval" || key == "tolerance")) {
 				return fail("策略组含尚未适配的选项：" + key)
 			}
 		}
@@ -97,7 +98,24 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 			members = append(members, names[name])
 			graph[text(g["name"])] = append(graph[text(g["name"])], name)
 		}
-		outbounds = append(outbounds, Record{"type": "selector", "tag": names[text(g["name"])], "outbounds": members, "default": members[0]})
+		group := Record{"type": "selector", "tag": names[text(g["name"])], "outbounds": members, "default": members[0]}
+		if g["type"] == "url-test" {
+			testURL, ok := g["url"].(string)
+			u, err := url.Parse(testURL)
+			if !ok || err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.TrimSpace(testURL) != testURL {
+				return fail("自动测速组需要有效的 HTTP/HTTPS 测试地址，不能包含登录凭据或片段")
+			}
+			interval, err := routingInteger(g["interval"], 300, 1, 86400)
+			if err != nil {
+				return fail("测速间隔须为 1–86400 秒的整数")
+			}
+			tolerance, err := routingInteger(g["tolerance"], 50, 0, 65535)
+			if err != nil {
+				return fail("测速容差须为 0–65535 毫秒的整数")
+			}
+			group = Record{"type": "urltest", "tag": names[text(g["name"])], "outbounds": members, "url": testURL, "interval": fmt.Sprintf("%ds", interval), "tolerance": tolerance}
+		}
+		outbounds = append(outbounds, group)
 	}
 	state := map[string]int{}
 	var visit func(string) bool
@@ -170,12 +188,22 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 				return fail("IP 规则必须为对应地址族 CIDR 且显式 no-resolve")
 			}
 			rule["ip_cidr"] = []string{prefix.Masked().String()}
-		case "DST-PORT":
+		case "SRC-IP-CIDR":
+			prefix, err := netip.ParsePrefix(parts[1])
+			if err != nil || prefix.Addr().Is4In6() || noResolve {
+				return fail("源 IP 规则必须为有效 CIDR，不支持额外选项")
+			}
+			rule["source_ip_cidr"] = []string{prefix.Masked().String()}
+		case "DST-PORT", "SRC-PORT":
 			port, err := strconv.Atoi(parts[1])
 			if err != nil || port < 1 || port > 65535 || noResolve {
 				return fail("目标端口规则无效")
 			}
-			rule["port"] = []int{port}
+			key := "port"
+			if kind == "SRC-PORT" {
+				key = "source_port"
+			}
+			rule[key] = []int{port}
 		case "NETWORK":
 			if (parts[1] != "tcp" && parts[1] != "udp") || noResolve {
 				return fail("网络规则只支持 tcp/udp")
@@ -202,4 +230,30 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 	var err error
 	result.Body, err = json.MarshalIndent(doc, "", "  ")
 	return result, err
+}
+
+// Configuration numbers may be YAML integers or JSON numbers; reject fractions
+// rather than silently changing the test interval or tolerance.
+func routingInteger(value any, fallback, min, max int) (int, error) {
+	if value == nil {
+		return fallback, nil
+	}
+	var raw string
+	switch n := value.(type) {
+	case int:
+		raw = strconv.Itoa(n)
+	case int64:
+		raw = strconv.FormatInt(n, 10)
+	case uint64:
+		raw = strconv.FormatUint(n, 10)
+	case json.Number:
+		raw = n.String()
+	default:
+		return 0, errors.New("需要整数")
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < min || n > max {
+		return 0, errors.New("整数超出范围")
+	}
+	return n, nil
 }

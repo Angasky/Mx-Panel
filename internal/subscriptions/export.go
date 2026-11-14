@@ -18,7 +18,7 @@ type Format struct {
 }
 
 var formats = []Format{
-	{"sing-box-routing", "sing-box 分流配置（实验性）", "保留 select 组及基础域名/IP/端口/网络规则；不支持项拒绝整份导出。不转换 DNS、防泄露和链路；本地 mixed 2080。", false, true},
+	{"sing-box-routing", "sing-box 分流配置（实验性）", "保留 select/url-test 组及基础域名/源与目标 IP/端口/网络规则；不支持项拒绝整份导出。不转换 DNS、防泄露和链路；本地 mixed 2080。", false, true},
 	{"xray", "Xray 客户端配置（实验性）", "每个节点一份 JSON；本地 SOCKS/HTTP 10808/10809，不继承 Mihomo 分流、DNS 或防泄露设置。", false, false},
 	{"quantumult-x", "Quantumult X 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
 	{"stash", "Stash 客户端配置", "独立手动选择组；仅兼容节点，不转换原分流、DNS、主备或链路。", false, false},
