@@ -4815,10 +4815,11 @@ function nodes() {
       <button type="button" class="btn small" data-node-protocol="" aria-pressed="${!protocol}">全部 · ${S.data.nodes.length}</button>
       ${[...protocolCounts].sort(([a],[b]) => a.localeCompare(b)).map(([type,count]) => `<button type="button" class="btn small" data-node-protocol="${esc(type)}" aria-pressed="${type === protocol}">${esc(type.toUpperCase())} · ${count}</button>`).join('')}
     </div>
-    <details class="node-secondary"><summary>批量操作 · 节点选择与名称整理</summary><div class="toolbar">
+    <details class="node-secondary"><summary>批量操作 · 节点选择、名称与证书验证</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
       <button type="button" class="btn small" onclick="clearNodeSelection()">取消选择</button>
       <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button>
+      <button id="bulkCertificateButton" type="button" class="btn small" onclick="bulkNodeCertificates()">启用证书验证</button>
       <button id="bulkDeleteButton" type="button" class="btn small danger" onclick="bulkDeleteNodes()">批量删除</button>
       <span id="nodeSelectedCount" class="pill">已选择 0 个</span>
     </div>
@@ -4873,6 +4874,31 @@ function updateNodeSelectionUi() {
   }
   if ($('nodeSelectedCount')) $('nodeSelectedCount').textContent = `已选择 ${S.nodeSelection.size} 个`;
   if ($('bulkDeleteButton')) $('bulkDeleteButton').disabled = S.nodeSelection.size === 0;
+  if ($('bulkCertificateButton')) $('bulkCertificateButton').disabled = S.nodeSelection.size === 0;
+}
+
+async function bulkNodeCertificates() {
+  const profile = S.profile, names = [...S.nodeSelection];
+  if (!names.length) return;
+  openModal('批量启用证书验证', `<p class="hint">关闭所选节点的“跳过证书验证”，仅修改当前订阅。自签名、过期或域名不匹配的证书可能导致连接失败，请先确认服务端证书有效。Reality、公钥固定及插件内部 TLS 设置不由此操作修改。</p><div id="certificateReview" class="hint" role="status">正在预览…</div><div id="certificateError" class="error" role="alert"></div><button id="certificateApply" class="btn primary" disabled>确认启用证书验证</button>`);
+  const box = $('certificateReview'), button = $('certificateApply'), errorBox = $('certificateError');
+  const active = () => box.isConnected && !$('modal').classList.contains('hidden') && S.profile === profile;
+  const request = payload => api('/nodes/certificate-verification', {method:'POST',headers:{'X-Profile':profile,'Content-Type':'application/json'},body:JSON.stringify({...payload,names})});
+  try {
+    const preview = await request({action:'preview'});
+    if (!active()) return;
+    box.innerHTML = `<p>将修改 ${preview.changed.length} 个节点，${preview.unchanged.length} 个无需修改。</p><ul style="max-height:35dvh;overflow:auto;overflow-wrap:anywhere">${preview.changed.map(name=>`<li>${esc(name)}</li>`).join('')}</ul>`;
+    button.disabled = !preview.changed.length;
+    button.onclick = async () => {
+      if (!active()) return;
+      button.disabled = true; errorBox.textContent = '';
+      try {
+        await request({action:'apply',revision:preview.revision,confirmed:true});
+        if (!active()) return;
+        closeModal(); await reload(); notice('所选节点已启用证书验证');
+      } catch (error) { if (active()) { errorBox.textContent = error.message + '；请关闭窗口后重新预览。'; } }
+    };
+  } catch (error) { if (active()) {box.textContent='未修改任何节点。';errorBox.textContent=error.message;} }
 }
 
 function toggleNodeSelection(input) {
