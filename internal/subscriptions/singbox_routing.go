@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/Angasky/dingzhi-ban/internal/config"
 	"github.com/Angasky/dingzhi-ban/internal/remote"
@@ -198,6 +200,9 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 		return fail("缺少末尾 MATCH 策略，拒绝猜测默认出口")
 	}
 	doc := Record{"log": Record{"level": "warn"}, "inbounds": []any{Record{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080}}, "outbounds": outbounds, "route": Record{"rules": rules, "final": final, "rule_set": ruleSets}}
+	if routingUsesProcess(rules) || routingUsesProcess(ruleSets) {
+		doc["route"].(Record)["find_process"] = true
+	}
 	result.Count = len(nodes)
 	var err error
 	result.Body, err = json.MarshalIndent(doc, "", "  ")
@@ -254,22 +259,102 @@ func singBoxBasicCondition(kind, value string, noResolve bool) (Record, error) {
 		}
 		rule["source_ip_cidr"] = []string{prefix.Masked().String()}
 	case "DST-PORT", "SRC-PORT":
-		port, err := strconv.Atoi(parts[1])
-		if err != nil || port < 1 || port > 65535 || noResolve {
-			return nil, errors.New("目标端口规则无效")
+		if noResolve {
+			return nil, errors.New("端口规则不支持 no-resolve")
 		}
 		key := "port"
 		if kind == "SRC-PORT" {
 			key = "source_port"
 		}
-		rule[key] = []int{port}
-	case "NETWORK":
-		if (parts[1] != "tcp" && parts[1] != "udp") || noResolve {
-			return nil, errors.New("网络规则只支持 tcp/udp")
+		condition, err := singBoxPortCondition(key, parts[1])
+		if err != nil {
+			return nil, err
 		}
-		rule["network"] = []string{parts[1]}
+		return condition, nil
+	case "PROCESS-PATH":
+		value := parts[1]
+		absolute := strings.HasPrefix(value, "/") || len(value) > 2 && ((value[0] >= 'A' && value[0] <= 'Z') || (value[0] >= 'a' && value[0] <= 'z')) && value[1] == ':' && (value[2] == '\\' || value[2] == '/')
+		if noResolve || len(value) > 2048 || !absolute || strings.ContainsFunc(value, unicode.IsControl) {
+			return nil, errors.New("进程路径需为有效桌面系统绝对路径，不支持额外选项")
+		}
+		// Mihomo exact path matching is case insensitive; sing-box's literal
+		// process_path is case sensitive, so preserve semantics with quoted regex.
+		rule["process_path_regex"] = []string{"(?i)^" + regexp.QuoteMeta(value) + "$"}
+	case "NETWORK":
+		network := strings.ToLower(parts[1])
+		if (network != "tcp" && network != "udp") || noResolve {
+			return nil, errors.New("网络规则只支持 TCP/UDP")
+		}
+		rule["network"] = []string{network}
 	default:
 		return nil, errors.New("规则类型暂未适配：" + kind)
 	}
 	return rule, nil
+}
+
+func routingUsesProcess(values []any) bool {
+	for _, v := range values {
+		r, ok := v.(Record)
+		if !ok {
+			continue
+		}
+		if r["process_path_regex"] != nil {
+			return true
+		}
+		if children, ok := r["rules"].([]any); ok && routingUsesProcess(children) {
+			return true
+		}
+	}
+	return false
+}
+func singBoxPortCondition(key, value string) (Record, error) {
+	parts := strings.Split(value, "/")
+	if len(parts) > 28 {
+		return nil, errors.New("端口规则最多 28 段")
+	}
+	ports := []int{}
+	ranges := []string{}
+	for _, part := range parts {
+		bounds := strings.Split(part, "-")
+		if len(bounds) > 2 {
+			return nil, errors.New("端口范围格式无效")
+		}
+		start, err := routingPort(bounds[0])
+		if err != nil {
+			return nil, err
+		}
+		if len(bounds) == 1 {
+			ports = append(ports, start)
+			continue
+		}
+		end, err := routingPort(bounds[1])
+		if err != nil || end < start {
+			return nil, errors.New("端口范围必须递增且介于 1–65535")
+		}
+		ranges = append(ranges, fmt.Sprintf("%d:%d", start, end))
+	}
+	// sing-box combines these two fields with OR within the same port group.
+	result := Record{}
+	if len(ports) > 0 {
+		result[key] = ports
+	}
+	if len(ranges) > 0 {
+		result[key+"_range"] = ranges
+	}
+	return result, nil
+}
+func routingPort(raw string) (int, error) {
+	if raw == "" {
+		return 0, errors.New("端口不能为空")
+	}
+	for _, ch := range raw {
+		if ch < '0' || ch > '9' {
+			return 0, errors.New("端口必须为数字")
+		}
+	}
+	port, err := strconv.Atoi(raw)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, errors.New("端口须介于 1–65535")
+	}
+	return port, nil
 }
