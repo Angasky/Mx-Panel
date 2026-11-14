@@ -301,6 +301,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.externalTrafficRoute(w, r) {
 		return
 	}
+	if s.subscriptionRotationRoute(w, r) {
+		return
+	}
 	if s.nodeTagsRoute(w, r) {
 		return
 	}

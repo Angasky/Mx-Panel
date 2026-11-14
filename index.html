@@ -2913,7 +2913,7 @@ function profiles() {
   const page = tableSlice(rows, 'profiles');
   const current = S.profiles.find(p => p.id === S.profile);
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div class="profile-summary"><h3>我的订阅</h3><p class="muted">共 ${S.profiles.length} 份订阅 · 当前：${esc(current?.name || '未选择')}</p></div>
-    <div class="toolbar"><button class="btn" onclick="policyTemplateManager()">策略模板</button><button class="btn primary" onclick="profileCreate()">${uiIcon('circle-plus')}新建订阅</button></div></div>
+    <div class="toolbar"><button class="btn" onclick="subscriptionRotationManager()">批量重置订阅链接</button><button class="btn" onclick="policyTemplateManager()">策略模板</button><button class="btn primary" onclick="profileCreate()">${uiIcon('circle-plus')}新建订阅</button></div></div>
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索订阅" placeholder="搜索订阅名称或标识…" value="${esc(q)}">
       <select id="profileFilter" aria-label="筛选订阅"><option value="all">全部订阅</option><option value="current">当前订阅</option><option value="configured">已设置流量</option><option value="expired">已到期</option></select>
       <select id="profileSort" aria-label="订阅排序"><option value="default">默认顺序</option><option value="latest">最近创建优先</option><option value="name">名称排序</option></select></div>
@@ -2934,6 +2934,41 @@ function profiles() {
   $('profileFilter').onchange = e => { S.profileFilter = e.target.value; S.tablePages.profiles = 1; profiles(); };
   $('profileSort').onchange = e => { S.profileSort = e.target.value; S.tablePages.profiles = 1; profiles(); };
   bindSearch('profiles', profiles);
+}
+
+async function subscriptionRotationManager() {
+  openModal('批量重置订阅链接', `<p class="note">确认后，所选订阅的旧链接及其所有客户端转换地址将失效；自定义地址也会改成随机地址。用户需重新获取链接并在客户端替换。已下载的节点仍可能连接：此操作不重置节点 UUID / 密码，也不修改远端服务。</p><div class="toolbar"><button id="rotationAll" class="btn" disabled>选择全部订阅</button><button id="rotationNone" class="btn" disabled>取消选择</button><span id="rotationCount" class="pill">正在读取…</span></div><div id="rotationChoices" class="checks" style="max-height:30dvh;overflow:auto"></div><button id="rotationPreview" class="btn" disabled>预览链接重置</button><div id="rotationReview" role="status" aria-live="polite"></div><label class="inlinecheck"><input id="rotationConfirm" type="checkbox" disabled><span>我已知晓旧链接会失效，需要重新分发新链接</span></label><button id="rotationApply" class="btn danger" disabled>确认重置所选链接</button><p id="rotationError" class="error" role="alert"></p>`);
+  const choices=$('rotationChoices'), count=$('rotationCount'), preview=$('rotationPreview'), apply=$('rotationApply'), confirmBox=$('rotationConfirm'), review=$('rotationReview'), errorBox=$('rotationError'), all=$('rotationAll'), none=$('rotationNone');
+  const active=()=>choices.isConnected && !$('modal').classList.contains('hidden');
+  let rows=[],plan=null,generation=0,busy=false;
+  const selected=()=>[...choices.querySelectorAll('input:checked')].map(e=>rows[Number(e.value)].id);
+  const invalidate=()=>{generation++;plan=null;confirmBox.checked=false;confirmBox.disabled=true;apply.disabled=true;review.textContent='';errorBox.textContent='';count.textContent=`已选择 ${selected().length} / ${rows.length} 份`;preview.disabled=!selected().length || busy;};
+  const lock=state=>{busy=state;choices.querySelectorAll('input').forEach(e=>e.disabled=state);all.disabled=none.disabled=state;preview.disabled=state||!selected().length;};
+  try {
+    const data=await api('/profiles');if(!active())return;rows=data.profiles||[];
+    choices.innerHTML=rows.map((p,i)=>`<label class="choice"><input type="checkbox" value="${i}"><span style="min-width:0;overflow-wrap:anywhere">${esc(p.name)}${p.customSlug ? '（自定义地址）' : ''}</span></label>`).join('')||'<p>暂无订阅。</p>';
+    choices.onchange=invalidate;all.disabled=none.disabled=!rows.length;all.onclick=()=>{choices.querySelectorAll('input').forEach(e=>e.checked=true);invalidate()};none.onclick=()=>{choices.querySelectorAll('input').forEach(e=>e.checked=false);invalidate()};invalidate();
+  }catch(error){if(active()){count.textContent='读取失败';errorBox.textContent=error.message;}return;}
+  confirmBox.onchange=()=>apply.disabled=!plan||!confirmBox.checked||busy;
+  preview.onclick=async()=>{
+    invalidate();const ticket=generation,ids=selected();lock(true);
+    try{
+      const data=await api('/profiles/rotate-links',jsonOpt('POST',{action:'preview',ids}));if(!active()||generation!==ticket)return;
+      plan={ids,revision:data.revision};review.innerHTML=`<p>将重置 ${data.profiles.length} 份订阅，${data.profiles.filter(p=>p.custom).length} 份为自定义地址。保存前会备份订阅索引。</p><ul style="max-height:20dvh;overflow:auto;overflow-wrap:anywhere">${data.profiles.map(p=>`<li>${esc(p.name)}</li>`).join('')}</ul>`;confirmBox.disabled=false;
+    }catch(error){if(active())errorBox.textContent=error.message;}
+    finally{if(active())lock(false);}
+  };
+  apply.onclick=async()=>{
+    if(!plan||!confirmBox.checked||busy||!active())return;
+    const payload=plan;plan=null;lock(true);apply.disabled=true;confirmBox.disabled=true;
+    try{
+      const result=await api('/profiles/rotate-links',jsonOpt('POST',{...payload,action:'apply',confirmed:true}));
+      review.textContent=`已重置 ${result.profiles.length} 份订阅。请从订阅列表重新复制链接，普通用户可在订阅中心获取新链接。`;
+      choices.innerHTML='';count.textContent='操作完成';preview.disabled=true;confirmBox.checked=false;
+      try {await loadProfiles();await reload();}catch(error){errorBox.textContent='链接已重置，但页面刷新失败。请重新加载页面获取新链接。';}
+      notice('订阅链接已重置，旧链接已失效');
+    }catch(error){if(active()){errorBox.textContent=error.message+'；若响应中断，请先刷新订阅列表确认结果，再重新预览。';lock(false);}}
+  };
 }
 
 async function useProfile(encoded, page = 'nodes') {
