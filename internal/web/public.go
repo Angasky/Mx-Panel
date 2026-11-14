@@ -78,6 +78,9 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if parts[2] == "loon" {
 			extension = "-loon.conf"
 		}
+		if parts[2] == "surge-routing" {
+			extension = "-surge-routing.conf"
+		}
 		if parts[2] == "surge" {
 			extension = "-surge.conf"
 		}
