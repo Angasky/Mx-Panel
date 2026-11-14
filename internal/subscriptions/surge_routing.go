@@ -3,6 +3,7 @@ package subscriptions
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"strconv"
 	"strings"
@@ -83,15 +84,33 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 			return fail(e.Error())
 		}
 	}
+	graph := map[string][]string{}
 	proxies := []string{}
 	for _, n := range nodes {
-		row, e := surgeNode(n)
+		checked := n
+		underlying := ""
+		if raw, exists := n["dialer-proxy"]; exists {
+			ref, ok := raw.(string)
+			if !ok || ref == "" || names[ref] == "" || ref == "DIRECT" || ref == "REJECT" {
+				return fail("Surge 中转必须引用已转换的节点或策略组，暂不支持内置策略")
+			}
+			if n["tfo"] == true {
+				return fail("Surge 中转节点暂不支持同时启用 TFO")
+			}
+			checked = maps.Clone(n)
+			delete(checked, "dialer-proxy")
+			underlying = names[ref]
+			graph[text(n["name"])] = append(graph[text(n["name"])], ref)
+		}
+		row, e := surgeNode(checked)
 		if e != nil {
 			return fail("存在不兼容 Surge 的节点：" + e.Error())
 		}
+		if underlying != "" {
+			row += ", underlying-proxy=" + underlying
+		}
 		proxies = append(proxies, names[text(n["name"])]+" = "+row)
 	}
-	graph := map[string][]string{}
 	policyRows := []string{}
 	testURL := ""
 	for _, g := range groups {
@@ -162,7 +181,7 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 	}
 	for name := range graph {
 		if !visit(name) {
-			return fail("策略组存在循环引用")
+			return fail("策略组或中转节点存在循环引用")
 		}
 	}
 	sourceRules, ok := source.Document["rules"].([]any)
