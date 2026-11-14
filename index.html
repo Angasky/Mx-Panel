@@ -1830,6 +1830,8 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
 #aiFloatWindow select::picker(select),#aiSettingsForm select::picker(select){appearance:auto}
 #aiSettingsForm select{appearance:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #aiFloatWindow select::picker-icon,#aiSettingsForm select::picker-icon{display:none}
+
+.node-tag-list{display:flex;flex-wrap:wrap;gap:6px;min-width:0}.node-tag-list .pill{white-space:normal;overflow-wrap:anywhere;max-width:100%}#nodeTagsForm{display:grid;gap:10px;min-width:0}#nodeTagsForm textarea{width:100%;box-sizing:border-box;resize:vertical}.node-tags-preview{max-height:30dvh;overflow:auto;overflow-wrap:anywhere}.node-tags-preview>div{padding:10px 0;border-top:1px solid var(--border)}.node-tags-preview p{margin:4px 0}#nodeTagFilter{max-width:100%}
 </style>
 </head>
 <body>
@@ -4800,7 +4802,10 @@ function nodes() {
   const protocol = S.filters.nodeProtocol || '';
   const protocolCounts = new Map();
   for (const node of S.data.nodes) protocolCounts.set(node.type, (protocolCounts.get(node.type) || 0) + 1);
-  let rows = S.data.nodes.filter(x => (!protocol || x.type === protocol) && (x.name + ' ' + x.type + ' ' + nodeProtocol(x) + ' ' + x.server).toLowerCase().includes(q.toLowerCase()));
+  const tagCounts = new Map();
+  for (const node of S.data.nodes) for (const tag of nodeTags(node)) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+  const tagFilter = S.filters.nodeTag || '';
+  let rows = S.data.nodes.filter(x => (!protocol || x.type === protocol) && (!tagFilter || (tagFilter === 'none' ? !nodeTags(x).length : nodeTags(x).includes(tagFilter.slice(4)))) && (x.name + ' ' + x.type + ' ' + nodeProtocol(x) + ' ' + x.server + ' ' + nodeTags(x).join(' ')).toLowerCase().includes(q.toLowerCase()));
   $('content').innerHTML = cards() + `
   <section class="panel">
     <div class="panel-head"><div><h3>我的节点</h3><p class="hint">服务器绑定节点可直接“批量加入订阅”，为每份订阅生成独立凭据；点击“策略组”设置用途。</p></div></div>
@@ -4810,15 +4815,16 @@ function nodes() {
       <button type="button" class="btn small" onclick="chooseNodeServer('subscriptions')">单个节点批量加入订阅</button><button type="button" class="btn small" onclick="chooseNodeServer('browse')">查看服务器节点</button>
       <button type="button" class="btn small" onclick="go('traffic')">订阅流量与有效期</button>
     </div>
-    <div class="toolbar"><input id="search" aria-label="搜索节点" placeholder="搜索名称、协议或服务器地址…" value="${esc(q)}"></div>
+    <div class="toolbar"><input id="search" aria-label="搜索节点" placeholder="搜索名称、标签、协议或服务器地址…" value="${esc(q)}"><label for="nodeTagFilter">标签筛选</label><select id="nodeTagFilter" aria-label="按节点标签筛选"><option value="">全部标签</option><option value="none" ${tagFilter === 'none' ? 'selected' : ''}>未打标签 · ${S.data.nodes.filter(n=>!nodeTags(n).length).length}</option>${[...tagCounts].sort(([a],[b])=>a.localeCompare(b,'zh-CN')).map(([tag,count])=>`<option value="${esc('tag:'+tag)}" ${tagFilter === 'tag:'+tag ? 'selected' : ''}>${esc(tag)} · ${count}</option>`).join('')}${tagFilter.startsWith('tag:') && !tagCounts.has(tagFilter.slice(4)) ? `<option value="${esc(tagFilter)}" selected>${esc(tagFilter.slice(4))} · 0</option>` : ''}</select></div>
     <div class="node-protocol-filter" role="group" aria-label="按节点协议筛选">
       <button type="button" class="btn small" data-node-protocol="" aria-pressed="${!protocol}">全部 · ${S.data.nodes.length}</button>
       ${[...protocolCounts].sort(([a],[b]) => a.localeCompare(b)).map(([type,count]) => `<button type="button" class="btn small" data-node-protocol="${esc(type)}" aria-pressed="${type === protocol}">${esc(type.toUpperCase())} · ${count}</button>`).join('')}
     </div>
-    <details class="node-secondary"><summary>批量操作 · 节点选择、名称与证书验证</summary><div class="toolbar">
+    <details class="node-secondary"><summary>批量操作 · 标签、名称与证书验证</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
       <button type="button" class="btn small" onclick="clearNodeSelection()">取消选择</button>
       <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button>
+      <button id="bulkTagsButton" type="button" class="btn small" onclick="nodeTagsModal()">批量管理标签</button>
       <button id="bulkCertificateButton" type="button" class="btn small" onclick="bulkNodeCertificates()">启用证书验证</button>
       <button id="bulkDeleteButton" type="button" class="btn small danger" onclick="bulkDeleteNodes()">批量删除</button>
       <span id="nodeSelectedCount" class="pill">已选择 0 个</span>
@@ -4837,10 +4843,12 @@ function nodes() {
                 <button type="button" class="drag-handle" title="拖动排序；键盘上下键移动，Home / End 置顶 / 置底" aria-label="拖动排序 ${esc(x.name)}">${uiIcon('grip-vertical')}</button>
               </div>
               <div class="node-card-meta"><code>${esc(nodeProtocol(x))}</code>${x.config?.udp ? '<span class="pill">UDP</span>' : ''}${x.config?.['dialer-proxy'] ? '<span class="pill">链式代理</span>' : ''}</div>
+              ${nodeTags(x).length ? `<div class="node-tag-list" aria-label="节点标签">${nodeTags(x).map(tag=>`<span class="pill">${esc(tag)}</span>`).join('')}</div>` : ''}
               <div class="node-card-address" title="${esc(x.server)}:${esc(x.port)}">${esc(x.server)}:${esc(x.port)}</div>
               <div class="node-card-actions">
                 <button class="btn small" onclick="nodeModal(${x.index})">编辑</button>
                 <button class="btn small" onclick="nodeGroupsModal(${x.index})">策略组</button>
+                <button class="btn small" onclick="nodeTagsModal(${x.index})">标签</button>
                 ${nodeSubscriptionBinding(x) ? `<button class="btn small primary" onclick="nodeSubscriptionImport(${x.index})">批量加入订阅</button>` : ''}
                 <button class="btn small primary" onclick="shareNode(${x.index})" title="显示二维码并导出节点链接">分享</button>
                 <details><summary class="btn small" aria-label="更多节点操作">更多</summary><div>
@@ -4854,6 +4862,7 @@ function nodes() {
     </div>
   </section>`;
   document.querySelectorAll('[data-node-protocol]').forEach(button => button.onclick = () => { S.filters.nodeProtocol = button.dataset.nodeProtocol; nodes(); });
+  $('nodeTagFilter').onchange = e => { S.filters.nodeTag = e.target.value; nodes(); };
   bindSearch('nodes', nodes);
   setupNodeDrag();
   updateNodeSelectionUi();
@@ -4874,7 +4883,44 @@ function updateNodeSelectionUi() {
   }
   if ($('nodeSelectedCount')) $('nodeSelectedCount').textContent = `已选择 ${S.nodeSelection.size} 个`;
   if ($('bulkDeleteButton')) $('bulkDeleteButton').disabled = S.nodeSelection.size === 0;
+  if ($('bulkTagsButton')) $('bulkTagsButton').disabled = S.nodeSelection.size === 0;
   if ($('bulkCertificateButton')) $('bulkCertificateButton').disabled = S.nodeSelection.size === 0;
+}
+
+function nodeTags(node) {
+  return Array.isArray(node?.config?.['x-mxioc-tags']) ? node.config['x-mxioc-tags'].filter(t=>typeof t==='string') : [];
+}
+
+async function nodeTagsModal(index) {
+  const single = Number.isInteger(index) ? S.data.nodes.find(n=>n.index===index) : null;
+  const names = single ? [single.name] : [...S.nodeSelection], profile = S.profile;
+  if (!names.length) return;
+  openModal(single ? '管理节点标签' : '批量管理节点标签', `<form id="nodeTagsForm"><p class="hint">已选择 ${names.length} 个节点（包含筛选隐藏的已选节点）。每个节点最多 16 个标签，每个标签最多 32 个字符。标签仅在面板中管理，不下发到客户端。</p><label for="nodeTagsMode">操作</label><select id="nodeTagsMode"><option value="add">添加标签（保留已有标签）</option><option value="remove">移除指定标签</option><option value="replace" ${single ? 'selected' : ''}>替换全部标签</option><option value="clear">清空标签</option></select><label for="nodeTagsInput">标签（每行一个，区分大小写）</label><textarea id="nodeTagsInput" rows="4" placeholder="香港&#10;流媒体&#10;备用线路">${single ? esc(nodeTags(single).join('\n')) : ''}</textarea><div class="toolbar"><button class="btn" id="nodeTagsPreview" type="submit">预览修改</button><button class="btn primary" id="nodeTagsApply" type="button" disabled>确认保存标签</button></div><div id="nodeTagsError" class="error" role="alert"></div><div id="nodeTagsReview" role="status" aria-live="polite"></div></form>`);
+  const form=$('nodeTagsForm'), mode=$('nodeTagsMode'), input=$('nodeTagsInput'), previewButton=$('nodeTagsPreview'), applyButton=$('nodeTagsApply'), errorBox=$('nodeTagsError'), review=$('nodeTagsReview');
+  let generation=0, plan=null;
+  const active=()=>form.isConnected && !$('modal').classList.contains('hidden') && S.profile===profile;
+  const invalidate=()=>{generation++;plan=null;applyButton.disabled=true;review.textContent='';errorBox.textContent='';input.disabled=mode.value==='clear';};
+  mode.onchange=invalidate;input.oninput=invalidate;
+  const request=payload=>api('/nodes/tags',{...jsonOpt('POST',{...payload,names}),headers:{'Content-Type':'application/json','X-Profile':profile}});
+  form.onsubmit=async e=>{
+    e.preventDefault();invalidate();const ticket=generation;
+    const action={mode:mode.value,tags:mode.value==='clear' ? [] : input.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)};
+    previewButton.disabled=true;
+    try {
+      const result=await request({...action,action:'preview'});
+      if (!active() || generation!==ticket) return;
+      plan={...action,revision:result.revision};
+      review.innerHTML=`<p>将修改 ${result.changes.length} 个节点，${result.unchanged} 个无需修改。</p><div class="node-tags-preview">${result.changes.map(change=>`<div><strong>${esc(change.name)}</strong><p>原标签：${esc(change.before.join('、') || '无')}</p><p>新标签：${esc(change.after.join('、') || '无')}</p></div>`).join('')}</div>`;
+      applyButton.disabled=!result.changes.length;
+    } catch(error) {if(active() && generation===ticket)errorBox.textContent=error.message;}
+    finally{if(active())previewButton.disabled=false;}
+  };
+  applyButton.onclick=async()=>{
+    if(!active() || !plan)return;
+    const submitted=plan;plan=null;generation++;applyButton.disabled=true;previewButton.disabled=true;mode.disabled=true;input.disabled=true;
+    try{await request({...submitted,action:'apply',confirmed:true});if(!active())return;closeModal();await reload();notice('节点标签已保存');}
+    catch(error){if(active()){errorBox.textContent=error.message+'；请重新预览。';previewButton.disabled=false;mode.disabled=false;input.disabled=mode.value==='clear';}}
+  };
 }
 
 async function bulkNodeCertificates() {

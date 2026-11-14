@@ -87,6 +87,13 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 	if err != nil {
 		return Subscription{}, err
 	}
+	doc, stripped := stripNodeTags(doc)
+	if stripped {
+		raw, err = yaml.Marshal(doc)
+		if err != nil {
+			return Subscription{}, err
+		}
+	}
 	options, err := readClientOptions(record)
 	if err != nil {
 		return Subscription{}, err

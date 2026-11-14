@@ -76,6 +76,7 @@ func (r *Repository) ImportSubscription(id string, nodes []map[string]any, confl
 		for _, source := range nodes {
 			node := cloneConfig(source).(Document)
 			delete(node, "dialer-proxy")
+			delete(node, NodeTagsKey) // External sources cannot replace local management labels.
 			if err := ValidateNode(node); err != nil {
 				return err
 			}
@@ -92,6 +93,9 @@ func (r *Repository) ImportSubscription(id string, nodes []map[string]any, confl
 			if exists && conflict == "replace" {
 				if owned[name] {
 					return errors.New("节点拥有服务器专属用户，请改用重命名导入")
+				}
+				if tags, ok := list[index].(Document)[NodeTagsKey]; ok {
+					node[NodeTagsKey] = cloneConfig(tags)
 				}
 				list[index] = node
 				replaced++

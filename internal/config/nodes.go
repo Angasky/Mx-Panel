@@ -77,6 +77,9 @@ func ValidateNode(node map[string]any) error {
 	if node == nil {
 		return errors.New("节点配置必须为对象")
 	}
+	if _, err := nodeTags(node[NodeTagsKey]); err != nil {
+		return err
+	}
 	if err := normalizeNumbers(node); err != nil {
 		return err
 	}

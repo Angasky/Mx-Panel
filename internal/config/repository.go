@@ -173,6 +173,11 @@ func validate(doc Document) error {
 				return errors.New("节点或策略组名称为空或重复")
 			}
 			names[name] = true
+			if key == "proxies" {
+				if _, err := nodeTags(row[NodeTagsKey]); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if doc["rules"] != nil {
@@ -413,7 +418,11 @@ func protectedComponents(doc Document, p Profile) string {
 		for _, value := range rows(doc, key) {
 			row := value.(map[string]any)
 			if names[stringValue(row["name"])] {
-				selected[key+":"+stringValue(row["name"])] = row
+				protected := cloneConfig(row).(Document)
+				if key == "proxies" {
+					delete(protected, NodeTagsKey)
+				}
+				selected[key+":"+stringValue(row["name"])] = protected
 			}
 		}
 	}
