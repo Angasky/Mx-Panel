@@ -29,6 +29,7 @@ type sharedMonitor struct {
 	Label string `json:"label"`
 }
 type monitorShare struct {
+	Entry      monitorEntry      `json:"entry"`
 	Appearance monitorAppearance `json:"appearance"`
 	Public     bool              `json:"public"`
 	Enabled    bool              `json:"enabled"`
@@ -81,7 +82,7 @@ func (s *Server) readShare() (monitorShare, error) {
 	if err != nil {
 		return c, err
 	}
-	if len(data) > 64<<10 || json.Unmarshal(data, &c) != nil || !validSharedServers(c.Servers) || !validMonitorAppearance(c.Appearance) {
+	if len(data) > 64<<10 || json.Unmarshal(data, &c) != nil || !validSharedServers(c.Servers) || !validMonitorAppearance(c.Appearance) || !validMonitorEntry(c.Entry) {
 		return c, errors.New("监控分享配置损坏")
 	}
 	if c.Digest != "" {
@@ -139,6 +140,7 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 	token := ""
 	if r.Method == "PUT" || r.Method == "POST" {
 		var input struct {
+			Entry      *monitorEntry      `json:"entry"`
 			Appearance *monitorAppearance `json:"appearance"`
 			Public     bool               `json:"public"`
 			Enabled    bool               `json:"enabled"`
@@ -147,6 +149,13 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 		if readJSON(w, r, &input) != nil || !validSharedServers(input.Servers) {
 			problem(w, 400, "最多分享 32 台服务器，公开名称需为 1–60 个字符且不能包含控制字符")
 			return true
+		}
+		if input.Entry != nil {
+			if !validMonitorEntry(*input.Entry) {
+				problem(w, 400, "探针地址须为 /status/名称，名称为 1–48 位字母、数字、下划线或短横线")
+				return true
+			}
+			c.Entry = *input.Entry
 		}
 		if input.Appearance != nil {
 			if !validMonitorAppearance(*input.Appearance) {
@@ -200,7 +209,7 @@ func (s *Server) monitorShareAdmin(w http.ResponseWriter, r *http.Request) bool 
 			return true
 		}
 	}
-	result := map[string]any{"appearance": c.Appearance, "public": c.Public, "publicURL": "/sub/status-public", "enabled": c.Enabled, "servers": c.Servers, "hasLink": c.Digest != "", "updated": c.Updated}
+	result := map[string]any{"entry": c.Entry, "appearance": c.Appearance, "public": c.Public, "publicURL": "/sub/status-public", "enabled": c.Enabled, "servers": c.Servers, "hasLink": c.Digest != "", "updated": c.Updated}
 	if token != "" {
 		result["url"] = "/sub/status/" + token
 		result["token"] = token

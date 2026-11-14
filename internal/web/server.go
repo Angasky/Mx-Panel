@@ -224,6 +224,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"ok": true, "runtime": "go", "version": s.options.Version})
 		return
 	}
+	if s.monitorEntryRoute(w, r) {
+		return
+	}
 	if r.URL.Path == "/" || r.URL.Path == "/admin" || r.URL.Path == "/admin/" {
 		if r.Method != "GET" && r.Method != "HEAD" {
 			problem(w, 405, "请求方法不支持")
