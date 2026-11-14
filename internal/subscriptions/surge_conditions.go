@@ -15,7 +15,24 @@ func surgeRoutingCondition(kind, value string, noResolve bool) (string, error) {
 	}
 	return renderSurgeCondition(r)
 }
-func renderSurgeCondition(r Record) (string, error) {
+func renderSurgeCondition(r Record, sets ...map[string]Record) (string, error) {
+	result, err := renderSurgeConditionDepth(r, 0, sets...)
+	if err == nil && len(result) > 8192 {
+		return "", errors.New("展开后的 Surge 条件超过 8192 字节")
+	}
+	return result, err
+}
+func renderSurgeConditionDepth(r Record, depth int, sets ...map[string]Record) (string, error) {
+	if depth > 10 {
+		return "", errors.New("展开后的 Surge 条件嵌套超过 10 层")
+	}
+	if raw, exists := r["rule_set"]; exists {
+		names, ok := raw.([]string)
+		if !ok || len(r) != 1 || len(names) != 1 || len(sets) != 1 || sets[0][names[0]] == nil {
+			return "", errors.New("Surge 内嵌规则集引用无效")
+		}
+		return renderSurgeConditionDepth(sets[0][names[0]], depth+1, sets...)
+	}
 	fail := func() (string, error) { return "", errors.New("Surge 分流规则类型或条件暂未适配") }
 	if r["type"] == "logical" {
 		for k := range r {
@@ -33,11 +50,14 @@ func renderSurgeCondition(r Record) (string, error) {
 			if !ok {
 				return fail()
 			}
-			text, e := renderSurgeCondition(c)
+			text, e := renderSurgeConditionDepth(c, depth+1, sets...)
 			if e != nil {
 				return "", e
 			}
 			parts = append(parts, "("+text+")")
+			if len(strings.Join(parts, ",")) > 8192 {
+				return "", errors.New("展开后的 Surge 条件超过 8192 字节")
+			}
 		}
 		mode := strings.ToUpper(text(r["mode"]))
 		if mode != "AND" && mode != "OR" {
@@ -115,6 +135,9 @@ func renderSurgeCondition(r Record) (string, error) {
 		}
 		if len(parts) == 0 {
 			return fail()
+		}
+		if depth >= 10 {
+			return "", errors.New("端口集合展开后超过 Surge 嵌套限制")
 		}
 		for i := range parts {
 			parts[i] = "(" + parts[i] + ")"

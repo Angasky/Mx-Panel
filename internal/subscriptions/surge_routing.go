@@ -20,7 +20,7 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 	if source.ClientOptions != nil && (source.ClientOptions.WebRTC || source.ClientOptions.DNSProtection) {
 		return fail("Surge 分流导出不能继承 DNS/WebRTC 防护，请使用完整 Mihomo 配置")
 	}
-	for _, key := range []string{"proxy-providers", "rule-providers", "sub-rules"} {
+	for _, key := range []string{"proxy-providers", "sub-rules"} {
 		if v, ok := source.Document[key]; ok && v != nil {
 			return fail("Surge 分流暂不支持提供者或子规则：" + key)
 		}
@@ -43,6 +43,24 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 				return fail("节点和策略组必须为对象")
 			}
 		}
+	}
+	inlineSets, setRefs, setErr := singBoxInlineRuleSets(source.Document["rule-providers"])
+	if setErr != nil {
+		return fail(setErr.Error())
+	}
+	expandedSets := map[string]Record{}
+	for _, raw := range inlineSets {
+		set := raw.(Record)
+		rules := set["rules"].([]any)
+		// Each provider is an OR, including when used inside NOT or AND.
+		condition := Record{"type": "logical", "mode": "or", "rules": rules}
+		if len(rules) == 1 {
+			condition = rules[0].(Record)
+		}
+		if _, err := renderSurgeCondition(condition); err != nil {
+			return fail(err.Error())
+		}
+		expandedSets[text(set["tag"])] = condition
 	}
 	names := map[string]string{"DIRECT": "DIRECT", "REJECT": "REJECT"}
 	nodes, groups := objects(source.Document["proxies"]), objects(source.Document["proxy-groups"])
@@ -152,6 +170,7 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 		return fail("Surge 分流需要明确的规则及末尾 MATCH")
 	}
 	rules := []string{}
+	ruleBytes := 0
 	final := false
 	for i, item := range sourceRules {
 		raw, ok := item.(string)
@@ -181,18 +200,30 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 		if len(parts) == 4 && !noResolve {
 			return fail("规则选项暂不支持")
 		}
-		condition, e := surgeRoutingCondition(kind, value, noResolve)
+		parsed, e := singBoxCondition(kind, value, noResolve, 0, new(int), setRefs)
+		if e != nil {
+			return fail(e.Error())
+		}
+		condition, e := renderSurgeCondition(parsed, expandedSets)
 		if e != nil {
 			return fail(e.Error())
 		}
 		// Basic IP flags belong after the policy, whereas nested flags remain
 		// within each parenthesized condition.
 		option := ""
-		if kind == "IP-CIDR" || kind == "IP-CIDR6" {
+		if strings.HasPrefix(condition, "IP-CIDR,") || strings.HasPrefix(condition, "IP-CIDR6,") {
 			condition = strings.TrimSuffix(condition, ",no-resolve")
 			option = ",no-resolve"
 		}
-		rules = append(rules, condition+","+names[target]+option)
+		line := condition + "," + names[target] + option
+		if len(line) > 8192 {
+			return fail("规则集展开后的单条 Surge 规则超过 8192 字节")
+		}
+		ruleBytes += len(line) + 1
+		if ruleBytes > 4<<20 {
+			return fail("规则集展开后的 Surge 规则超过 4 MiB")
+		}
+		rules = append(rules, line)
 	}
 	if !final {
 		return fail("缺少末尾 MATCH，拒绝猜测默认出口")
@@ -200,6 +231,9 @@ func convertSurgeRouting(source config.Subscription) (Export, error) {
 	general := ""
 	if testURL != "" {
 		general = "[General]\nproxy-test-url = " + testURL + "\ninternet-test-url = " + testURL + "\n\n"
+	}
+	if len(strings.Join(rules, "\n")) > 4<<20 {
+		return fail("规则集展开后的 Surge 规则超过 4 MiB")
 	}
 	result.Count = len(nodes)
 	result.Body = []byte("# MX-Panel Surge routing (experimental); DNS/TUN settings are not converted.\n" + general + "[Proxy]\n" + strings.Join(proxies, "\n") + "\n\n[Proxy Group]\n" + strings.Join(policyRows, "\n") + "\n\n[Rule]\n" + strings.Join(rules, "\n") + "\n")

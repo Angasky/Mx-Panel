@@ -1,4 +1,4 @@
-# Surge 分流配置（v0.2.21，实验性）
+# Surge 分流配置（v0.2.22，实验性）
 
 入口：订阅总览 → 客户端订阅与扫码导入 → **Surge 分流配置（实验性）**。独立下载地址为 `/convert/<订阅令牌>/surge-routing`，文件扩展名 `.conf`。原有 `surge` 基础节点导出仍保持原来的独立手动组与兼容节点跳过行为。
 
@@ -25,7 +25,7 @@ Surge 的测试采用 HEAD 请求，并按使用情况和测试结果年龄触�
 
 ## 仍未转换
 
-DNS/TUN、嗅探、规则集、代理提供者、GEOIP/GEOSITE、进程规则、节点 dialer-proxy、面板远端主备及服务器链路。启用了面板 DNS/WebRTC 防护覆盖的订阅拒绝这个分流导出，防止误以为已继承保护。需要完整保持原配置时使用 Mihomo 原始订阅。
+DNS/TUN、嗅探、远程/文件规则集、代理提供者、GEOIP/GEOSITE、进程规则、节点 dialer-proxy、面板远端主备及服务器链路。启用了面板 DNS/WebRTC 防护覆盖的订阅拒绝这个分流导出，防止误以为已继承保护。需要完整保持原配置时使用 Mihomo 原始订阅。
 
 本功能补齐 Surge 的部分策略组与规则转换，不是与妙妙屋或 Mihomo 的完整等价。它也不会让 Surge 支持其本身不支持的节点协议。
 
@@ -80,3 +80,28 @@ Surge 源端口规则要求支持该能力的版本（官方标注 iOS 5.8.4+ / 
 - https://manual.nssurge.com/rules/source-and-port.html
 - https://manual.nssurge.com/rules/protocol-and-network.html
 - https://manual.nssurge.com/rules/logical.html
+
+
+## v0.2.22：内嵌规则集
+
+支持 `rule-providers` 中 `type: inline` 的 domain、ipcidr、classical 三种 behavior。引用处展开为内联规则条件，不生成规则文件、远程 URL 或新公开下载入口：
+
+- domain：精确域名及 `+.example.com` 后缀；其他通配语法仍拒绝。
+- ipcidr：IPv4/IPv6 CIDR，自动规范化网段。
+- classical：本页已支持的基础/端口/来源/逻辑条件，不携带路由动作；不支持规则集之间继续引用。
+
+顶层 `RULE-SET,集合,策略` 及 AND/OR/NOT 内的 RULE-SET 子条件均可转换。多个集合条目按 OR 解释，单条直接展开；NOT 取反整个集合，不逐条取反。包含目标 IP 条件的集合在引用处必须显式 `no-resolve`，classical 内的目标 IP 条件也需明确该选项。
+
+例如 `RULE-SET,本地域名,DIRECT` 引用 `[example.org, +.example.net]` 时输出：
+
+```text
+OR,((DOMAIN,example.org),(DOMAIN-SUFFIX,example.net)),DIRECT
+```
+
+仅一个 IP 条目的顶层引用输出 `IP-CIDR,网段,策略,no-resolve`，IP 选项放在策略之后；嵌套引用的选项保留在子条件内，避免展开破坏语法。
+
+限制：最多 64 个规则集、合计 4096 个条目，每个输入条目最多 8192 字节。展开后的单条规则最多 8192 字节、全部规则最多 4 MiB；包含规则集和端口集合展开后的嵌套深度受 10 层限制。重复引用大集合可能触发展开限制，届时整份拒绝，不截断。未使用的规则集也检查兼容性。
+
+HTTP/文件提供者、未知字段、空集合、未知引用、进程等未适配子条件均拒绝。只读取内存中的订阅数据，不发网络请求，不读取集合声明的文件路径；原基础 Surge 导出保持不变。
+
+专项验证覆盖三种 behavior、顶层/逻辑引用、单 IP 选项位置、NOT 整体取反、循环引用拒绝、确定性导出、原始数据不变及输入/展开边界。真实浏览器验证新格式下载中的展开内容及六主题四种屏幕宽度。仍没有 Surge iOS/macOS 实机联网验收。

@@ -181,3 +181,10 @@ Go 全量测试、针对性 race、隔离浏览器下载/兼容报告和六主�
 扩展独立分流导出，支持 SRC-IP-CIDR、SRC-PORT/DST-PORT 的范围与集合、TCP/UDP、嵌套 AND/OR/NOT。端口集合转换为 OR，保留 IP 子条件 no-resolve；限制规则长度、层数和条件数量，不支持的子条件整份拒绝。后端边界/权限、race 和真实浏览器下载结果检查通过，尚无 Surge 客户端实机验收。
 
 规则集、进程规则、完整 DNS/TUN/链路及跨客户端等价仍未补齐；Agent 非 SSH 全流程、数据库切换、三网回程、跨内核在线连接、多套餐拼车等差异继续保留。详见 [Surge 分流导出](SURGE-ROUTING.md)。
+
+
+### v0.2.22：Surge 内嵌规则集
+
+独立分流导出支持 inline domain/ipcidr/classical 集合及顶层、逻辑条件内 RULE-SET 引用。集合展开为 OR，不增加远程抓取或文件读取；保留 IP no-resolve 位置并校验引用、输入条数、展开大小和嵌套深度。Go 全量、针对性 race 与浏览器下载结果检查通过，Surge 实机验收仍未完成。
+
+远程/文件规则集、进程规则、完整 DNS/TUN/链路及跨客户端等价仍有差异；Agent 非 SSH 全流程、数据库切换、三网回程、统一在线连接、多套餐拼车等仍未补齐。详见 [Surge 分流导出](SURGE-ROUTING.md)。
