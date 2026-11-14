@@ -28,3 +28,10 @@ IP/极速模式用自签名 HTTPS，域名模式自动申请与续期 Let’s En
 `fresh` / `install` / `update` 成功后自动注册 `/usr/local/bin/mx-p`。菜单嵌入 Go 二进制，本地打开无需网络；升级时才下载 GitHub 发布包。直接 HTTP/仅 SSH 转发后端端口无法登录，应使用 HTTPS 网关或已有 HTTPS 反代。
 
 验证范围：本地真实 TLS 与登录、凭据重置、隔离安装/更新/卸载脚本检查；没有在本机实际启停生产 systemd 服务，公网域名 ACME 签发仍需目标服务器验证。
+
+
+## v0.2.36 网站信息路由
+
+若使用 `deploy/nginx.conf.example` 的整站转发无需修改。已有 Nginx 若仅转发 `/admin/`、`/sub/` 和 `/convert/`，还须将 `/site-info`、`/site-icon` 两个精确路径转发到 `127.0.0.1:62578`，并沿用 Host、X-Forwarded-Proto 和真实 IP 头设置；否则登录页无法读取自定义网站信息和图标。修改前备份反代配置，执行 `nginx -t` 后平滑重载。
+
+部署后检查 `/admin/`、`/site-info`、`/site-icon` 的 HTTPS 响应，以及未登录请求管理接口仍返回 401。源站 HTML 应与安装包一致；CDN 自动注入脚本可能导致公网 HTML 字节哈希不同。版本以本机 `/healthz` 返回为准。
