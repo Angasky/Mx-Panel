@@ -56,6 +56,14 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
+	if source.BlockBrowserDownloads && browserSubscriptionRequest(r) {
+		if r.Method == "HEAD" {
+			w.WriteHeader(http.StatusForbidden)
+		} else {
+			problem(w, 403, "该订阅已关闭浏览器直接下载，请在代理客户端中更新订阅，或联系管理员调整设置")
+		}
+		return true
+	}
 	body := source.Raw
 	extension := ".yaml"
 	contentType := "text/yaml; charset=utf-8"

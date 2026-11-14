@@ -13,13 +13,14 @@ var ErrSubscriptionMissing = errors.New("订阅不存在")
 var ErrSubscriptionBlocked = errors.New("订阅已过期或流量已用尽")
 
 type Subscription struct {
-	ClientOptions *ClientOptions `json:"-"`
-	Name, Slug    string
-	Document      Document
-	Raw           []byte
-	Traffic       Document
-	Userinfo      string
-	Managed       Document `json:"-"`
+	BlockBrowserDownloads bool           `json:"-"`
+	ClientOptions         *ClientOptions `json:"-"`
+	Name, Slug            string
+	Document              Document
+	Raw                   []byte
+	Traffic               Document
+	Userinfo              string
+	Managed               Document `json:"-"`
 }
 
 // PublicSubscription resolves capability tokens only. Profile IDs, old index
@@ -72,6 +73,10 @@ func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscri
 }
 
 func (r *Repository) subscriptionRecordView(record Document, now time.Time, includeDocument bool) (Subscription, error) {
+	blockBrowser, err := readSubscriptionBrowser(record)
+	if err != nil {
+		return Subscription{}, err
+	}
 	info, err := TrafficInfo(record, now)
 	if err != nil {
 		return Subscription{}, err
@@ -141,7 +146,7 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 	if includeDocument {
 		document = cloneConfig(doc).(Document)
 	}
-	return Subscription{ClientOptions: options, Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
+	return Subscription{BlockBrowserDownloads: blockBrowser, ClientOptions: options, Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available
