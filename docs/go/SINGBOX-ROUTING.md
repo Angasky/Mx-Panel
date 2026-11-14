@@ -79,3 +79,21 @@ PROCESS-PATH 支持桌面系统绝对路径，包含 Windows 路径与空格。M
 此功能是 DOMAIN-WILDCARD 条件，不改变 inline domain 提供者的专用语法；该提供者仍只接受精确域名及 +. 后缀。使用通配条件时选择 classical 集合。Surge 不会因为共享解析器而误接受尚未适配的通配条件，仍整份拒绝。
 
 测试覆盖根域/多级子域、问号长度、大小写、正则字面量转义、锚定、非法字符/长度、逻辑与 classical 引用、源配置不变、下载接口及跨格式拒绝。真实 sing-box 内核 check 通过；没有手机客户端实际联网验收。
+
+
+## v0.2.31：常用域名正则子集
+
+独立 sing-box 分流导出新增 DOMAIN-REGEX，可用于顶层、AND/OR/NOT 子条件及 inline classical 规则集。例如：
+
+```text
+DOMAIN-REGEX,^ads[0-9]+\.example\.com$,REJECT
+AND,((NETWORK,tcp),(DOMAIN-REGEX,^(api|cdn)\.example\.net$)),选择
+```
+
+Mihomo 使用 regexp2 并默认忽略大小写，sing-box 使用 Go 正则；本实现仅接受两者共同的常用子集，生成 `(?i)` 前缀，不自动添加首尾锚点。未写 ^ / $ 的表达式仍是子串匹配，不会擅自变为整域名匹配。
+
+表达式限 1–1024 字节 ASCII，支持域名字面字符、普通分组、分支 |、字符类及范围/取反、^ / $、点和 * / + / ? 量词，以及转义点和连字符。国际域名使用 Punycode。拒绝前后查找、反向引用、内联标志、特殊分组、字符类减法、POSIX 类、`\w` / `\d` / Unicode 类、花括号重复次数、逗号和 no-resolve。非法或不支持表达式拒绝整份导出；不请求远程资源。不能把此子集当作任意 Unicode 文本的正则兼容层。
+
+原 inline domain 集合仍采用域名专用语法，正则请放到 classical 集合。Surge 分流不会因共用条件解析器而自动开放正则规则。
+
+验证：匹配/不匹配样例、大小写与锚定、非法输入、嵌套与内嵌集合、源配置不变、GET/HEAD 下载，以及 sing-box 1.14.4 内核 check；Go 全量与专项 race 通过。另以实际 regexp2 和 Go 正则比较 32192 组 ASCII 主机名结果。没有手机客户端实机联网验收；远程规则集、完整 DNS/TUN、跨客户端完全等价等仍未完成。

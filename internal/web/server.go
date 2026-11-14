@@ -47,6 +47,7 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	siteInfoMu           sync.Mutex
 	portableBackupMu     sync.Mutex
 	aiMu                 sync.Mutex
 	aiActive             map[string]bool
@@ -228,6 +229,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.monitorEntryRoute(w, r) {
 		return
 	}
+	if r.URL.Path == "/site-info" {
+		s.siteInfoPublic(w, r)
+		return
+	}
+	if r.URL.Path == "/site-icon" {
+		s.siteIconPublic(w, r)
+		return
+	}
 	if r.URL.Path == "/" || r.URL.Path == "/admin" || r.URL.Path == "/admin/" {
 		if r.Method != "GET" && r.Method != "HEAD" {
 			problem(w, 405, "请求方法不支持")
@@ -281,6 +290,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.authorized(r) {
 		problem(w, 401, "请重新登录")
+		return
+	}
+	if s.siteInfoAdmin(w, r) {
 		return
 	}
 	if s.aiRoute(w, r, nil) {
@@ -347,6 +359,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.monitorShareAdmin(w, r) {
+		return
+	}
+	if s.serverObservationsRoute(w, r) {
 		return
 	}
 	if s.monitorHistoryRoute(w, r) {

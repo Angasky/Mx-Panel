@@ -19,6 +19,7 @@ import (
 )
 
 type notificationConfig struct {
+	TextTemplate string `json:"textTemplate"`
 	Renewal      bool   `json:"renewal"`
 	RenewalUsers string `json:"renewalUsers"`
 	Enabled      bool   `json:"enabled"`
@@ -37,6 +38,7 @@ type notificationConfig struct {
 	LossPercent  int    `json:"lossPercent"`
 }
 type notificationEvent struct {
+	DeliveryText  string           `json:"deliveryText,omitempty"`
 	RenewalResult string           `json:"renewalResult,omitempty"`
 	Renewal       *telegramRenewal `json:"renewal,omitempty"`
 	Key           string           `json:"key,omitempty"`
@@ -71,6 +73,9 @@ func (s *Server) readNotifications() (notificationState, error) {
 	if n.Active == nil {
 		n.Active = map[string]string{}
 	}
+	if e == nil {
+		e = validateNotificationTemplate(n.Config.TextTemplate)
+	}
 	return n, e
 }
 func (s *Server) saveNotifications(n notificationState) error {
@@ -101,6 +106,9 @@ var notificationTokenPattern = regexp.MustCompile(`^[0-9]{5,20}:[A-Za-z0-9_-]{20
 var notificationChatPattern = regexp.MustCompile(`^-?[0-9]{1,20}$`)
 
 func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool {
+	if s.notificationTemplateRoute(w, r) {
+		return true
+	}
 	if r.URL.Path == "/admin/api/notifications/daily-preview" {
 		if r.Method != "GET" {
 			problem(w, 405, "请求方法不支持")
@@ -128,6 +136,7 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 	case "GET":
 	case "PUT":
 		var input struct {
+			TextTemplate *string `json:"textTemplate"`
 			Renewal      *bool   `json:"renewal"`
 			RenewalUsers *string `json:"renewalUsers"`
 			Enabled      bool    `json:"enabled"`
@@ -176,6 +185,14 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 			return true
 		}
 		next := notificationConfig{Enabled: input.Enabled, ChatID: input.ChatID, SealedToken: sealed, Monitor: input.Monitor, Traffic: input.Traffic, Expiry: input.Expiry, Days: input.Days, Percent: input.Percent, Failures: input.Failures, Daily: n.Config.Daily, DailyHour: n.Config.DailyHour, Probes: n.Config.Probes, LatencyMS: n.Config.LatencyMS, LossPercent: n.Config.LossPercent}
+		next.TextTemplate = n.Config.TextTemplate
+		if input.TextTemplate != nil {
+			next.TextTemplate = *input.TextTemplate
+		}
+		if err := validateNotificationTemplate(next.TextTemplate); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
 		next.Renewal, next.RenewalUsers = n.Config.Renewal, n.Config.RenewalUsers
 		if input.Renewal != nil {
 			next.Renewal = *input.Renewal
@@ -512,8 +529,14 @@ func (s *Server) pollNotifications(ctx context.Context) {
 			return
 		}
 		token, _ := secret["token"].(string)
+		if event.DeliveryText == "" {
+			event.DeliveryText, _ = renderNotificationText(n.Config.TextTemplate, event.Text, event.Time)
+			if s.saveNotifications(n) != nil {
+				return
+			}
+		}
 		call, cancel := context.WithTimeout(ctx, 10*time.Second)
-		delay, message := sendTelegram(call, &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, token, n.Config.ChatID, event.Text, renewalKeyboard(event.Renewal))
+		delay, message := sendTelegram(call, &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, token, n.Config.ChatID, event.DeliveryText, renewalKeyboard(event.Renewal))
 		cancel()
 		event.Attempts++
 		event.Error = message

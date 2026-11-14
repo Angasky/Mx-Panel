@@ -218,6 +218,9 @@ func validUserCredentials(username, password string, requirePassword bool) bool 
 	return utf8.ValidString(username) && utf8.RuneCountInString(username) >= 3 && utf8.RuneCountInString(username) <= 64 && strings.IndexFunc(username, unicode.IsSpace) < 0 && !strings.ContainsAny(username, ":\x00") && (!requirePassword && password == "" || utf8.ValidString(password) && utf8.RuneCountInString(password) >= 12 && len(password) <= 1024 && !strings.ContainsAny(password, "\r\n\x00"))
 }
 func (s *Server) userAdminRoute(w http.ResponseWriter, r *http.Request) bool {
+	if s.userSubscriptionsRoute(w, r) {
+		return true
+	}
 	if r.URL.Path != "/admin/api/users" {
 		return false
 	}

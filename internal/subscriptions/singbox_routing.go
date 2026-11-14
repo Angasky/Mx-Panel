@@ -268,6 +268,12 @@ func singBoxBasicCondition(kind, value string, noResolve bool) (Record, error) {
 		}
 		key := map[string]string{"DOMAIN": "domain", "DOMAIN-SUFFIX": "domain_suffix", "DOMAIN-KEYWORD": "domain_keyword"}[kind]
 		rule[key] = []string{parts[1]}
+	case "DOMAIN-REGEX":
+		pattern, err := singBoxDomainRegex(value, noResolve)
+		if err != nil {
+			return nil, err
+		}
+		rule["domain_regex"] = []string{pattern}
 	case "DOMAIN-WILDCARD":
 		if noResolve || len(value) == 0 || len(value) > 253 {
 			return nil, errors.New("通配域名须为 1–253 字节且不含额外选项")

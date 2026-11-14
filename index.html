@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mx-Panel · 订阅与服务器管理</title>
+<link id="siteFavicon" rel="icon" href="/site-icon">
 <script>
 try { document.documentElement.dataset.theme = ['craft', 'slate', 'high', 'low', 'pink', 'amber'].includes(localStorage.getItem('mxioc_theme')) ? localStorage.getItem('mxioc_theme') : 'slate'; } catch (_) {}
 </script>
@@ -1832,6 +1833,9 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
 #aiFloatWindow select::picker-icon,#aiSettingsForm select::picker-icon{display:none}
 
 .node-tag-list{display:flex;flex-wrap:wrap;gap:6px;min-width:0}.node-tag-list .pill{white-space:normal;overflow-wrap:anywhere;max-width:100%}#nodeTagsForm{display:grid;gap:10px;min-width:0}#nodeTagsForm textarea{width:100%;box-sizing:border-box;resize:vertical}.node-tags-preview{max-height:30dvh;overflow:auto;overflow-wrap:anywhere}.node-tags-preview>div{padding:10px 0;border-top:1px solid var(--border)}.node-tags-preview p{margin:4px 0}#nodeTagFilter{max-width:100%}
+@media(max-width:640px){#serverStatusFilter,#serverKindFilter,#serverRefresh{flex:1 1 100%;width:100%;min-width:0}}
+[data-site-name],[data-site-description]{overflow-wrap:anywhere;min-width:0}.login-identity b{font-weight:inherit}.side-brand>div:nth-child(2){min-width:0;flex:1}.site-announcement{white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto;flex-shrink:0}#siteInfoPreview{overflow-wrap:anywhere}#siteInfoForm textarea{width:100%;box-sizing:border-box;resize:vertical}
+[data-site-logo].site-custom-logo{background:none!important;font-size:0!important;padding:0;overflow:hidden;flex-shrink:0}[data-site-logo] img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}.site-login-logo{width:64px;height:64px;margin-bottom:16px}#siteLogoPreview{width:64px;height:64px;object-fit:contain}#siteLogo{max-width:100%}
 </style>
 </head>
 <body>
@@ -2017,8 +2021,8 @@ SOFTWARE.
 
 <div id="boot" class="boot" role="status" aria-live="polite">
   <div class="boot-card">
-    <div class="boot-mark">M</div>
-    <p class="boot-title">MXIOC // Control Center</p>
+    <div class="boot-mark" data-site-logo>M</div>
+    <p class="boot-title" data-site-name>MXIOC // Control Center</p>
     <p id="bootStatus" class="boot-status">正在验证登录状态…</p>
     <div class="boot-progress" aria-hidden="true"></div>
     <button id="bootRetry" class="btn hidden" type="button">重新加载</button>
@@ -2034,10 +2038,10 @@ SOFTWARE.
         <span class="window-dot dot-yellow"></span>
         <span class="window-dot dot-green"></span>
       </div>
-      <span>MXIOC / 账号登录</span>
+      <span><span data-site-name>MXIOC</span> / 账号登录</span>
     </div>
     <div class="login-body">
-      <div class="login-identity">MXIOC<span>订阅管理控制台</span></div>
+      <div class="site-login-logo hidden" data-site-logo></div><div class="login-identity"><b data-site-name>MXIOC</b><span data-site-description>订阅管理控制台</span></div><div class="note site-announcement hidden" data-site-announcement role="note"></div>
       <div class="ascii-logo terminal-logo"> __  _____  _____ ___  ____
 |  \/  \ \/ /_ _/ _ \/ ___|
 | |\/| |\  / | | | | | |
@@ -2063,10 +2067,10 @@ SOFTWARE.
   <button id="navBackdrop" class="nav-backdrop" type="button" aria-label="关闭导航" tabindex="-1"></button>
   <aside class="side" id="appSidebar" aria-label="主导航">
     <div class="side-brand">
-      <div class="side-logo">M</div>
+      <div class="side-logo" data-site-logo>M</div>
       <div>
-        <h1>MXIOC<span class="brand-terminal"> // CLI</span></h1>
-        <p>订阅与服务器管理</p>
+        <h1><span data-site-name>MXIOC</span><span class="brand-terminal"> // CLI</span></h1>
+        <p data-site-description>订阅与服务器管理</p>
       </div>
       <button class="btn ghost icon-button side-close" id="navClose" type="button" aria-label="关闭导航">×</button>
     </div>
@@ -2088,7 +2092,7 @@ SOFTWARE.
   <main class="main" id="appMain">
     <div class="workspace-bar">
       <button class="btn ghost mobile-menu-toggle" id="navToggle" type="button" aria-label="打开导航" aria-controls="appSidebar" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-      <span class="workspace-context">MXIOC <span aria-hidden="true">/</span> 管理工作台</span>
+      <span class="workspace-context"><span data-site-name>MXIOC</span> <span aria-hidden="true">/</span> 管理工作台</span>
       <div class="workspace-actions">
         <button id="manageProfiles" class="btn current-profile" title="进入订阅管理并切换配置"><span>当前订阅</span><strong id="currentProfileName">—</strong><span>切换 <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span></button>
         <button id="refresh" class="btn ghost" title="刷新当前页面" aria-label="刷新当前页面"><svg class="icon" aria-hidden="true"><use href="#icon-refresh-cw"/></svg><span class="utility-label">刷新</span></button>
@@ -2097,7 +2101,7 @@ SOFTWARE.
     </div>
     <div class="top">
       <div class="top-title-area">
-        <div class="cli-breadcrumb">MXIOC <span>/ 工作空间 / </span><span id="titleBreadcrumb">overview</span></div>
+        <div class="cli-breadcrumb"><span data-site-name>MXIOC</span> <span>/ 工作空间 / </span><span id="titleBreadcrumb">overview</span></div>
         <h2 id="title">总览</h2>
         <p id="subtitle">综合订阅配置状态</p>
       </div>
@@ -2106,6 +2110,7 @@ SOFTWARE.
         <button id="add" class="btn primary hidden"><svg class="icon" aria-hidden="true"><use href="#icon-circle-plus"/></svg>新增</button>
       </div>
     </div>
+    <div class="note site-announcement hidden" data-site-announcement role="note"></div>
     <nav id="sectionTabs" class="toolbar" aria-label="当前功能分区"></nav>
     <aside id="goReleaseNotice" class="panel hidden" role="status" style="margin-bottom:16px"></aside>
     <div id="content" tabindex="-1"></div>
@@ -2582,14 +2587,36 @@ const accessNotice = '授权控制面板内的订阅访问。禁用用户或撤�
 async function userManager() {
   const [data, profiles] = await Promise.all([api('/users'), api('/profiles')]);
   openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button></div><div id="panelUserList"></div>`);
-  $('panelUserList').innerHTML = data.users.map((u,i)=>`<article class="panel" style="margin-top:12px"><div class="panel-head"><h3>${esc(u.username)}</h3><span class="pill">${u.enabled?'启用':'已禁用'}</span></div><p class="muted">普通用户 · 已授权 ${(u.profiles||[]).length} 份订阅</p><div class="toolbar"><button class="btn" data-edit-user="${i}">编辑 / 授权 / 重置密码</button><button class="btn danger" data-delete-user="${i}">删除</button></div></article>`).join('') || '<p class="empty">暂无普通用户，请先新建用户并分配订阅。</p>';
+  $('panelUserList').innerHTML = data.users.map((u,i)=>`<article class="panel" style="margin-top:12px"><div class="panel-head"><h3>${esc(u.username)}</h3><span class="pill">${u.enabled?'启用':'已禁用'}</span></div><p class="muted">普通用户 · 已授权 ${(u.profiles||[]).length} 份订阅</p><div class="toolbar"><button class="btn" data-user-subscriptions="${i}" ${u.enabled?'':'disabled'}>客户端订阅</button><button class="btn" data-edit-user="${i}">编辑 / 授权 / 重置密码</button><button class="btn danger" data-delete-user="${i}">删除</button></div></article>`).join('') || '<p class="empty">暂无普通用户，请先新建用户并分配订阅。</p>';
   $('newPanelUser').onclick = ()=>editPanelUser(null, profiles.profiles);
+  document.querySelectorAll('[data-user-subscriptions]').forEach(b=>b.onclick=()=>userSubscriptionsManager(data.users[Number(b.dataset.userSubscriptions)].id).catch(e=>notice(e.message)));
   document.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>editPanelUser(data.users[Number(b.dataset.editUser)], profiles.profiles));
   document.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=async()=>{
     const u=data.users[Number(b.dataset.deleteUser)];
     if (!confirm(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`)) return;
     try { await api('/users',jsonOpt('DELETE',{id:u.id})); await userManager(); notice('用户已删除'); } catch(e) { notice(e.message); }
   });
+}
+async function userSubscriptionsManager(id) {
+  openModal('用户客户端订阅',`<p class="note">只展示当前启用用户获授权的订阅。地址包含下载凭据，多名用户共用同一订阅时地址相同；禁用用户不会使已复制地址失效，彻底撤销需轮换订阅链接。复制后请自行交付给对应用户。</p><label for="userSubscriptionChoice">选择已授权订阅</label><select id="userSubscriptionChoice" disabled></select><div class="toolbar"><button type="button" class="btn" id="userSubscriptionRefresh">重新读取</button><button type="button" class="btn" id="userSubscriptionBack">返回用户管理</button></div><p id="userSubscriptionStatus" role="status">正在读取…</p><div id="userSubscriptionLinks"></div>`);
+  const select=$('userSubscriptionChoice'),status=$('userSubscriptionStatus'),links=$('userSubscriptionLinks'),refresh=$('userSubscriptionRefresh');let generation=0;
+  const load=async()=>{
+    const ticket=++generation,profile=select.value;links.replaceChildren();status.textContent='正在核对用户与订阅授权…';select.disabled=true;refresh.disabled=true;
+    try {
+      const data=await api('/users/subscriptions?id='+encodeURIComponent(id)+(profile?'&profile='+encodeURIComponent(profile):''));
+      if(!links.isConnected||ticket!==generation)return;
+      select.replaceChildren();
+      for(const p of data.profiles){const option=document.createElement('option');option.value=p.id;option.textContent=p.name;select.append(option)}
+      if(profile)select.value=profile;
+      if(!data.profiles.length){status.textContent='该用户没有可用的已授权订阅。';return}
+      if(!profile){await load();return}
+      const sub=data.subscription;
+      status.textContent='用户：'+data.user.username+' · 订阅：'+sub.name;
+      links.innerHTML=subscriptionRow('Clash / Mihomo','原始完整配置',location.origin+sub.url,sub.url)+conversionRows(sub.formats||[]);
+    }catch(e){if(links.isConnected&&ticket===generation){select.replaceChildren();links.replaceChildren();status.textContent=e.message}}
+    finally{if(links.isConnected&&ticket===generation){select.disabled=!select.options.length;refresh.disabled=false}}
+  };
+  select.onchange=load;refresh.onclick=load;$('userSubscriptionBack').onclick=()=>userManager().catch(e=>notice(e.message));await load();
 }
 function editPanelUser(u, profiles) {
   openModal(u?'编辑用户与授权':'新建普通用户', `<form id="panelUserForm"><label for="panelUserName">用户名</label><input id="panelUserName" required minlength="3" maxlength="64" autocomplete="off" value="${esc(u?.username||'')}"><label for="panelUserPassword">${u?'新密码（留空保留原密码）':'初始密码'}</label><input id="panelUserPassword" type="password" minlength="12" maxlength="256" ${u?'':'required'} autocomplete="new-password"><p class="muted">至少 12 个字符。普通用户需要重置密码时，请联系管理员。</p><label style="display:flex;align-items:center;gap:8px"><input id="panelUserEnabled" type="checkbox" ${!u||u.enabled?'checked':''}>启用账号</label><h4>允许访问的订阅</h4><div style="display:grid;gap:10px;max-height:260px;overflow:auto">${profiles.map((p,i)=>`<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-user-profile="${i}" ${(u?.profiles||[]).includes(p.id)?'checked':''}>${esc(p.name)}</label>`).join('')||'<p class="muted">暂无订阅，可先保存用户，再创建订阅并授权。</p>'}</div><p class="note">${esc(accessNotice)} 保存变更后，该用户需要重新登录。</p><p id="panelUserError" class="error" role="alert"></p><div class="toolbar"><button class="btn primary" type="submit">保存用户</button><button class="btn" type="button" id="panelUserBack">返回</button></div></form>`);
@@ -2784,9 +2811,81 @@ async function aiAssistantRender(){
  renderMessages();controls();await loadChats();await loadMessages();
 }
 
+let siteInfoGeneration = 0;
+let siteIconLogo = null;
+function applySiteInfo(config) {
+  const iconLogo=typeof config.logo==='string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(config.logo) ? config.logo : '';
+  if(siteIconLogo!==iconLogo){
+    siteIconLogo=iconLogo;
+    const icon=$('siteFavicon');
+    // Data URLs change with the image bytes; no old URL cache can win after save.
+    icon.href=iconLogo||('/site-icon?v='+Date.now()+'-'+siteInfoGeneration);
+    icon.removeAttribute('type');
+  }
+  document.querySelectorAll('[data-site-logo]').forEach(el=>{
+    if(!el.hasAttribute('data-site-default'))el.dataset.siteDefault=el.textContent;
+    el.replaceChildren();const logo=typeof config.logo==='string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(config.logo) ? config.logo : '';
+    el.classList.toggle('site-custom-logo',!!logo);
+    if(el.classList.contains('site-login-logo'))el.classList.toggle('hidden',!logo);
+    if(logo){const img=document.createElement('img');img.alt='网站 Logo';img.src=logo;el.append(img)}else el.textContent=el.dataset.siteDefault;
+  });
+  for (const [selector,key] of [['[data-site-name]','name'],['[data-site-description]','description']]) document.querySelectorAll(selector).forEach(el=>{
+    if (!el.hasAttribute('data-site-default')) el.dataset.siteDefault=el.textContent;
+    el.textContent=config[key] || el.dataset.siteDefault;
+  });
+  document.querySelectorAll('[data-site-announcement]').forEach(el=>{el.textContent=config.announcement||'';el.classList.toggle('hidden',!config.announcement)});
+  document.title=config.name ? config.name+' · 订阅与服务器管理' : 'Mx-Panel · 订阅与服务器管理';
+}
+async function loadSiteInfo() {
+  const generation=++siteInfoGeneration;
+  try {
+    const response=await fetch('/site-info',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(5000)});
+    if (!response.ok) return;
+    const config=await response.json();
+    if(generation===siteInfoGeneration && config && ['name','description','announcement'].every(key=>typeof config[key]==='string')) applySiteInfo(config);
+  } catch (_) { /* Public branding failure must not block authentication. */ }
+}
+async function siteInfoManager() {
+  const page=S.page, epoch=S.modalEpoch;
+  const data=await api('/site-info');
+  if(S.role!=='admin'||S.page!==page||S.modalEpoch!==epoch)return;
+  let revision=data.revision,logo=data.config.logo||'',logoGeneration=0;
+  openModal('网站信息',`<form id="siteInfoForm"><p class="note">以下内容会公开显示在登录页及登录后的界面，请勿填写密码、订阅链接等私密信息。留空使用默认名称和简介，公告留空则隐藏。公开探针站外观仍在“监控分享”单独设置。</p><label for="siteLogo">面板 Logo</label><input id="siteLogo" type="file" accept="image/png,image/jpeg"><p class="hint">选择本地 PNG/JPEG，最大 24 KiB、512×512；保存后公开展示在登录页、加载页、侧栏及浏览器标签页图标。未选择新文件时保留现有 Logo。</p><img id="siteLogoPreview" alt="Logo 预览" hidden><button type="button" class="btn small" id="siteLogoRemove">移除 Logo（保存后生效）</button><p id="siteLogoError" class="error" role="alert"></p><label for="siteName">面板名称（最多 60 字）</label><input id="siteName" maxlength="120" value="${esc(data.config.name)}" placeholder="MXIOC"><label for="siteDescription">简介（最多 160 字）</label><input id="siteDescription" maxlength="320" value="${esc(data.config.description)}" placeholder="订阅与服务器管理"><label for="siteAnnouncement">公开公告（最多 1000 字）</label><textarea id="siteAnnouncement" maxlength="2000" rows="4" placeholder="例如：维护时间与使用说明">${esc(data.config.announcement)}</textarea><p class="hint">仅展示纯文本，不解析 HTML、Markdown 或脚本。保存后当前页面立即更新，其他浏览器重新加载页面后生效。</p><div class="toolbar"><button type="button" class="btn" id="sitePreview">预览（不保存）</button><button type="button" class="btn" id="siteReset">恢复默认内容</button></div><section id="siteInfoPreview" class="panel hidden" aria-label="网站信息预览"><h4 id="sitePreviewName"></h4><p id="sitePreviewDescription"></p><div class="note site-announcement" id="sitePreviewAnnouncement"></div></section><p id="siteInfoError" class="error" role="alert"></p><div class="toolbar"><button type="submit" class="btn primary" id="siteInfoSave">保存网站信息</button></div></form>`);
+  const form=$('siteInfoForm'),error=$('siteInfoError'),save=$('siteInfoSave'),preview=$('siteInfoPreview');
+  const logoInput=$('siteLogo'),logoPreview=$('siteLogoPreview'),logoError=$('siteLogoError');
+  const displayLogo=()=>{logoPreview.hidden=!logo;if(logo)logoPreview.src=logo;else logoPreview.removeAttribute('src')};displayLogo();
+  let logoLoading=false,siteSaving=false;
+  logoInput.onchange=async()=>{
+    if(siteSaving)return;const ticket=++logoGeneration,file=logoInput.files[0];logoError.textContent='';if(!file){logoLoading=false;save.disabled=false;return;}
+    logoLoading=true;save.disabled=true;
+    try{
+      if(!['image/png','image/jpeg'].includes(file.type)||file.size>24*1024)throw Error('请选择 24 KiB 以内的 PNG 或 JPEG 图片');
+      const next=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('图片读取失败'));reader.readAsDataURL(file)});
+      await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>img.naturalWidth>0&&img.naturalHeight>0&&img.naturalWidth<=512&&img.naturalHeight<=512?resolve():reject(Error('图片尺寸不能超过 512×512'));img.onerror=()=>reject(Error('图片无法解码'));img.src=next});
+      if(!form.isConnected||ticket!==logoGeneration)return;logo=next;displayLogo();preview.classList.add('hidden');
+    }catch(e){if(form.isConnected&&ticket===logoGeneration){logoInput.value='';logoError.textContent=e.message}}
+    finally{if(form.isConnected&&ticket===logoGeneration){logoLoading=false;save.disabled=false}}
+  };
+  const clearLogo=()=>{++logoGeneration;logoLoading=false;logo='';logoInput.value='';logoError.textContent='';save.disabled=false;displayLogo()};
+  $('siteLogoRemove').onclick=()=>{if(siteSaving)return;clearLogo();preview.classList.add('hidden')};
+  const values=()=>({name:$('siteName').value,description:$('siteDescription').value,announcement:$('siteAnnouncement').value,logo});
+  const validate=config=>{
+    if([...config.name].length>60||[...config.description].length>160||[...config.announcement].length>1000)throw Error('名称最多 60 字、简介最多 160 字、公告最多 1000 字');
+    if(/[\u0000-\u001f\u007f-\u009f]/u.test(config.name+config.description+config.announcement.replace(/[\n\t]/g,'')))throw Error('名称与简介不能换行，公告只允许换行和制表控制字符');
+  };
+  const showPreview=()=>{error.textContent='';preview.classList.add('hidden');try{const c=values();validate(c);$('sitePreviewName').textContent=c.name.trim()||'MXIOC';$('sitePreviewDescription').textContent=c.description.trim()||'订阅与服务器管理';$('sitePreviewAnnouncement').textContent=c.announcement.trim()||'（公告已隐藏）';preview.classList.remove('hidden')}catch(e){error.textContent=e.message}};
+  $('sitePreview').onclick=showPreview;
+  form.oninput=()=>{preview.classList.add('hidden');error.textContent=''};
+  $('siteReset').onclick=()=>{if(siteSaving)return;clearLogo();for(const id of ['siteName','siteDescription','siteAnnouncement'])$(id).value='';showPreview()};
+  form.onsubmit=async e=>{
+    e.preventDefault();if(save.disabled||logoLoading||siteSaving)return;error.textContent='';
+    try{const config=values();validate(config);siteSaving=true;save.disabled=true;logoInput.disabled=true;const result=await api('/site-info',jsonOpt('PUT',{config,revision}));++siteInfoGeneration;applySiteInfo(result.config);revision=result.revision;logo=result.config.logo||'';if(form.isConnected){$('siteName').value=result.config.name;$('siteDescription').value=result.config.description;$('siteAnnouncement').value=result.config.announcement;logoInput.value='';displayLogo();showPreview();notice('网站信息已保存')}}catch(e){if(form.isConnected)error.textContent=e.message}finally{siteSaving=false;save.disabled=false;logoInput.disabled=false}
+  };
+}
+
 function settings() {
   const theme = document.documentElement.dataset.theme;
-  const shortcuts=[['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['shield-check','订阅 IP 白名单','限制订阅下载的 IP 与网段','subscriptionAccessManager'],['shield-check','浏览器订阅访问','按订阅控制浏览器直接下载','subscriptionBrowserManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
+  const shortcuts=[['settings-2','网站信息','面板名称、简介与公开公告','siteInfoManager'],['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['shield-check','订阅 IP 白名单','限制订阅下载的 IP 与网段','subscriptionAccessManager'],['shield-check','浏览器订阅访问','按订阅控制浏览器直接下载','subscriptionBrowserManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>常用设置</h3><p class="muted">按任务选择设置，主题与显示偏好位于下方。</p></div></div><div class="settings-shortcuts">${shortcuts.map(([icon,title,description,action])=>`<button class="settings-shortcut" type="button" onclick="${action}().catch(e=>notice(e.message))">${uiIcon(icon)}<span><strong>${title}</strong><small>${description}</small></span>${uiIcon('chevron-right')}</button>`).join('')}</div></section><section class="panel"><div class="panel-head"><div><h3>主题与外观</h3><p class="muted">六种配色，共用一致的按钮、表单与排版。</p></div></div>
     <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
     <div class="theme-options">
@@ -2895,6 +2994,7 @@ async function notificationManager() {
  <div class="grid"><div><label for="ntToken">Bot Token</label><input type="password" id="ntToken" autocomplete="new-password" placeholder="${data.tokenConfigured?'已保存，留空保持不变':'填写机器人 Token'}"></div><div><label for="ntChat">Chat ID</label><input id="ntChat" value="${esc(c.chatId)}" placeholder="数字用户 ID 或负数群 ID"></div>
  <div><label for="ntDays">提前提醒天数</label><input type="number" id="ntDays" min="1" max="30" value="${c.days}"></div><div><label for="ntPercent">流量使用阈值（%）</label><input type="number" id="ntPercent" min="1" max="100" value="${c.percent}"></div><div><label for="ntFailures">连续采样失败次数</label><input type="number" id="ntFailures" min="2" max="20" value="${c.failures}"></div></div>
  <div class="toolbar"><label class="check"><input type="checkbox" id="ntMonitor" ${c.monitor?'checked':''}>监控异常 / 恢复</label><label class="check"><input type="checkbox" id="ntTraffic" ${c.traffic?'checked':''}>流量阈值</label><label class="check"><input type="checkbox" id="ntExpiry" ${c.expiry?'checked':''}>订阅到期 / 服务器续费</label></div>
+ <hr><h4>通知文本模板</h4><label for="ntTextTemplate">自定义文本（留空使用原始通知）</label><textarea id="ntTextTemplate" rows="4" placeholder="我的面板 · {time}&#10;{message}">${esc(c.textTemplate||'')}</textarea><p class="hint">最多 512 个字符，必须包含一次 {message}（原始正文），可选一次 {time}（事件时间，UTC）。纯文本发送，不解析 HTML / Markdown。适用于告警、恢复、到期提醒和日报；续费按钮点击后的交互回复保持原格式。修改设置会取消已有待发通知并使原续费按钮失效。</p><div class="toolbar"><select id="ntTemplateSample" aria-label="通知模板预览类型"><option value="monitor">监控异常</option><option value="traffic">流量阈值</option><option value="expiry">到期提醒</option><option value="recovery">恢复通知</option><option value="daily">日报</option></select><button type="button" class="btn small" id="ntTemplatePreview">预览模板（不发送）</button><button type="button" class="btn small" id="ntTemplateReset">恢复默认文本</button></div><p id="ntTemplateError" class="error" role="alert"></p><pre id="ntTemplateOutput" class="hidden" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
  <hr><h4>Telegram 续费登记</h4><label class="check"><input type="checkbox" id="ntRenewal" ${c.renewal?'checked':''}>在服务器续费提醒中添加「我已续费」按钮</label>
  <label for="ntRenewalUsers">允许操作的 Telegram 用户 ID</label><input id="ntRenewalUsers" value="${esc(c.renewalUsers||'')}" placeholder="正整数用户 ID，多个用逗号分隔" maxlength="400">
  <p class="hint">默认关闭。需同时开启通知和到期提醒，最多授权 20 人；群聊 ID 不能代替用户 ID。使用专用 Bot，不能同时被其他程序轮询或配置 Webhook。启用后每 5 秒检查按钮操作，不要求新增公网回调入口。面板不会删除已有 Webhook。</p>
@@ -2907,10 +3007,16 @@ async function notificationManager() {
  <p class="hint">按后台采样周期检查，相同告警持续期间只提醒一次；日期按 UTC。失败自动重试，最多 8 次。记录保留最近 200 条。首次启用会提醒已达到阈值的项目。</p>
  <label class="check"><input type="checkbox" id="ntClear">清除已保存的 Token（需同时关闭通知）</label>
  <div class="toolbar"><button class="btn primary" type="submit">保存通知设置</button><button class="btn" type="button" id="ntRefresh">刷新记录</button></div></form>
- <h4>最近通知</h4><div class="tablewrap"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${(data.events||[]).slice().reverse().map(e=>`<tr><td>${esc(new Date(e.time*1000).toLocaleString())}</td><td>${esc(e.text)}${e.renewalResult?'<br><span class="hint">'+esc(e.renewalResult)+'</span>':''}${e.error?'<br><span class="muted">'+esc(e.error)+'</span>':''}</td><td>${esc(({pending:'等待发送',sent:'已发送',failed:'发送失败',cancelled:'已取消'})[e.status]||e.status)} · ${e.attempts} 次</td></tr>`).join('')||'<tr><td colspan="3">暂无通知</td></tr>'}</tbody></table></div>`);
+ <h4>最近通知</h4><div class="tablewrap"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${(data.events||[]).slice().reverse().map(e=>`<tr><td>${esc(new Date(e.time*1000).toLocaleString())}</td><td>${esc(e.deliveryText || e.text)}${e.renewalResult?'<br><span class="hint">'+esc(e.renewalResult)+'</span>':''}${e.error?'<br><span class="muted">'+esc(e.error)+'</span>':''}</td><td>${esc(({pending:'等待发送',sent:'已发送',failed:'发送失败',cancelled:'已取消'})[e.status]||e.status)} · ${e.attempts} 次</td></tr>`).join('')||'<tr><td colspan="3">暂无通知</td></tr>'}</tbody></table></div>`);
  $('ntPreview').onclick=async()=>{try{const d=await api('/notifications/daily-preview');$('ntDailyPreview').textContent=d.text;$('ntDailyPreview').classList.remove('hidden');}catch(e){notice(e.message);}};
  $('ntRefresh').onclick=()=>notificationManager().catch(e=>notice(e.message));
- $('notificationForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('/notifications',jsonOpt('PUT',{enabled:$('ntEnabled').checked,renewal:$('ntRenewal').checked,renewalUsers:$('ntRenewalUsers').value,token:$('ntToken').value,chatId:$('ntChat').value,clearToken:$('ntClear').checked,monitor:$('ntMonitor').checked,traffic:$('ntTraffic').checked,expiry:$('ntExpiry').checked,days:Number($('ntDays').value),percent:Number($('ntPercent').value),failures:Number($('ntFailures').value),daily:$('ntDaily').checked,dailyHour:Number($('ntDailyHour').value),probes:$('ntProbes').checked,latencyMs:Number($('ntLatency').value),lossPercent:Number($('ntLoss').value)}));$('ntToken').value='';notice('通知设置已保存');await notificationManager();}catch(err){notice(err.message);}finally{button.disabled=false;}};
+ const templateInput=$('ntTextTemplate'), templateOutput=$('ntTemplateOutput'), templateError=$('ntTemplateError'), templateButton=$('ntTemplatePreview'), templateSample=$('ntTemplateSample');
+ let templateGeneration=0;
+ const clearTemplatePreview=()=>{templateGeneration++;templateOutput.textContent='';templateOutput.classList.add('hidden');templateError.textContent='';};
+ templateInput.oninput=clearTemplatePreview;templateSample.onchange=clearTemplatePreview;
+ $('ntTemplateReset').onclick=()=>{templateInput.value='';clearTemplatePreview();notice('已恢复默认文本，保存通知设置后生效');};
+ templateButton.onclick=async()=>{clearTemplatePreview();const ticket=templateGeneration;templateButton.disabled=true;try{const result=await api('/notifications/template-preview',jsonOpt('POST',{template:templateInput.value,sample:templateSample.value}));if(!templateOutput.isConnected||ticket!==templateGeneration)return;templateOutput.textContent=result.text;templateOutput.classList.remove('hidden');}catch(error){if(templateError.isConnected&&ticket===templateGeneration)templateError.textContent=error.message;}finally{templateButton.disabled=false;}};
+ $('notificationForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('/notifications',jsonOpt('PUT',{enabled:$('ntEnabled').checked,textTemplate:$('ntTextTemplate').value,renewal:$('ntRenewal').checked,renewalUsers:$('ntRenewalUsers').value,token:$('ntToken').value,chatId:$('ntChat').value,clearToken:$('ntClear').checked,monitor:$('ntMonitor').checked,traffic:$('ntTraffic').checked,expiry:$('ntExpiry').checked,days:Number($('ntDays').value),percent:Number($('ntPercent').value),failures:Number($('ntFailures').value),daily:$('ntDaily').checked,dailyHour:Number($('ntDailyHour').value),probes:$('ntProbes').checked,latencyMs:Number($('ntLatency').value),lossPercent:Number($('ntLoss').value)}));$('ntToken').value='';notice('通知设置已保存');await notificationManager();}catch(err){notice(err.message);}finally{button.disabled=false;}};
 }
 
 function profiles() {
@@ -3032,22 +3138,44 @@ function panelLink(value) {
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch (_) { return ''; }
 }
 
+const serverObservationLabels = {fresh:'采样正常',failed:'采样失败',stale:'采样过期',pending:'等待采样',paused:'未监控',external:'外部探针',unknown:'状态未知'};
+function serverObservationFor(id) {
+  const value = S.serverObservations?.[id];
+  return value && Object.hasOwn(serverObservationLabels,value.status) ? value : {status:'unknown',source:'unknown'};
+}
+function serverKind(row) { return row.probeDiscovery ? 'probe' : (row.installType || '3x-ui'); }
 async function servers() {
+  const ticket = S.serverLoadTicket = (S.serverLoadTicket || 0) + 1;
+  S.serverLoading = true;
   if (S.servers.length) renderServers();
-  const data = await api('/servers');
-  if (S.page !== 'servers') return;
-  S.servers = data.servers;
-  renderServers();
+  try {
+    const [data,observations] = await Promise.all([api('/servers'),api('/servers/observations').catch(()=>null)]);
+    if (S.page !== 'servers' || ticket !== S.serverLoadTicket) return;
+    S.servers = data.servers;
+    S.serverObservations = observations?.observations || {};
+    S.serverObservedAt = observations?.generatedAt || 0;
+    S.serverObservationError = !observations;
+  } finally {
+    if (ticket === S.serverLoadTicket) {
+      S.serverLoading = false;
+      if (S.page === 'servers') renderServers();
+    }
+  }
 }
 
 function renderServers() {
   const q = S.filters.servers || '';
-  const page = tableSlice(S.servers.filter(s => `${s.name} ${s.host} ${s.domain} ${s.nodeAddress || ''}`.toLowerCase().includes(q.toLowerCase())), 'servers');
+  const kind = S.filters.serverKind || '', status = S.filters.serverStatus || '';
+  const matching = S.servers.filter(s => `${s.name} ${s.host} ${s.domain} ${s.nodeAddress || ''}`.toLowerCase().includes(q.toLowerCase()) && (!kind || serverKind(s) === kind));
+  const counts = Object.fromEntries(Object.keys(serverObservationLabels).map(key=>[key,matching.filter(s=>serverObservationFor(s.id).status===key).length]));
+  const page = tableSlice(matching.filter(s => !status || serverObservationFor(s.id).status === status), 'servers');
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div class="profile-summary"><h3>远端服务器</h3><p class="muted">可选择 3x-ui 面板、独立 Xray 或 sing-box，也可接入现有 X-ui。SSH 账号须为 root 或具有 sudo 权限。</p></div><div class="toolbar"><button class="btn" onclick="serverForm('',true)">接入已有面板 / 内核</button><button class="btn primary" onclick="serverForm()">${uiIcon('circle-plus')}添加服务器</button></div></div>
-    <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"></div>
+    <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"><select id="serverKindFilter" aria-label="服务器类型">${[['','全部类型'],['3x-ui','3x-ui'],['x-ui','X-ui'],['x-panel','X-Panel'],['xray','Xray'],['sing-box','sing-box'],['probe','探针待接管']].map(([id,label])=>`<option value="${id}" ${kind===id?'selected':''}>${label}</option>`).join('')}</select><select id="serverStatusFilter" aria-label="监控状态"><option value="">全部监控状态（${matching.length}）</option>${Object.entries(serverObservationLabels).map(([id,label])=>`<option value="${id}" ${status===id?'selected':''}>${label}（${counts[id]}）</option>`).join('')}</select><button type="button" class="btn" id="serverRefresh" ${S.serverLoading?'disabled':''}>${S.serverLoading?'正在刷新…':'刷新列表与状态'}</button><button type="button" class="btn" id="serverFilterClear">清除筛选</button></div>
+    <p class="hint" id="serverObservationNote" role="status">${S.serverObservationError?'状态读取失败，已标记为未知；可点击刷新重试。':S.serverObservedAt?'状态快照：'+esc(new Date(S.serverObservedAt*1000).toLocaleString())+'。':'尚未读取监控状态。'}仅依据本地已有采样或 Agent 心跳，不代表代理连接可用；采样失败不等同离线。外部探针状态请打开硬件监控查看。</p>
     <div class="profile-grid">${page.rows.map(s => {
-      const id = encodeURIComponent(s.id), url = panelLink(s.panelUrl), running = s.job?.status === 'running';
+      const id = encodeURIComponent(s.id), url = panelLink(s.panelUrl), running = s.job?.status === 'running', observation = serverObservationFor(s.id);
       return `<article class="profile-card"><div class="profile-card-head"><div><h4>${esc(s.name)}</h4><div class="profile-id">${esc(s.sshUser)}@${esc(s.host)}:${s.sshPort}</div></div><span class="pill ${s.job?.status === 'failed' ? 'reject' : ''}">${s.probeDiscovery ? '探针已接入' : s.connectionMode === 'existing' ? (s.existingVerifiedAt ? '已接入' : '待验证') : remoteStatus(s.job?.status)}</span></div>
+      <p class="hint"><span class="pill ${['failed','stale'].includes(observation.status)?'reject':''}">${serverObservationLabels[observation.status]}</span> · ${{agent:'Agent 心跳',history:'历史采样',komari:'Komari',unknown:'来源未知'}[observation.source]||'来源未知'}${observation.sampledAt?' · '+esc(new Date(observation.sampledAt*1000).toLocaleString()):''}</p>
       <div class="profile-usage">${s.probeDiscovery ? '复用探针监控 · SSH 已授权' : s.connectionMode === 'existing' ? (panelType(s.installType) ? '接入现有面板' : '接入已有内核') : s.domain ? '绑定域名：' + esc(s.domain) : '无域名自动安装'}<br>节点连接地址：${esc(s.nodeAddress || s.domain || s.host)}<br>安装类型：${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')}${panelType(s.installType) ? ' · 面板账号：' + esc(s.panelUser) : ' · 支持模板节点 / 中转'}${s.job ? '<br>阶段：' + esc(remoteStage(s.job.stage)) : ''}</div>
       ${s.lastError ? `<div class="error">${esc(s.lastError)}</div>` : ''}
       ${url ? `<a class="btn small" href="${esc(url)}" target="_blank" rel="noopener noreferrer">打开面板 ${uiIcon('chevron-right')}</a><code style="overflow-wrap:anywhere;white-space:normal">${esc(url)}</code>` : ''}
@@ -3057,6 +3185,11 @@ function renderServers() {
       <button class="btn small" onclick="serverDiagnose('${id}')">读取诊断</button><button class="btn small danger" onclick="serverRemove('${id}')" ${running ? 'disabled' : ''}>移除管理</button></div></details></article>`;
     }).join('') || '<div class="empty">尚未添加服务器，或没有匹配结果。</div>'}</div>${pagination(page)}</section>`;
   bindSearch('servers', renderServers);
+  for (const [id,key] of [['serverKindFilter','serverKind'],['serverStatusFilter','serverStatus']]) $(id).onchange = e => {
+    S.filters[key] = e.target.value; S.tablePages.servers = 1; renderServers(); $(id).focus();
+  };
+  $('serverFilterClear').onclick = () => { S.filters.servers=''; S.filters.serverKind=''; S.filters.serverStatus=''; S.tablePages.servers=1; renderServers(); $('search').focus(); };
+  $('serverRefresh').onclick = () => servers().catch(error=>notice('刷新失败：'+error.message));
 }
 
 function serverForm(encoded = '', existing = false) {
@@ -7189,6 +7322,8 @@ $('add').onclick = () => ({
 }[S.page])();
 
 aiInitWidget();
+applySiteInfo({});
+void loadSiteInfo();
 void bootstrap();
 </script>
 </body>
