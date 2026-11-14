@@ -151,7 +151,10 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 		if !ok {
 			return fail("规则格式无效")
 		}
-		parts := strings.Split(raw, ",")
+		parts, splitErr := splitRoutingParts(raw)
+		if splitErr != nil {
+			return fail(fmt.Sprintf("第 %d 条规则括号或长度无效", i+1))
+		}
 		if len(parts) < 2 || len(parts) > 4 {
 			return fail(fmt.Sprintf("第 %d 条规则结构不支持", i+1))
 		}
@@ -173,44 +176,9 @@ func convertSingBoxRouting(source config.Subscription) (Export, error) {
 		if actionIndex != 2 {
 			return fail("规则参数数量不支持")
 		}
-		rule := Record{}
-		switch kind {
-		case "DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD":
-			if noResolve || strings.TrimSpace(parts[1]) != parts[1] || parts[1] == "" || strings.ContainsAny(parts[1], "\r\n\t /\\") {
-				return fail("域名规则值或选项无效")
-			}
-			key := map[string]string{"DOMAIN": "domain", "DOMAIN-SUFFIX": "domain_suffix", "DOMAIN-KEYWORD": "domain_keyword"}[kind]
-			rule[key] = []string{parts[1]}
-		case "IP-CIDR", "IP-CIDR6":
-			// DNS resolution semantics differ; only explicit no-resolve is lossless.
-			prefix, err := netip.ParsePrefix(parts[1])
-			if err != nil || !noResolve || prefix.Addr().Is4In6() || (kind == "IP-CIDR") != prefix.Addr().Is4() {
-				return fail("IP 规则必须为对应地址族 CIDR 且显式 no-resolve")
-			}
-			rule["ip_cidr"] = []string{prefix.Masked().String()}
-		case "SRC-IP-CIDR":
-			prefix, err := netip.ParsePrefix(parts[1])
-			if err != nil || prefix.Addr().Is4In6() || noResolve {
-				return fail("源 IP 规则必须为有效 CIDR，不支持额外选项")
-			}
-			rule["source_ip_cidr"] = []string{prefix.Masked().String()}
-		case "DST-PORT", "SRC-PORT":
-			port, err := strconv.Atoi(parts[1])
-			if err != nil || port < 1 || port > 65535 || noResolve {
-				return fail("目标端口规则无效")
-			}
-			key := "port"
-			if kind == "SRC-PORT" {
-				key = "source_port"
-			}
-			rule[key] = []int{port}
-		case "NETWORK":
-			if (parts[1] != "tcp" && parts[1] != "udp") || noResolve {
-				return fail("网络规则只支持 tcp/udp")
-			}
-			rule["network"] = []string{parts[1]}
-		default:
-			return fail(fmt.Sprintf("第 %d 条规则类型 %s 暂未适配", i+1, kind))
+		rule, err := singBoxCondition(kind, parts[1], noResolve, 0, new(int))
+		if err != nil {
+			return fail(fmt.Sprintf("第 %d 条规则：%s", i+1, err.Error()))
 		}
 		if target == "REJECT" {
 			rule["action"] = "reject"
@@ -256,4 +224,48 @@ func routingInteger(value any, fallback, min, max int) (int, error) {
 		return 0, errors.New("整数超出范围")
 	}
 	return n, nil
+}
+
+func singBoxBasicCondition(kind, value string, noResolve bool) (Record, error) {
+	parts := []string{kind, value}
+	rule := Record{}
+	switch kind {
+	case "DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD":
+		if noResolve || strings.TrimSpace(parts[1]) != parts[1] || parts[1] == "" || strings.ContainsAny(parts[1], "\r\n\t /\\") {
+			return nil, errors.New("域名规则值或选项无效")
+		}
+		key := map[string]string{"DOMAIN": "domain", "DOMAIN-SUFFIX": "domain_suffix", "DOMAIN-KEYWORD": "domain_keyword"}[kind]
+		rule[key] = []string{parts[1]}
+	case "IP-CIDR", "IP-CIDR6":
+		// DNS resolution semantics differ; only explicit no-resolve is lossless.
+		prefix, err := netip.ParsePrefix(parts[1])
+		if err != nil || !noResolve || prefix.Addr().Is4In6() || (kind == "IP-CIDR") != prefix.Addr().Is4() {
+			return nil, errors.New("IP 规则必须为对应地址族 CIDR 且显式 no-resolve")
+		}
+		rule["ip_cidr"] = []string{prefix.Masked().String()}
+	case "SRC-IP-CIDR":
+		prefix, err := netip.ParsePrefix(parts[1])
+		if err != nil || prefix.Addr().Is4In6() || noResolve {
+			return nil, errors.New("源 IP 规则必须为有效 CIDR，不支持额外选项")
+		}
+		rule["source_ip_cidr"] = []string{prefix.Masked().String()}
+	case "DST-PORT", "SRC-PORT":
+		port, err := strconv.Atoi(parts[1])
+		if err != nil || port < 1 || port > 65535 || noResolve {
+			return nil, errors.New("目标端口规则无效")
+		}
+		key := "port"
+		if kind == "SRC-PORT" {
+			key = "source_port"
+		}
+		rule[key] = []int{port}
+	case "NETWORK":
+		if (parts[1] != "tcp" && parts[1] != "udp") || noResolve {
+			return nil, errors.New("网络规则只支持 tcp/udp")
+		}
+		rule["network"] = []string{parts[1]}
+	default:
+		return nil, errors.New("规则类型暂未适配：" + kind)
+	}
+	return rule, nil
 }
