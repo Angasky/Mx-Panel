@@ -139,9 +139,23 @@ func (s *Server) startMonitorHistory(ctx context.Context) {
 				}
 			}
 		}()
+		renewalDone := make(chan struct{})
+		go func() {
+			defer close(renewalDone)
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					s.pollTelegramRenewals(ctx)
+				}
+			}
+		}()
 		go func() {
 			defer close(s.historyDone)
-			defer func() { <-externalDone; <-batchDone }()
+			defer func() { <-externalDone; <-batchDone; <-renewalDone }()
 			ticker := time.NewTicker(30 * time.Second)
 			defer ticker.Stop()
 			for {

@@ -19,35 +19,43 @@ import (
 )
 
 type notificationConfig struct {
-	Enabled     bool   `json:"enabled"`
-	ChatID      string `json:"chatId"`
-	SealedToken string `json:"sealedToken,omitempty"`
-	Monitor     bool   `json:"monitor"`
-	Traffic     bool   `json:"traffic"`
-	Expiry      bool   `json:"expiry"`
-	Days        int    `json:"days"`
-	Percent     int    `json:"percent"`
-	Failures    int    `json:"failures"`
-	Daily       bool   `json:"daily"`
-	DailyHour   int    `json:"dailyHour"`
-	Probes      bool   `json:"probes"`
-	LatencyMS   int    `json:"latencyMs"`
-	LossPercent int    `json:"lossPercent"`
+	Renewal      bool   `json:"renewal"`
+	RenewalUsers string `json:"renewalUsers"`
+	Enabled      bool   `json:"enabled"`
+	ChatID       string `json:"chatId"`
+	SealedToken  string `json:"sealedToken,omitempty"`
+	Monitor      bool   `json:"monitor"`
+	Traffic      bool   `json:"traffic"`
+	Expiry       bool   `json:"expiry"`
+	Days         int    `json:"days"`
+	Percent      int    `json:"percent"`
+	Failures     int    `json:"failures"`
+	Daily        bool   `json:"daily"`
+	DailyHour    int    `json:"dailyHour"`
+	Probes       bool   `json:"probes"`
+	LatencyMS    int    `json:"latencyMs"`
+	LossPercent  int    `json:"lossPercent"`
 }
 type notificationEvent struct {
-	Key      string `json:"key,omitempty"`
-	Time     int64  `json:"time"`
-	Text     string `json:"text"`
-	Status   string `json:"status"`
-	Attempts int    `json:"attempts"`
-	Next     int64  `json:"next"`
-	Error    string `json:"error,omitempty"`
+	RenewalResult string           `json:"renewalResult,omitempty"`
+	Renewal       *telegramRenewal `json:"renewal,omitempty"`
+	Key           string           `json:"key,omitempty"`
+	Time          int64            `json:"time"`
+	Text          string           `json:"text"`
+	Status        string           `json:"status"`
+	Attempts      int              `json:"attempts"`
+	Next          int64            `json:"next"`
+	Error         string           `json:"error,omitempty"`
 }
 type notificationState struct {
-	LastDaily string              `json:"lastDaily,omitempty"`
-	Config    notificationConfig  `json:"config"`
-	Active    map[string]string   `json:"active"`
-	Events    []notificationEvent `json:"events"`
+	CallbackReceiptError string              `json:"callbackReceiptError,omitempty"`
+	CallbackOffset       int64               `json:"callbackOffset,omitempty"`
+	CallbackNext         int64               `json:"callbackNext,omitempty"`
+	CallbackError        string              `json:"callbackError,omitempty"`
+	LastDaily            string              `json:"lastDaily,omitempty"`
+	Config               notificationConfig  `json:"config"`
+	Active               map[string]string   `json:"active"`
+	Events               []notificationEvent `json:"events"`
 }
 
 func (s *Server) readNotifications() (notificationState, error) {
@@ -120,21 +128,23 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 	case "GET":
 	case "PUT":
 		var input struct {
-			Enabled     bool   `json:"enabled"`
-			ChatID      string `json:"chatId"`
-			Token       string `json:"token"`
-			ClearToken  bool   `json:"clearToken"`
-			Monitor     bool   `json:"monitor"`
-			Traffic     bool   `json:"traffic"`
-			Expiry      bool   `json:"expiry"`
-			Days        int    `json:"days"`
-			Percent     int    `json:"percent"`
-			Failures    int    `json:"failures"`
-			Daily       *bool  `json:"daily"`
-			DailyHour   *int   `json:"dailyHour"`
-			Probes      *bool  `json:"probes"`
-			LatencyMS   *int   `json:"latencyMs"`
-			LossPercent *int   `json:"lossPercent"`
+			Renewal      *bool   `json:"renewal"`
+			RenewalUsers *string `json:"renewalUsers"`
+			Enabled      bool    `json:"enabled"`
+			ChatID       string  `json:"chatId"`
+			Token        string  `json:"token"`
+			ClearToken   bool    `json:"clearToken"`
+			Monitor      bool    `json:"monitor"`
+			Traffic      bool    `json:"traffic"`
+			Expiry       bool    `json:"expiry"`
+			Days         int     `json:"days"`
+			Percent      int     `json:"percent"`
+			Failures     int     `json:"failures"`
+			Daily        *bool   `json:"daily"`
+			DailyHour    *int    `json:"dailyHour"`
+			Probes       *bool   `json:"probes"`
+			LatencyMS    *int    `json:"latencyMs"`
+			LossPercent  *int    `json:"lossPercent"`
 		}
 		if readJSON(w, r, &input) != nil {
 			return true
@@ -166,6 +176,22 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 			return true
 		}
 		next := notificationConfig{Enabled: input.Enabled, ChatID: input.ChatID, SealedToken: sealed, Monitor: input.Monitor, Traffic: input.Traffic, Expiry: input.Expiry, Days: input.Days, Percent: input.Percent, Failures: input.Failures, Daily: n.Config.Daily, DailyHour: n.Config.DailyHour, Probes: n.Config.Probes, LatencyMS: n.Config.LatencyMS, LossPercent: n.Config.LossPercent}
+		next.Renewal, next.RenewalUsers = n.Config.Renewal, n.Config.RenewalUsers
+		if input.Renewal != nil {
+			next.Renewal = *input.Renewal
+		}
+		if input.RenewalUsers != nil {
+			next.RenewalUsers = *input.RenewalUsers
+		}
+		if !next.Enabled || !next.Expiry {
+			next.Renewal = false
+		}
+		users, err := normalizeRenewalUsers(next.RenewalUsers)
+		if err != nil || (next.Renewal && users == "") {
+			problem(w, 400, "续费按钮需要开启通知和到期提醒，并填写允许操作的数字 Telegram 用户 ID（最多 20 个）")
+			return true
+		}
+		next.RenewalUsers = users
 		if input.Daily != nil {
 			next.Daily = *input.Daily
 		}
@@ -187,6 +213,13 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 		}
 		// Cancel stale queued messages when the recipient or alert policy changes.
 		if next != n.Config || !next.Enabled {
+			n.CallbackNext, n.CallbackError, n.CallbackReceiptError = 0, "", ""
+			if next.SealedToken != n.Config.SealedToken {
+				n.CallbackOffset = 0
+			}
+			for i := range n.Events {
+				n.Events[i].Renewal = nil
+			}
 			for i := range n.Events {
 				if n.Events[i].Status == "pending" {
 					n.Events[i].Status = "cancelled"
@@ -204,7 +237,11 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 	}
 	public := n.Config
 	public.SealedToken = ""
-	respond(w, 200, map[string]any{"config": public, "tokenConfigured": n.Config.SealedToken != "", "events": n.Events})
+	events := append([]notificationEvent{}, n.Events...)
+	for i := range events {
+		events[i].Renewal = nil
+	}
+	respond(w, 200, map[string]any{"config": public, "tokenConfigured": n.Config.SealedToken != "", "events": events, "callbackError": strings.TrimSpace(n.CallbackError + "\n" + n.CallbackReceiptError)})
 	return true
 }
 
@@ -394,8 +431,12 @@ func notificationReconcile(n *notificationState, current map[string]string, now 
 }
 
 // HTTP errors are deliberately generic: request URLs contain the bot secret.
-func sendTelegram(ctx context.Context, client *http.Client, token, chat, message string) (int, string) {
-	body, _ := json.Marshal(map[string]any{"chat_id": chat, "text": message, "disable_web_page_preview": true})
+func sendTelegram(ctx context.Context, client *http.Client, token, chat, message string, markup ...any) (int, string) {
+	payload := map[string]any{"chat_id": chat, "text": message, "disable_web_page_preview": true}
+	if len(markup) > 0 && markup[0] != nil {
+		payload["reply_markup"] = markup[0]
+	}
+	body, _ := json.Marshal(payload)
 	req, e := http.NewRequestWithContext(ctx, "POST", "https://api.telegram.org/bot"+token+"/sendMessage", bytes.NewReader(body))
 	if e != nil {
 		return 60, "通知请求创建失败"
@@ -452,6 +493,7 @@ func (s *Server) pollNotifications(ctx context.Context) {
 	if len(n.Events) > 200 {
 		n.Events = n.Events[len(n.Events)-200:]
 	}
+	s.prepareTelegramRenewals(&n, now)
 	// Persist intent before sending; a crash after delivery can cause one duplicate.
 	if s.saveNotifications(n) != nil {
 		return
@@ -471,7 +513,7 @@ func (s *Server) pollNotifications(ctx context.Context) {
 		}
 		token, _ := secret["token"].(string)
 		call, cancel := context.WithTimeout(ctx, 10*time.Second)
-		delay, message := sendTelegram(call, &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, token, n.Config.ChatID, event.Text)
+		delay, message := sendTelegram(call, &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, token, n.Config.ChatID, event.Text, renewalKeyboard(event.Renewal))
 		cancel()
 		event.Attempts++
 		event.Error = message
