@@ -13,6 +13,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 )
 
 type cfDNSRecord struct {
@@ -72,7 +74,13 @@ func (c cfDNSClient) call(ctx context.Context, method, path string, body any, ou
 var cfID = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 
 func cfDomain(s string) string {
-	s = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(s), "."))
+	s = strings.TrimSpace(s)
+	var err error
+	s, err = idna.Lookup.ToASCII(s)
+	if err != nil {
+		return ""
+	}
+	s = strings.ToLower(strings.TrimSuffix(s, "."))
 	if len(s) > 253 || !strings.Contains(s, ".") || net.ParseIP(s) != nil {
 		return ""
 	}
@@ -91,7 +99,7 @@ func (c cfDNSClient) bind(ctx context.Context, zone, domain, address string) (bo
 	if e := c.call(ctx, "GET", "/zones?name="+url.QueryEscape(zone)+"&per_page=100", nil, &zones); e != nil {
 		return false, e
 	}
-	if len(zones) != 1 || zones[0].Name != zone || !cfID.MatchString(zones[0].ID) {
+	if len(zones) != 1 || cfDomain(zones[0].Name) != zone || !cfID.MatchString(zones[0].ID) {
 		return false, errors.New("未找到唯一的 Cloudflare 域名区域，请填写实际 Zone 根域名")
 	}
 	base := "/zones/" + zones[0].ID + "/dns_records"
@@ -105,7 +113,7 @@ func (c cfDNSClient) bind(ctx context.Context, zone, domain, address string) (bo
 	}
 	exact := false
 	for _, row := range rows {
-		if strings.ToLower(strings.TrimSuffix(row.Name, ".")) != domain {
+		if cfDomain(row.Name) != domain {
 			return false, errors.New("Cloudflare 返回了非目标域名的记录")
 		}
 		if row.Type == "CNAME" || (row.Type == "A" || row.Type == "AAAA") && (row.Type != kind || !net.ParseIP(row.Content).Equal(net.ParseIP(address)) || row.Proxied) {
@@ -123,7 +131,7 @@ func (c cfDNSClient) bind(ctx context.Context, zone, domain, address string) (bo
 	if e != nil {
 		return false, errors.New("DNS 创建未确认，请先在 Cloudflare 核对记录再重试（请求可能已被处理）")
 	}
-	if !cfID.MatchString(created.ID) || created.Name != domain || created.Type != kind || !net.ParseIP(created.Content).Equal(net.ParseIP(address)) || created.Proxied {
+	if !cfID.MatchString(created.ID) || cfDomain(created.Name) != domain || created.Type != kind || !net.ParseIP(created.Content).Equal(net.ParseIP(address)) || created.Proxied {
 		return false, errors.New("DNS 返回结果与请求不一致，请在 Cloudflare 核对，未绑定本地节点地址")
 	}
 	return true, nil

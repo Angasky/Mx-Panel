@@ -23,8 +23,11 @@ func (c cfDNSClient) zones(ctx context.Context) ([]remote.CFZone, error) {
 			return nil, e
 		}
 		for _, z := range rows {
-			if !cfID.MatchString(z.ID) || cfDomain(z.Name) != z.Name || seen[z.ID] {
-				return nil, errors.New("CF 域名列表无效或分页重复，未覆盖原列表")
+			if !cfID.MatchString(z.ID) || cfDomain(z.Name) == "" {
+				return nil, errors.New("CF 返回了无效的域名或区域 ID，未覆盖原列表")
+			}
+			if seen[z.ID] {
+				return nil, errors.New("CF 返回了重复的域名区域分页，请重新同步；未覆盖原列表")
 			}
 			seen[z.ID] = true
 			all = append(all, z)
