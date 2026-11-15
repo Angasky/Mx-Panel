@@ -14,14 +14,25 @@ import (
 )
 
 type siteInfo struct {
-	SubscriptionOrigin string `json:"subscriptionOrigin,omitempty"`
-	Logo               string `json:"logo,omitempty"`
-	Name               string `json:"name"`
-	Description        string `json:"description"`
-	Announcement       string `json:"announcement"`
+	ThemeNames         map[string]string `json:"themeNames,omitempty"`
+	SubscriptionOrigin string            `json:"subscriptionOrigin,omitempty"`
+	Logo               string            `json:"logo,omitempty"`
+	Name               string            `json:"name"`
+	Description        string            `json:"description"`
+	Announcement       string            `json:"announcement"`
 }
 
 func validSiteInfo(c siteInfo) bool {
+	for key, name := range c.ThemeNames {
+		switch key {
+		case "craft", "slate", "high", "low", "pink", "amber":
+		default:
+			return false
+		}
+		if !utf8.ValidString(name) || utf8.RuneCountInString(name) > 24 || strings.ContainsFunc(name, unicode.IsControl) {
+			return false
+		}
+	}
 	if normalized, err := normalizeSubscriptionOrigin(c.SubscriptionOrigin); err != nil || normalized != c.SubscriptionOrigin {
 		return false
 	}
@@ -123,11 +134,12 @@ func (s *Server) siteInfoAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method == "PUT" {
 		var input struct {
 			Config *struct {
-				Name               string  `json:"name"`
-				Description        string  `json:"description"`
-				Announcement       string  `json:"announcement"`
-				Logo               *string `json:"logo"`
-				SubscriptionOrigin *string `json:"subscriptionOrigin"`
+				ThemeNames         *map[string]string `json:"themeNames"`
+				Name               string             `json:"name"`
+				Description        string             `json:"description"`
+				Announcement       string             `json:"announcement"`
+				Logo               *string            `json:"logo"`
+				SubscriptionOrigin *string            `json:"subscriptionOrigin"`
 			} `json:"config"`
 			Revision string `json:"revision"`
 		}
@@ -140,6 +152,10 @@ func (s *Server) siteInfoAdmin(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		next := siteInfo{Name: input.Config.Name, Description: input.Config.Description, Announcement: input.Config.Announcement, Logo: c.Logo, SubscriptionOrigin: c.SubscriptionOrigin}
+		next.ThemeNames = c.ThemeNames
+		if input.Config.ThemeNames != nil {
+			next.ThemeNames = *input.Config.ThemeNames
+		}
 		if input.Config.Logo != nil {
 			next.Logo = *input.Config.Logo
 		}
@@ -152,7 +168,7 @@ func (s *Server) siteInfoAdmin(w http.ResponseWriter, r *http.Request) bool {
 			next.SubscriptionOrigin = origin
 		}
 		if !validSiteInfo(next) {
-			problem(w, 400, "名称最多 60 字、简介最多 160 字且不能换行；公告最多 1000 字；Logo 仅支持 24 KiB 内、512×512 以内的 PNG/JPEG")
+			problem(w, 400, "网站信息无效：主题名称仅支持六套内置主题，每项最多 24 字且不能换行；名称最多 60 字、简介最多 160 字、公告最多 1000 字；Logo 仅支持规定尺寸的 PNG/JPEG")
 			return true
 		}
 		if input.Revision != siteInfoRevision(c) {
@@ -160,6 +176,15 @@ func (s *Server) siteInfoAdmin(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		c = next
+		if c.ThemeNames != nil {
+			names := map[string]string{}
+			for key, name := range c.ThemeNames {
+				if name = strings.TrimSpace(name); name != "" {
+					names[key] = name
+				}
+			}
+			c.ThemeNames = names
+		}
 		c.Name = strings.TrimSpace(c.Name)
 		c.Description = strings.TrimSpace(c.Description)
 		c.Announcement = strings.TrimSpace(c.Announcement)

@@ -2634,6 +2634,32 @@ function formatBytes(value) {
   return (value / 1024 ** index).toLocaleString('zh-CN', { maximumFractionDigits: 2 }) + ' ' + units[index];
 }
 
+const defaultThemeNames={craft:'我的世界',slate:'云白',high:'石墨',low:'简洁',pink:'猛男',amber:'暖橙'};
+let siteThemeNames={};
+function themeLabel(key){return Object.hasOwn(siteThemeNames,key)?siteThemeNames[key]:(defaultThemeNames[key]||key)}
+function refreshThemeLabels(){
+ document.querySelectorAll('[data-theme-choice]').forEach(button=>{const el=button.querySelector('strong');if(!el)return;if(!el.dataset.defaultTitle)el.dataset.defaultTitle=el.textContent;el.textContent=siteThemeNames[button.dataset.themeChoice]||el.dataset.defaultTitle});
+ document.querySelectorAll('#memberTheme option').forEach(el=>el.textContent=themeLabel(el.value)+'主题');
+}
+async function loadThemeNamesEditor(){
+ const form=$('themeNamesForm');if(!form)return;form.onsubmit=e=>e.preventDefault();
+ const error=form.querySelector('[role=alert]'),status=form.querySelector('[role=status]'),save=$('themeNamesSave');
+ const active=()=>form.isConnected&&S.page==='settings'&&S.role==='admin';
+ let snapshot;
+ const readValues=()=>Object.fromEntries(Object.keys(defaultThemeNames).map(key=>[key,$('themeName-'+key).value.trim()]));
+ const setValues=names=>{for(const key of Object.keys(defaultThemeNames))$('themeName-'+key).value=names?.[key]||''};
+ form.oninput=()=>{status.textContent='尚未保存';error.textContent=''};
+ $('themeNamesReset').onclick=()=>{setValues({});status.textContent='已清空草稿，保存后恢复默认名称'};
+ try{snapshot=await api('/site-info');if(!active())return;setValues(snapshot.config.themeNames);save.disabled=false;status.textContent='留空使用默认名称；只改变名称，不更换配色。'}catch(e){if(active())error.textContent=e.message;return}
+ form.onsubmit=async e=>{
+  e.preventDefault();if(!active()||save.disabled)return;
+  const names=readValues();error.textContent='';
+  if(Object.values(names).some(name=>[...name].length>24||/[\u0000-\u001f\u007f-\u009f]/u.test(name))){error.textContent='每个主题名称最多 24 字，不能包含换行或控制字符';return}
+  const controls=[...form.querySelectorAll('input,button')];controls.forEach(el=>el.disabled=true);
+  try{const result=await api('/site-info',jsonOpt('PUT',{revision:snapshot.revision,config:{...snapshot.config,themeNames:names}}));if(!active())return;snapshot=result;++siteInfoGeneration;applySiteInfo(result.config);setValues(result.config.themeNames);status.textContent='主题名称已保存，其他浏览器刷新后生效。'}catch(e){if(active())error.textContent=e.message}finally{if(active())controls.forEach(el=>el.disabled=false)}
+ };
+}
+
 function setTheme(theme) {
   if (!['craft', 'slate', 'high', 'low', 'pink', 'amber'].includes(theme)) return;
   const root = document.documentElement;
@@ -2645,7 +2671,7 @@ function setTheme(theme) {
   let persisted = true;
   try { browserStore('localStorage','setItem','mxioc_theme', theme); } catch (_) { persisted = false; }
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
-  notice(persisted ? `已切换为${({craft:'我的世界',slate:'云白',high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
+  notice(persisted ? `已切换为${themeLabel(theme)}主题` : '主题已切换，当前浏览器未允许保存偏好');
 }
 
 
@@ -2730,6 +2756,7 @@ async function memberPortal() {
     const t=p.traffic||{};
     return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制订阅链接</button><a class="btn" href="${esc(subscriptionURL(p.url))}" referrerpolicy="no-referrer" download>下载 Clash / Mihomo</a></div><details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(subscriptionURL(f.url))}" referrerpolicy="no-referrer" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
   }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
+  refreshThemeLabels();
   $('memberTheme').value=document.documentElement.dataset.theme;
   $('memberTheme').onchange=e=>setTheme(e.target.value);
   document.querySelectorAll('[data-member-copy]').forEach(b=>b.onclick=async()=>{
@@ -2917,6 +2944,8 @@ function subscriptionURL(path) {
  return (subscriptionOrigin||location.origin)+path;
 }
 function applySiteInfo(config) {
+ siteThemeNames=Object.fromEntries(Object.keys(defaultThemeNames).filter(key=>typeof config.themeNames?.[key]==='string'&&config.themeNames[key].trim()).map(key=>[key,config.themeNames[key]]));
+ refreshThemeLabels();
  subscriptionOrigin='';
  if(typeof config.subscriptionOrigin==='string'&&config.subscriptionOrigin){
   try{const u=new URL(config.subscriptionOrigin);if(u.protocol==='https:'&&!u.username&&!u.password&&u.origin===config.subscriptionOrigin)subscriptionOrigin=u.origin;}catch{}
@@ -3012,7 +3041,8 @@ function settings() {
         <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白界面、陶橙操作与细描边，适合偏好柔和配色的用户。</p>
       </button>
     </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
-  </section>`;
+  </section><section class="panel"><h3>自定义主题名称</h3><p class="hint">统一设置管理员与用户界面的主题名称，每项最多 24 字。名称公开可见，请勿填写私密信息。</p><form id="themeNamesForm"><div class="grid">${Object.entries(defaultThemeNames).map(([key,name])=>`<div><label for="themeName-${key}">${esc(name)}主题</label><input id="themeName-${key}" maxlength="48" placeholder="${esc(name)}"></div>`).join('')}</div><p role="status" aria-live="polite">正在读取…</p><p role="alert" class="error"></p><div class="toolbar"><button type="submit" class="btn primary" id="themeNamesSave" disabled>保存主题名称</button><button type="button" class="btn" id="themeNamesReset">恢复默认名称（保存后生效）</button></div></form></section>`;
+ refreshThemeLabels();void loadThemeNamesEditor();
 }
 
 async function render_usageDisplayManager(){
