@@ -1,5 +1,12 @@
 # 更新日志
 
+## v0.3.6
+
+- 安装时支持 Cloudflare API Token / Global API Key 创建 A/AAAA 灰云记录，并绑定为新节点默认域名。
+- 服务器卡片支持仅绑定 CF 域名，不必重装内核；原 SSH 地址及 Reality SNI 不变。
+- 同名相同灰云记录复用，冲突不覆盖；DNS 失败不启动安装，部分成功明确提示。
+- 凭据仅本次使用、不保存；完整说明见 docs/go/CLOUDFLARE-NODE-DNS.md。
+
 ## v0.3.5
 
 - Agent 初次登记优先 IPv4，IPv4 DNS/连接等传输失败时回退 IPv6，避免双栈服务器默认只登记 IPv6。
