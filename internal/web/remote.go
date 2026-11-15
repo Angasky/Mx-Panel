@@ -35,6 +35,9 @@ func stringField(payload map[string]any, key string) string {
 	return value
 }
 func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
+	if s.cloudflareSettingsRoute(w, r) {
+		return true
+	}
 	if s.serverBatchRoute(w, r) {
 		return true
 	}

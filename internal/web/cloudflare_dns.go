@@ -60,7 +60,7 @@ func (c cfDNSClient) call(ctx context.Context, method, path string, body any, ou
 	if json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&envelope) != nil || res.StatusCode < 200 || res.StatusCode >= 300 || !envelope.Success {
 		return errors.New("Cloudflare 请求失败，请核对凭据、Zone Read / DNS Edit 权限与请求频率")
 	}
-	if envelope.ResultInfo.TotalCount > 100 {
+	if strings.Contains(path, "/dns_records") && envelope.ResultInfo.TotalCount > 100 {
 		return errors.New("同名 DNS 记录过多，停止自动处理")
 	}
 	if out != nil && json.Unmarshal(envelope.Result, out) != nil {
@@ -138,13 +138,15 @@ func (s *Server) cloudflareDNSRoute(w http.ResponseWriter, r *http.Request) bool
 		return true
 	}
 	var in struct {
-		ID        string `json:"id"`
-		Key       string `json:"key"`
-		Email     string `json:"email"`
-		Zone      string `json:"zone"`
-		Domain    string `json:"domain"`
-		Address   string `json:"address"`
-		Confirmed bool   `json:"confirmed"`
+		UseSaved           bool   `json:"useSaved"`
+		CredentialRevision string `json:"credentialRevision"`
+		ID                 string `json:"id"`
+		Key                string `json:"key"`
+		Email              string `json:"email"`
+		Zone               string `json:"zone"`
+		Domain             string `json:"domain"`
+		Address            string `json:"address"`
+		Confirmed          bool   `json:"confirmed"`
 	}
 	if readJSON(w, r, &in) != nil {
 		problem(w, 400, "参数无效")
@@ -155,6 +157,28 @@ func (s *Server) cloudflareDNSRoute(w http.ResponseWriter, r *http.Request) bool
 	if !in.Confirmed || zone == "" || domain == "" || (domain != zone && !strings.HasSuffix(domain, "."+zone)) || ip == nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() {
 		problem(w, 400, "请确认操作，填写有效 Zone、所属域名及服务器公网 IPv4/IPv6")
 		return true
+	}
+	if in.UseSaved {
+		manager, err := s.remoteManager()
+		if err != nil {
+			problem(w, 500, "CF 设置不可用")
+			return true
+		}
+		settings, err := manager.CloudflareSettings()
+		if err != nil || settings.Secret == "" {
+			problem(w, 400, "请先在设置中保存 CF 凭据")
+			return true
+		}
+		if in.CredentialRevision != settings.Revision {
+			problem(w, 409, "CF 设置已变化，请重新打开安装窗口")
+			return true
+		}
+		in.Key, err = manager.CloudflareKey(settings)
+		if err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
+		in.Email = settings.Email
 	}
 	in.Key = strings.TrimSpace(in.Key)
 	in.Email = strings.TrimSpace(in.Email)
