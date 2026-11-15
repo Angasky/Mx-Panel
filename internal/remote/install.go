@@ -97,6 +97,9 @@ func (m *Manager) RecoverInstallJobs() error {
 }
 
 func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
+	return m.startInstallExpected(id, confirmed, "")
+}
+func (m *Manager) startInstallExpected(id string, confirmed bool, expected string) (Record, error) {
 	if !confirmed {
 		return nil, errors.New("请确认安装或更新服务器软件")
 	}
@@ -109,6 +112,9 @@ func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 	record, err := find(data, id)
 	if err != nil {
 		return nil, err
+	}
+	if expected != "" && batchRecordRevision(record) != expected {
+		return nil, errors.New("服务器配置在排队后发生变化，未安装，请重新核查后创建批次")
 	}
 	if value(record["coreUserPending"]) != "" {
 		return nil, errors.New("独立内核用户变更待核对，暂不能安装或更新")

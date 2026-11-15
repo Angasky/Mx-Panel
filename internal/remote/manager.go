@@ -23,6 +23,8 @@ import (
 )
 
 type Manager struct {
+	batchMu          sync.Mutex
+	batchRunning     bool
 	root, path       string
 	key              []byte
 	mu               sync.Mutex
