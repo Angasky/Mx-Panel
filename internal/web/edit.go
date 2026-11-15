@@ -21,6 +21,27 @@ func (s *Server) editRoutes(w http.ResponseWriter, r *http.Request) bool {
 	}
 	path := r.URL.Path
 	method := r.Method
+	if path == "/admin/api/policy-templates/default" {
+		if method != "PUT" {
+			problem(w, 405, "请求方法不支持")
+			return true
+		}
+		var input struct {
+			ID       string `json:"id"`
+			Expected string `json:"expected"`
+		}
+		if readJSON(w, r, &input) != nil {
+			problem(w, 400, "默认模板请求无效")
+			return true
+		}
+		result, err := s.repository.SetDefaultPolicyTemplate(input.ID, input.Expected)
+		if err != nil {
+			problem(w, 400, err.Error())
+		} else {
+			respond(w, 200, result)
+		}
+		return true
+	}
 	if path == "/admin/api/policy-templates" {
 		var result config.Document
 		var err error

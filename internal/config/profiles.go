@@ -229,6 +229,9 @@ func (r *Repository) CreateProfile(payload map[string]any) (map[string]any, erro
 	}
 	id = "p-" + id
 	template := stringValue(payload["templateId"])
+	if template == "default" {
+		template = defaultPolicyTemplate(index)
+	}
 	if template == "" {
 		template = "blank"
 	}

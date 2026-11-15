@@ -195,7 +195,7 @@ func (r *Repository) PolicyTemplates(profileID, id, source string) (Document, er
 		if id != "" {
 			return nil, errors.New("策略模板不存在")
 		}
-		return Document{"templates": list}, nil
+		return Document{"templates": list, "defaultTemplateId": defaultPolicyTemplate(index)}, nil
 	}
 	base, err := r.blankProfile()
 	if err != nil {
@@ -250,6 +250,9 @@ func (r *Repository) SavePolicyTemplate(method string, payload Document) (Docume
 	var result Document
 	if method == "DELETE" {
 		list = append(list[:at], list[at+1:]...)
+		if defaultPolicyTemplate(index) == id {
+			delete(index, "defaultPolicyTemplate")
+		}
 	} else {
 		if name == "" || len([]rune(name)) > 60 || strings.ContainsAny(name, "\r\n\x00") {
 			return nil, errors.New("模板名称不能为空或超过 60 字")

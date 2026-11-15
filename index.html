@@ -7321,10 +7321,14 @@ async function policyTemplateManager() {
     const data = await api('/policy-templates');
     if (!loading.isConnected) return;
     openModal('策略模板', `<p class="hint">模板只保存策略组和分流规则。可先在订阅中编辑策略组，再保存为模板供新订阅使用。</p>
-      <div class="toolbar"><button class="btn primary" id="policyNew">从内置模板新建</button><button class="btn" id="policyCurrent">从当前订阅提取</button></div>
+      <div class="toolbar"><button class="btn primary" id="policyNew">从内置模板新建</button><button class="btn" id="policyCurrent">从当前订阅提取</button><button class="btn" id="policyDefaultReset">恢复内置默认模板</button></div><p class="hint">默认模板用于新建订阅的预选，不修改已有订阅；本次仍可选择其他模板。删除默认模板后自动恢复内置模板。</p>
       <div id="policyTemplateRows" class="checks" style="max-height:320px;overflow:auto"></div>
       <div id="policyTemplateError" class="error" role="alert"></div>`);
     const rows = $('policyTemplateRows'), errorBox = $('policyTemplateError');
+    const setDefault=async(id,button)=>{button.disabled=true;errorBox.textContent='';try{await api('/policy-templates/default',jsonOpt('PUT',{id,expected:data.defaultTemplateId||'blank'}));if(rows.isConnected)await policyTemplateManager()}catch(e){if(rows.isConnected)errorBox.textContent=e.message}finally{button.disabled=false}};
+    $('policyDefaultReset').disabled=(data.defaultTemplateId||'blank')==='blank';
+    $('policyDefaultReset').onclick=e=>setDefault('blank',e.currentTarget);
+
     const open = async (url, button) => {
       button.disabled = true;
       errorBox.textContent = '';
@@ -7348,7 +7352,8 @@ async function policyTemplateManager() {
       button.className = 'btn small';
       button.textContent = '编辑';
       button.onclick = () => open('/policy-templates?id=' + encodeURIComponent(template.id), button);
-      row.append(document.createTextNode(template.name + ' '), button);
+      const defaultButton=document.createElement('button');defaultButton.type='button';defaultButton.className='btn small';defaultButton.textContent=data.defaultTemplateId===template.id?'当前默认':'设为默认';defaultButton.disabled=data.defaultTemplateId===template.id;defaultButton.onclick=()=>setDefault(template.id,defaultButton);
+      row.append(document.createTextNode(template.name + ' '), button,defaultButton);
       rows.append(row);
     }
   } catch (error) {
@@ -7401,11 +7406,12 @@ function policyTemplateEditor(template) {
 async function profileCreate(templateId = 'blank') {
   const template = S.profiles.find(p => p.id === templateId);
   if (templateId !== 'blank' && !template) return notice('来源订阅已不存在，请刷新列表');
-  let templates = [];
+  let templates = [],defaultTemplate='blank';
   if (!template) {
     try {
       const data = await api('/policy-templates');
       templates = data.templates || [];
+      defaultTemplate=data.defaultTemplateId||'blank';
     } catch (error) {
       return notice(error.message);
     }
@@ -7444,6 +7450,7 @@ async function profileCreate(templateId = 'blank') {
     </fieldset>
   </form>`);
 
+  if(!template)$('profileTemplate').value=templates.some(t=>t.id===defaultTemplate)?defaultTemplate:'blank';
   $('createProfile').onsubmit = async e => {
     e.preventDefault();
     try {
