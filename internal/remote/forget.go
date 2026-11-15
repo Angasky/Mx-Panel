@@ -44,6 +44,13 @@ func (m *Manager) ForgetServer(id string, detach func(Record, func() error) (Rec
 		}
 		data[key] = keep
 	}
+	if _, exists := data["serverGroups"]; exists {
+		groups, err := groupSnapshot(data)
+		if err != nil {
+			return nil, err
+		}
+		data["serverGroups"] = groups
+	}
 	committed := false
 	result, err := detach(record, func() error {
 		if committed {

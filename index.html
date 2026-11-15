@@ -1839,6 +1839,13 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
 #panelUserProfile{max-width:100%;min-width:0}#panelUserSearch{min-width:0}
 
 .manager-page{min-width:0}.manager-page>h3{margin-bottom:20px}.manager-page textarea{max-width:100%;box-sizing:border-box}.manager-page pre{white-space:pre-wrap;overflow-wrap:anywhere}.manager-page .grid>*{min-width:0}#sectionTabs{flex-wrap:wrap}
+
+html[data-theme] .server-group-card {display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;min-width:0}
+html[data-theme] .server-group-card > .check {display:flex;align-items:center;gap:8px;margin:0;white-space:nowrap}
+html[data-theme] .server-group-picker {display:flex;align-items:center;gap:8px;margin:0;min-width:0;flex:1 1 150px}
+html[data-theme] .server-group-picker > span {white-space:nowrap;flex:none}
+html[data-theme] .server-group-picker > select {width:100%;min-width:0;max-width:100%;flex:1}
+#serverGroupsEditor .panel {min-width:0;max-width:100%;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -3271,9 +3278,10 @@ async function servers() {
   S.serverLoading = true;
   if (S.servers.length) renderServers();
   try {
-    const [data,observations] = await Promise.all([api('/servers'),api('/servers/observations').catch(()=>null)]);
+    const [data,observations,groups] = await Promise.all([api('/servers'),api('/servers/observations').catch(()=>null),api('/servers/groups')]);
     if (S.page !== 'servers' || ticket !== S.serverLoadTicket) return;
     S.servers = data.servers;
+    S.serverGroups = groups; S.serverSelection = new Set();
     S.serverObservations = observations?.observations || {};
     S.serverObservedAt = observations?.generatedAt || 0;
     S.serverObservationError = !observations;
@@ -3285,19 +3293,44 @@ async function servers() {
   }
 }
 
+function serverGroupOptions(selected='',all=false) {
+ return (all?'<option value="*">全部分组</option>':'')+`<option value="" ${selected===''?'selected':''}>未分组</option>`+(S.serverGroups?.groups||[]).map(g=>`<option value="${esc(g.id)}" ${selected===g.id?'selected':''}>${esc(g.name)}</option>`).join('');
+}
+function serverGroupCard(s) {
+ const group=S.serverGroups?.assignments?.[s.id]||'';
+ return `<div class="server-group-card"><label class="check"><input type="checkbox" data-server-select="${esc(s.id)}" ${S.serverSelection?.has(s.id)?'checked':''}>选择服务器</label><label class="server-group-picker"><span>分组</span><select data-server-group="${esc(s.id)}" aria-label="${esc(s.name)}的分组">${serverGroupOptions(group)}</select></label></div>`;
+}
+async function changeServerGroup(change) {
+ if(S.serverGroupBusy)return;S.serverGroupBusy=true;
+ const revision=S.serverGroups?.revision;
+ const controls=[...$('content').querySelectorAll('[data-group-control],[data-server-group],#groupCreate button')];controls.forEach(b=>b.disabled=true);
+ try {const result=await api('/servers/groups',jsonOpt('PUT',{...change,revision}));S.serverGroups=result;
+ if(change.action==='delete'&&S.filters.serverGroup===change.id)S.filters.serverGroup='*';
+ if(change.action==='assign')S.serverSelection=new Set();
+ if(S.page==='servers')renderServers();notice('服务器分组已保存');
+ }catch(e){if(S.page==='servers')renderServers();notice(e.message+'；可刷新服务器列表后重试。')}
+ finally{S.serverGroupBusy=false;controls.forEach(b=>b.disabled=false)}
+}
+
 function renderServers() {
+  const groupEditorOpen=$('serverGroupsEditor')?.open||false;
   const q = S.filters.servers || '';
+  const groupFilter=S.filters.serverGroup??'*';
+  S.serverSelection ||= new Set();
   const kind = S.filters.serverKind || '', status = S.filters.serverStatus || '';
-  const matching = S.servers.filter(s => `${s.name} ${s.host} ${s.domain} ${s.nodeAddress || ''}`.toLowerCase().includes(q.toLowerCase()) && (!kind || serverKind(s) === kind));
+  const matching = S.servers.filter(s => `${s.name} ${s.host} ${s.domain} ${s.nodeAddress || ''}`.toLowerCase().includes(q.toLowerCase()) && (!kind || serverKind(s) === kind) && (groupFilter==='*'||(S.serverGroups?.assignments?.[s.id]||'')===groupFilter));
   const counts = Object.fromEntries(Object.keys(serverObservationLabels).map(key=>[key,matching.filter(s=>serverObservationFor(s.id).status===key).length]));
   const page = tableSlice(matching.filter(s => !status || serverObservationFor(s.id).status === status), 'servers');
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div class="profile-summary"><h3>远端服务器</h3><p class="muted">可选择 3x-ui 面板、独立 Xray 或 sing-box，也可接入现有 X-ui。SSH 账号须为 root 或具有 sudo 权限。</p></div><div class="toolbar"><button class="btn" onclick="serverForm('',true)">接入已有面板 / 内核</button><button class="btn primary" onclick="agentEnrollManager()">复制命令接入 Agent</button><button class="btn" onclick="serverForm()">${uiIcon('circle-plus')}添加 SSH 服务器</button></div></div>
+    <details class="card-secondary" id="serverGroupsEditor"><summary>管理服务器分组（${S.serverGroups?.groups?.length||0}）</summary><p class="hint">每台服务器归属一个分组。删除分组仅将成员移回未分组，不删除服务器、节点或监控数据。</p><form id="groupCreate" class="toolbar"><input id="groupNewName" aria-label="新分组名称" placeholder="例如：分组 A / 香港 / 测试环境" maxlength="60" required><button class="btn primary" type="submit">创建分组</button></form><div class="toolbar">${(S.serverGroups?.groups||[]).map(g=>`<div class="panel"><strong>${esc(g.name)}</strong><p>${S.servers.filter(s=>S.serverGroups.assignments[s.id]===g.id).length} 台服务器</p><button class="btn small" data-group-control data-group-rename="${esc(g.id)}">改名</button> <button class="btn small danger" data-group-control data-group-delete="${esc(g.id)}">删除分组</button></div>`).join('')||'<p class="muted">尚未创建分组，所有服务器都在未分组中。</p>'}</div></details>
+    <div class="toolbar"><label for="serverGroupFilter">服务器分组</label><select id="serverGroupFilter">${serverGroupOptions(groupFilter,true)}</select><span class="hint">共 ${S.servers.filter(s=>groupFilter==='*'||(S.serverGroups?.assignments?.[s.id]||'')===groupFilter).length} 台</span></div>
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"><select id="serverKindFilter" aria-label="服务器类型">${[['','全部类型'],['3x-ui','3x-ui'],['x-ui','X-ui'],['x-panel','X-Panel'],['xray','Xray'],['sing-box','sing-box'],['probe','探针待接管'],['agent','Agent 免 SSH']].map(([id,label])=>`<option value="${id}" ${kind===id?'selected':''}>${label}</option>`).join('')}</select><select id="serverStatusFilter" aria-label="监控状态"><option value="">全部监控状态（${matching.length}）</option>${Object.entries(serverObservationLabels).map(([id,label])=>`<option value="${id}" ${status===id?'selected':''}>${label}（${counts[id]}）</option>`).join('')}</select><button type="button" class="btn" id="serverRefresh" ${S.serverLoading?'disabled':''}>${S.serverLoading?'正在刷新…':'刷新列表与状态'}</button><button type="button" class="btn" id="serverFilterClear">清除筛选</button></div>
     <p class="hint" id="serverObservationNote" role="status">${S.serverObservationError?'状态读取失败，已标记为未知；可点击刷新重试。':S.serverObservedAt?'状态快照：'+esc(new Date(S.serverObservedAt*1000).toLocaleString())+'。':'尚未读取监控状态。'}仅依据本地已有采样或 Agent 心跳，不代表代理连接可用；采样失败不等同离线。外部探针状态请打开硬件监控查看。</p>
+    <div class="toolbar"><button class="btn" id="serverSelectPage">选择本页</button><button class="btn" id="serverClearSelection">取消选择</button><span id="serverSelectionCount">已选 ${S.serverSelection.size} 台</span><label for="serverGroupTarget">移动到</label><select id="serverGroupTarget">${serverGroupOptions()}</select><button class="btn primary" id="serverGroupMove" data-group-control>批量移动分组</button></div>
     <div class="profile-grid">${page.rows.map(s => {
       const id = encodeURIComponent(s.id), url = panelLink(s.panelUrl), running = s.job?.status === 'running', observation = serverObservationFor(s.id);
-      if(s.agentOnly)return `<article class="profile-card"><div class="profile-card-head"><h4>${esc(s.name)}</h4><span class="pill">Agent 免 SSH</span></div><p class="hint">登记来源 IP：${esc(s.host)}（可能是 NAT / CDN 出口，不作为节点地址）</p><p><span class="pill">${serverObservationLabels[observation.status]}</span> · Agent 心跳</p><p class="hint">已登记监控服务器，未授权 SSH、节点部署或中转。历史记录可在硬件监控中开启。</p><div class="toolbar"><button class="btn primary" onclick="openHostMonitor('${id}')">硬件监控</button><button class="btn" onclick="agentManager('${id}').catch(e=>notice(e.message))">Agent 凭据与管理</button><button class="btn danger" onclick="serverRemove('${id}')">移除服务器</button></div></article>`;
-      return `<article class="profile-card"><div class="profile-card-head"><div><h4>${esc(s.name)}</h4><div class="profile-id">${esc(s.sshUser)}@${esc(s.host)}:${s.sshPort}</div></div><span class="pill ${s.job?.status === 'failed' ? 'reject' : ''}">${s.probeDiscovery ? '探针已接入' : s.connectionMode === 'existing' ? (s.existingVerifiedAt ? '已接入' : '待验证') : remoteStatus(s.job?.status)}</span></div>
+      if(s.agentOnly)return `<article class="profile-card">${serverGroupCard(s)}<div class="profile-card-head"><h4>${esc(s.name)}</h4><span class="pill">Agent 免 SSH</span></div><p class="hint">登记来源 IP：${esc(s.host)}（可能是 NAT / CDN 出口，不作为节点地址）</p><p><span class="pill">${serverObservationLabels[observation.status]}</span> · Agent 心跳</p><p class="hint">已登记监控服务器，未授权 SSH、节点部署或中转。历史记录可在硬件监控中开启。</p><div class="toolbar"><button class="btn primary" onclick="openHostMonitor('${id}')">硬件监控</button><button class="btn" onclick="agentManager('${id}').catch(e=>notice(e.message))">Agent 凭据与管理</button><button class="btn danger" onclick="serverRemove('${id}')">移除服务器</button></div></article>`;
+      return `<article class="profile-card">${serverGroupCard(s)}<div class="profile-card-head"><div><h4>${esc(s.name)}</h4><div class="profile-id">${esc(s.sshUser)}@${esc(s.host)}:${s.sshPort}</div></div><span class="pill ${s.job?.status === 'failed' ? 'reject' : ''}">${s.probeDiscovery ? '探针已接入' : s.connectionMode === 'existing' ? (s.existingVerifiedAt ? '已接入' : '待验证') : remoteStatus(s.job?.status)}</span></div>
       <p class="hint"><span class="pill ${['failed','stale'].includes(observation.status)?'reject':''}">${serverObservationLabels[observation.status]}</span> · ${{agent:'Agent 心跳',history:'历史采样',komari:'Komari',unknown:'来源未知'}[observation.source]||'来源未知'}${observation.sampledAt?' · '+esc(new Date(observation.sampledAt*1000).toLocaleString()):''}</p>
       <div class="profile-usage">${s.probeDiscovery ? '复用探针监控 · SSH 已授权' : s.connectionMode === 'existing' ? (panelType(s.installType) ? '接入现有面板' : '接入已有内核') : s.domain ? '绑定域名：' + esc(s.domain) : '无域名自动安装'}<br>节点连接地址：${esc(s.nodeAddress || s.domain || s.host)}<br>安装类型：${esc(s.probeDiscovery?'自动识别 · 尚未接管':s.installType || '3x-ui')}${panelType(s.installType) ? ' · 面板账号：' + esc(s.panelUser) : ' · 支持模板节点 / 中转'}${s.job ? '<br>阶段：' + esc(remoteStage(s.job.stage)) : ''}</div>
       ${s.lastError ? `<div class="error">${esc(s.lastError)}</div>` : ''}
@@ -3307,11 +3340,21 @@ function renderServers() {
       ${s.job ? `<button class="btn small" onclick="showServerJob('${encodeURIComponent(s.job.id)}')">安装日志</button>` : ''}
       <button class="btn small" onclick="serverDiagnose('${id}')">读取诊断</button><button class="btn small danger" onclick="serverRemove('${id}')" ${running ? 'disabled' : ''}>移除管理</button></div></details></article>`;
     }).join('') || '<div class="empty">尚未添加服务器，或没有匹配结果。</div>'}</div>${pagination(page)}</section>`;
+  $('serverGroupsEditor').open=groupEditorOpen;
+  $('serverGroupFilter').value=groupFilter;
+  $('groupCreate').onsubmit=e=>{e.preventDefault();changeServerGroup({action:'create',name:$('groupNewName').value})};
+  $('content').querySelectorAll('[data-group-rename]').forEach(b=>b.onclick=()=>{const g=S.serverGroups.groups.find(g=>g.id===b.dataset.groupRename);const name=prompt('修改分组名称',g.name);if(name!==null)changeServerGroup({action:'rename',id:g.id,name})});
+  $('content').querySelectorAll('[data-group-delete]').forEach(b=>b.onclick=()=>{if(confirm('删除此分组？组内服务器将移回未分组，服务器本身不会被删除。'))changeServerGroup({action:'delete',id:b.dataset.groupDelete})});
+  $('content').querySelectorAll('[data-server-group]').forEach(el=>el.onchange=()=>changeServerGroup({action:'assign',id:el.value,servers:[el.dataset.serverGroup]}));
+  $('content').querySelectorAll('[data-server-select]').forEach(el=>el.onchange=()=>{if(el.checked)S.serverSelection.add(el.dataset.serverSelect);else S.serverSelection.delete(el.dataset.serverSelect);$('serverSelectionCount').textContent='已选 '+S.serverSelection.size+' 台'});
+  $('serverSelectPage').onclick=()=>{page.rows.forEach(s=>S.serverSelection.add(s.id));renderServers()};
+  $('serverClearSelection').onclick=()=>{S.serverSelection.clear();renderServers()};
+  $('serverGroupMove').onclick=()=>{if(!S.serverSelection.size){notice('请先选择服务器');return}changeServerGroup({action:'assign',id:$('serverGroupTarget').value,servers:[...S.serverSelection]})};
   bindSearch('servers', renderServers);
-  for (const [id,key] of [['serverKindFilter','serverKind'],['serverStatusFilter','serverStatus']]) $(id).onchange = e => {
+  for (const [id,key] of [['serverKindFilter','serverKind'],['serverStatusFilter','serverStatus'],['serverGroupFilter','serverGroup']]) $(id).onchange = e => {
     S.filters[key] = e.target.value; S.tablePages.servers = 1; renderServers(); $(id).focus();
   };
-  $('serverFilterClear').onclick = () => { S.filters.servers=''; S.filters.serverKind=''; S.filters.serverStatus=''; S.tablePages.servers=1; renderServers(); $('search').focus(); };
+  $('serverFilterClear').onclick = () => { S.filters.serverGroup='*'; S.filters.servers=''; S.filters.serverKind=''; S.filters.serverStatus=''; S.tablePages.servers=1; renderServers(); $('search').focus(); };
   $('serverRefresh').onclick = () => servers().catch(error=>notice('刷新失败：'+error.message));
 }
 
