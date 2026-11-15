@@ -50,6 +50,7 @@ type failure struct {
 type Server struct {
 	nodeProbeMu          sync.Mutex
 	measureNodeTCP       func(context.Context, []netprobe.Target) []netprobe.Result
+	measureNodeTLS       func(context.Context, []netprobe.TLSTarget) []netprobe.TLSResult
 	siteInfoMu           sync.Mutex
 	portableBackupMu     sync.Mutex
 	aiMu                 sync.Mutex

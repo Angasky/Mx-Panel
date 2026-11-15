@@ -36,7 +36,7 @@ func (r *Repository) NodeProbeTargets(id string, names []string) ([]Document, er
 			return nil, errors.New("节点名称重复，请先修正配置")
 		}
 		port, _ := integer(n["port"])
-		found[name] = Document{"name": name, "type": n["type"], "host": n["server"], "port": port, "network": n["network"], "transport": n["transport"], "chain": stringValue(n["dialer-proxy"]) != ""}
+		found[name] = Document{"name": name, "type": n["type"], "host": n["server"], "port": port, "network": n["network"], "transport": n["transport"], "chain": stringValue(n["dialer-proxy"]) != "", "tls": n["tls"], "sni": n["sni"], "servername": n["servername"], "alpn": cloneConfig(n["alpn"]), "reality": n["reality-opts"] != nil}
 	}
 	result := make([]Document, 0, len(names))
 	for _, name := range names {
