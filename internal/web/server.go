@@ -263,6 +263,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
+		if s.agentManagementPublic(w, r) {
+			return
+		}
 		if s.agentEnrollPublic(w, r) {
 			return
 		}

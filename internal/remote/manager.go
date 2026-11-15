@@ -215,7 +215,7 @@ func (m *Manager) Secret(record Record, key string) (string, error) {
 }
 func publicServer(record Record) Record {
 	result := Record{}
-	for _, key := range []string{"agentOnly", "probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
+	for _, key := range []string{"agentOnly", "agentManaged", "probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
 		if v, ok := record[key]; ok {
 			result[key] = v
 		}

@@ -407,7 +407,11 @@ func agentPullClient() (*http.Client, *http.Transport) {
 }
 
 func agentServerRevision(record remote.Record) string {
-	raw, _ := json.Marshal([]any{record["host"], record["sshPort"], record["sshUser"], record["fingerprint"], record["installType"]})
+	kind := record["installType"]
+	if record["agentManaged"] == true {
+		kind = "agent-managed"
+	}
+	raw, _ := json.Marshal([]any{record["host"], record["sshPort"], record["sshUser"], record["fingerprint"], kind})
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }
