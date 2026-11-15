@@ -361,6 +361,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.agentControlAdmin(w, r) {
 		return
 	}
+	if s.agentEnrollSettingsRoute(w, r) {
+		return
+	}
 	if s.agentEnrollAdmin(w, r) {
 		return
 	}

@@ -40,14 +40,27 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 	switch r.Method {
 	case "POST":
 		var input struct {
-			Name   string `json:"name"`
-			Origin string `json:"origin"`
+			Name             string `json:"name"`
+			SettingsRevision string `json:"settingsRevision"`
+			Origin           string `json:"origin"`
 		}
 		if e := readJSON(w, r, &input); e != nil {
 			problem(w, 400, e.Error())
 			return true
 		}
+		settings, err := s.readAgentEnrollSettings()
+		if err != nil {
+			problem(w, 500, "Agent 接入设置读取失败")
+			return true
+		}
+		if input.SettingsRevision != "" && input.SettingsRevision != settings.revision() {
+			problem(w, 409, "接入设置已变更，请刷新页面后生成命令")
+			return true
+		}
 		name := strings.TrimSpace(input.Name)
+		if settings.AutoHostname {
+			name = "等待服务器上报 hostname"
+		}
 		if name == "" || utf8.RuneCountInString(name) > 60 || !utf8.ValidString(name) || strings.ContainsFunc(name, unicode.IsControl) {
 			problem(w, 400, "服务器名称须为 1–60 个字符且不能换行")
 			return true
@@ -81,7 +94,7 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 		}
 		id := hex.EncodeToString(random[:12])
 		token := base64.RawURLEncoding.EncodeToString(random[12:])
-		entry := agentRegistration{EnrollDigest: enrollHash(token), EnrollExpires: s.now().Add(30 * time.Minute).Unix(), EnrollName: name, EnrollOrigin: origin}
+		entry := agentRegistration{EnrollAutoHostname: settings.AutoHostname, EnrollDigest: enrollHash(token), EnrollExpires: s.now().Add(30 * time.Minute).Unix(), EnrollName: name, EnrollOrigin: origin}
 		entries[id] = entry
 		if s.writeAgents(entries) != nil {
 			problem(w, 500, "登记凭据保存失败")
@@ -186,8 +199,9 @@ func (s *Server) agentEnrollPublic(w http.ResponseWriter, r *http.Request) bool 
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	var input struct {
-		ID     string `json:"id"`
-		Client string `json:"client"`
+		ID             string `json:"id"`
+		Client         string `json:"client"`
+		HostnameBase64 string `json:"hostnameBase64"`
 	}
 	if e := readJSON(w, r, &input); e != nil {
 		problem(w, 400, "接入请求无效")
@@ -219,6 +233,14 @@ func (s *Server) agentEnrollPublic(w http.ResponseWriter, r *http.Request) bool 
 	}
 	if !entry.EnrollDone {
 		if entry.EnrollClient == "" {
+			if entry.EnrollAutoHostname {
+				name, err := decodeEnrollHostname(input.HostnameBase64)
+				if err != nil {
+					problem(w, 400, err.Error())
+					return true
+				}
+				entry.EnrollName = name
+			}
 			ip, _ := s.subscriptionClientIP(r)
 			if net.ParseIP(ip) == nil {
 				problem(w, 400, "无法识别接入来源 IP，请检查反向代理")

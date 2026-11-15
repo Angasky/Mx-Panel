@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 [[ $EUID == 0 ]] || { echo '请使用 root 执行安装命令'; exit 1; }
 [[ $(uname -s) == Linux ]] || { echo '仅支持 Linux'; exit 1; }
-for dep in curl tar sha256sum flock systemctl install od tr cmp; do command -v "$dep" >/dev/null || { echo "缺少依赖：$dep"; exit 1; }; done
+for dep in curl tar sha256sum flock systemctl install od tr cmp base64; do command -v "$dep" >/dev/null || { echo "缺少依赖：$dep"; exit 1; }; done
 [[ -d /run/systemd/system ]] || { echo '需要 systemd 服务管理器'; exit 1; }
 origin=${1:-}; enrollment=${2:-}
 [[ "$origin" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ && "$enrollment" =~ ^[a-f0-9]{24}$ ]] || { echo '接入参数无效'; exit 1; }
@@ -32,7 +32,9 @@ stage=$(mktemp -d /var/tmp/mxioc-enroll.XXXXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
 printf 'Authorization: Bearer %s\n' "$enrollment_token" > "$stage/auth"
 unset enrollment_token
-printf '{"id":"%s","client":"%s"}' "$enrollment" "$client" > "$stage/request"
+detected_hostname=$(hostname 2>/dev/null || uname -n)
+hostname_encoded=$(printf '%s' "$detected_hostname" | base64 | tr -d '\n')
+printf '{"id":"%s","client":"%s","hostnameBase64":"%s"}' "$enrollment" "$client" "$hostname_encoded" > "$stage/request"
 if ! $existing; then
  [[ -z $(systemctl show mxioc-agent.service -p FragmentPath --value 2>/dev/null) ]] || { echo '发现非标准位置的已有 Agent 服务，不会覆盖'; exit 1; }
  case "$(uname -m)" in

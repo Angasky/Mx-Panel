@@ -16,7 +16,7 @@ func (m *Manager) RegisterAgent(id, name, host string) (Record, error) {
 	if b, e := hex.DecodeString(id); e != nil || len(b) != 12 {
 		return nil, errors.New("Agent 登记 ID 无效")
 	}
-	if strings.TrimSpace(name) == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 60 || strings.ContainsFunc(name, unicode.IsControl) || net.ParseIP(host) == nil {
+	if strings.TrimSpace(name) == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 253 || strings.ContainsFunc(name, unicode.IsControl) || net.ParseIP(host) == nil {
 		return nil, errors.New("Agent 服务器名称或来源地址无效")
 	}
 	m.mu.Lock()

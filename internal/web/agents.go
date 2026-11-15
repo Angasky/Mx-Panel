@@ -25,13 +25,14 @@ import (
 )
 
 type agentRegistration struct {
-	EnrollDigest  string `json:"enrollDigest,omitempty"`
-	EnrollExpires int64  `json:"enrollExpires,omitempty"`
-	EnrollName    string `json:"enrollName,omitempty"`
-	EnrollOrigin  string `json:"enrollOrigin,omitempty"`
-	EnrollClient  string `json:"enrollClient,omitempty"`
-	EnrollHost    string `json:"enrollHost,omitempty"`
-	EnrollDone    bool   `json:"enrollDone,omitempty"`
+	EnrollAutoHostname bool   `json:"enrollAutoHostname,omitempty"`
+	EnrollDigest       string `json:"enrollDigest,omitempty"`
+	EnrollExpires      int64  `json:"enrollExpires,omitempty"`
+	EnrollName         string `json:"enrollName,omitempty"`
+	EnrollOrigin       string `json:"enrollOrigin,omitempty"`
+	EnrollClient       string `json:"enrollClient,omitempty"`
+	EnrollHost         string `json:"enrollHost,omitempty"`
+	EnrollDone         bool   `json:"enrollDone,omitempty"`
 
 	DeployHash string `json:"deployHash,omitempty"`
 	DeployJob  string `json:"deployJob,omitempty"`
