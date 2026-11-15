@@ -244,6 +244,38 @@ fi
 if [[ "$action" != update ]]; then
     systemctl enable "$service"
 fi
+# Nginx may share its compiled proxy temp path with another instance.
+# Repair only the standard system service and its exact compiled directory.
+repair_nginx_proxy_permissions() {
+    local config compiled master workers uid gid path=/var/lib/nginx/proxy owner
+    command -v nginx >/dev/null 2>&1 || return 0
+    systemctl is-active --quiet nginx.service || return 0
+    config=$(nginx -T 2>/dev/null) || { printf '警告：Nginx 配置检查失败，请执行 nginx -t。\n' >&2; return 0; }
+    grep -Eq 'proxy_pass[[:space:]]+http://127\.0\.0\.1:62578([/;[:space:]])' <<< "$config" || return 0
+    compiled=$(nginx -V 2>&1) || return 0
+    if [[ "$compiled" != *"--http-proxy-temp-path=$path "* && "$compiled" != *"--http-proxy-temp-path=$path" ]] ||
+       grep -Eq '^[[:space:]]*proxy_temp_path[[:space:]]' <<< "$config"; then
+        printf '提示：自定义 Nginx 临时路径未自动修改。若网页截断，请检查错误日志，或在面板反代 location 设置 proxy_max_temp_file_size 0。\n'
+        return 0
+    fi
+    master=$(systemctl show nginx.service -p MainPID --value) || return 0
+    [[ "$master" =~ ^[1-9][0-9]*$ ]] || return 0
+    workers=$(ps -eo ppid=,uid=,gid=,args= | awk -v pid="$master" '$1==pid && $4=="nginx:" && $5=="worker" && $6=="process" {print $2 ":" $3}' | sort -u) || return 0
+    [[ "$workers" =~ ^[1-9][0-9]*:[0-9]+$ ]] || { printf '提示：无法唯一识别 Nginx 非 root 工作进程，未修改临时目录。\n'; return 0; }
+    uid=${workers%%:*}; gid=${workers#*:}
+    [[ -d "$path" && ! -L "$path" && $(readlink -f -- "$path") == "$path" ]] || return 0
+    owner=$(stat -c '%u:%g' -- "$path") || return 0
+    if [[ "$owner" != "$workers" ]]; then
+        if chown --no-dereference "$uid:$gid" -- "$path"; then
+            printf '已修复 Nginx 标准代理临时目录属主（%s → %s），避免网页响应截断。\n' "$owner" "$workers"
+        else
+            printf '警告：无法修复 Nginx 临时目录，请检查目录权限。\n' >&2
+        fi
+    fi
+    printf 'Nginx 提示：多实例可能共用临时目录；建议面板反代 location 设置 proxy_max_temp_file_size 0，避免落盘权限冲突。\n'
+}
+repair_nginx_proxy_permissions
+
 install -d -m 0755 /usr/local/bin
 shortcut_stage=$(mktemp /usr/local/bin/.mx-p.XXXXXXXX)
 cat > "$shortcut_stage" <<'MENU'

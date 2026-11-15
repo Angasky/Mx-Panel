@@ -13,6 +13,8 @@ server {
     # Public subscription routes only; no management/API/Agent endpoints.
     location ~ ^/(sub/[^/]+|convert/[^/]+/[^/]+)$ {
         limit_except GET HEAD { deny all; }
+        # Keep large UI/subscription responses off shared proxy temp directories.
+        proxy_max_temp_file_size 0;
         proxy_pass http://127.0.0.1:62578;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

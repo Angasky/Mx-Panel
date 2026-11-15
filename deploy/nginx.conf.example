@@ -8,6 +8,8 @@ server {
     client_max_body_size 2m;
 
     location / {
+        # Keep large UI/subscription responses off shared proxy temp directories.
+        proxy_max_temp_file_size 0;
         proxy_pass http://127.0.0.1:62578;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
