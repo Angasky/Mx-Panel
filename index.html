@@ -2674,7 +2674,7 @@ async function userSubscriptionsManager(id) {
       if(!profile){await load();return}
       const sub=data.subscription;
       status.textContent='用户：'+data.user.username+' · 订阅：'+sub.name;
-      links.innerHTML=subscriptionRow('Clash / Mihomo','原始完整配置',location.origin+sub.url,sub.url)+conversionRows(sub.formats||[]);
+      links.innerHTML=subscriptionRow('Clash / Mihomo','原始完整配置',location.origin+sub.url,sub.url)+autoSubscriptionRow(sub.url)+conversionRows(sub.formats||[]);
     }catch(e){if(links.isConnected&&ticket===generation){select.replaceChildren();links.replaceChildren();status.textContent=e.message}}
     finally{if(links.isConnected&&ticket===generation){select.disabled=!select.options.length;refresh.disabled=false}}
   };
@@ -3195,7 +3195,7 @@ function profileCopyLink(encoded) {
 async function profileClientLinks(encoded) {
   const p = S.profiles.find(x => x.id === decodeURIComponent(encoded));
   if (!p) return;
-  openModal('客户端订阅 · ' + p.name, `<p class="muted">用量与有效期按整个订阅统计。服务器筛选只提供节点 URI，不包含完整分流或主备配置；只包含归属明确且仍在托管的节点，外部节点和归属不明节点不纳入。筛选不是权限隔离，持有地址者删除筛选参数仍可获取原订阅。</p><label for="clientServerFilter">导出范围</label><select id="clientServerFilter" disabled><option value="">全部服务器与节点</option></select><div id="clientRawLink">${subscriptionRow('Clash / Mihomo','完整节点、策略组、规则与 DNS',location.origin+p.url,p.url)}</div><div id="clientConversionRows" class="empty">正在检查客户端兼容性...</div>`);
+  openModal('客户端订阅 · ' + p.name, `<p class="muted">用量与有效期按整个订阅统计。服务器筛选只提供节点 URI，不包含完整分流或主备配置；只包含归属明确且仍在托管的节点，外部节点和归属不明节点不纳入。筛选不是权限隔离，持有地址者删除筛选参数仍可获取原订阅。</p><label for="clientServerFilter">导出范围</label><select id="clientServerFilter" disabled><option value="">全部服务器与节点</option></select><div id="clientRawLink">${subscriptionRow('Clash / Mihomo','完整节点、策略组、规则与 DNS',location.origin+p.url,p.url)}${autoSubscriptionRow(p.url)}</div><div id="clientConversionRows" class="empty">正在检查客户端兼容性...</div>`);
   const target=$('clientConversionRows'),select=$('clientServerFilter'),raw=$('clientRawLink');let generation=0;
   const load=async()=>{
     const ticket=++generation,server=select.value;target.replaceChildren();target.textContent='正在检查客户端兼容性…';raw.classList.toggle('hidden',!!server);
@@ -4961,11 +4961,16 @@ function conversionRows(formats) {
     return subscriptionRow(f.name,`可导出 ${f.supported} 个${unit}`,location.origin+f.url,f.url,details,id);
   }).join('');
 }
-function subscriptionRow(name, description, url, href, details='', id='') {
+function autoSubscriptionRow(rawURL,id='') {
+  const url=rawURL.replace('/sub/','/convert/')+'/auto';
+  return subscriptionRow('自动识别客户端（实验性）','复制同一地址到客户端：Clash/Mihomo 返回完整 YAML；其他已识别客户端使用现有基础导出，不保证保留分流、DNS 或主备。未知客户端和浏览器请使用下方专用格式。',location.origin+url,url,'',id,true);
+}
+
+function subscriptionRow(name, description, url, href, details='', id='', auto=false) {
  const encodedUrl=encodeURIComponent(url).replace(/'/g,'%27'),encodedName=encodeURIComponent(name).replace(/'/g,'%27'),qr='/admin/api/qrcode?url='+encodedUrl;
  return `<article class="subscription-row" ${id?`id="${esc(id)}"`:''} data-client-name="${esc(name)}" tabindex="-1">
  <div class="subscription-main"><b>${esc(name)}</b><p class="hint">${esc(description)}</p><input class="subscription-url" aria-label="${esc(name)}订阅地址" readonly value="${esc(url)}" title="点击选中完整链接" onclick="this.select()">
- <div class="subscription-actions"><button class="btn small" onclick="copyText(decodeURIComponent('${encodedUrl}'))">复制链接</button><a class="btn small primary" href="${esc(href)}" download>下载</a><a class="btn small" href="${esc(href)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">打开链接</a></div></div>
+ <div class="subscription-actions"><button class="btn small" onclick="copyText(decodeURIComponent('${encodedUrl}'))">复制链接</button>${auto?'':`<a class="btn small primary" href="${esc(href)}" download>下载</a><a class="btn small" href="${esc(href)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">打开链接</a>`}</div></div>
  <button class="subscription-qr-button" onclick="openSubscriptionQr('${encodedUrl}','${encodedName}')" title="放大 ${esc(name)} 二维码"><img loading="lazy" class="subscription-qr" src="${esc(qr)}" alt="${esc(name)}订阅二维码"><span>点击放大</span></button>
  ${details?`<details class="subscription-details"><summary>格式说明与兼容性</summary>${details}</details>`:''}</article>`;
 }
@@ -5015,7 +5020,7 @@ async function overview() {
       <h3>客户端订阅与扫码导入</h3>
     </div>
     <div class="client-navigation"><label for="clientJump">快速跳转</label><select id="clientJump" aria-label="选择客户端跳转"></select><a class="btn small" href="#client-clash">Clash / Mihomo</a><a class="btn small" href="#client-v2rayn">v2rayN</a><a class="btn small" href="#client-v2rayng">v2rayNG</a></div><p class="hint">复制链接、扫码或下载配置。各格式的支持范围请展开卡片说明；二维码可点击放大。</p>
-    <div class="subscription-grid">${subscriptionRow('Clash / Mihomo 完整订阅', '保留节点、策略组、路由规则、DNS 与链式代理', url, p.url,'','client-clash')}
+    <div class="subscription-grid">${subscriptionRow('Clash / Mihomo 完整订阅', '保留节点、策略组、路由规则、DNS 与链式代理', url, p.url,'','client-clash')}${autoSubscriptionRow(p.url,'client-auto')}
     <div id="overviewConversionRows"><div class="empty">正在生成客户端配置与节点订阅...</div></div></div>
   </section>`;
 

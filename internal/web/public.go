@@ -86,6 +86,24 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		}
 		return true
 	}
+	if convert && parts[2] == "auto" {
+		values := r.Header.Values("User-Agent")
+		if len(values) != 1 {
+			problem(w, 400, "需要唯一客户端标识，请使用专用订阅链接")
+			return true
+		}
+		format, e := autoSubscriptionFormat(values[0])
+		if e != nil {
+			problem(w, 400, e.Error())
+			return true
+		}
+		w.Header().Set("X-Mxioc-Client-Format", format)
+		if format == "clash" {
+			convert = false
+		} else {
+			parts[2] = format
+		}
+	}
 	if values, exists := r.URL.Query()["server"]; exists {
 		if !convert || len(values) != 1 || values[0] == "" {
 			problem(w, 400, "服务器筛选仅支持节点 URI 订阅且需要唯一服务器")
