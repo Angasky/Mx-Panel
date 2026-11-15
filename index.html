@@ -4627,7 +4627,7 @@ document.addEventListener('visibilitychange', () => {
 function showVerifiedCoreLinks(id) {
   const row = S.remoteRows.find(item => item.id === id);
   if (row?.coreStatus !== 'present' || !row.shareLinks?.length) return;
-  openModal('已核对的入站连接', '<p class="muted">分享链接包含现有用户凭据。</p><textarea id="verifiedCoreLinks" class="raw" readonly></textarea>');
+  openModal('已核对的入站连接', (row.shareLinks.some(link=>link.includes('support-x25519mlkem768=true'))?realityClientNotice({type:'vless','reality-opts':{'support-x25519mlkem768':true}}):'')+'<p class="muted">分享链接包含现有用户凭据。</p><textarea id="verifiedCoreLinks" class="raw" readonly></textarea>');
   $('verifiedCoreLinks').value = row.shareLinks.join('\n');
 }
 
@@ -7188,6 +7188,17 @@ async function copyText(text) {
   }
 }
 
+function realityClientNotice(node) {
+  if(node?.type!=='vless'||node?.['reality-opts']?.['support-x25519mlkem768']!==true)return '';
+  return '<div class="note" role="note">此 Reality 节点使用混合密钥交换。Clash Meta / Mihomo 请更新内核并使用完整订阅，或下载下方 Mihomo 配置；客户端必须保留 reality-opts.support-x25519mlkem768: true 和 Chrome 指纹。部分旧客户端扫码或导入 vless 链接会丢失该参数，表现为端口可达但无法联网。仅修改 SNI 无法修复此问题。</div>';
+}
+function mihomoSingleNodeConfig(node) {
+  if(!node||node.type!=='vless'||node['dialer-proxy'])throw Error('请选择普通 VLESS 节点，链式节点请使用完整订阅');
+  const proxy=structuredClone(node);proxy.name='节点';
+  // JSON is a YAML 1.2 subset and preserves every Reality option without
+  // interpolating credentials into HTML or executable JavaScript.
+  return JSON.stringify({'mixed-port':7890,'allow-lan':false,mode:'rule','log-level':'warning',proxies:[proxy],'proxy-groups':[{name:'代理',type:'select',proxies:['节点']}],rules:['MATCH,代理']},null,2);
+}
 async function shareNode(index) {
   let node = S.data.nodes.find(item => item.index === index);
   if (!node) return;
@@ -7195,6 +7206,7 @@ async function shareNode(index) {
     let data = await api('/nodes/share?name=' + encodeURIComponent(node.name));
     let encodedUri = encodeURIComponent(data.uri);
     let encodedName = encodeURIComponent(data.name + '.txt');
+    const hybrid=node.config?.['reality-opts']?.['support-x25519mlkem768']===true;
     openModal('NODE_SHARE // 单节点二维码与导出', `
       <div class="node-share-hero">
         <img class="node-share-qr" src="/admin/api/nodes/qrcode?name=${encodeURIComponent(data.name)}&profile=${encodeURIComponent(S.profile)}" alt="${esc(data.name)} 节点二维码">
@@ -7204,13 +7216,16 @@ async function shareNode(index) {
           <div class="hint">${esc(nodeProtocol({ type: data.type, config: node.config }))}</div>
         </div>
       </div>
+      ${realityClientNotice(node.config)}
       <label>节点连接</label>
       <textarea id="nodeShareLink" readonly style="min-height:150px">${esc(data.uri)}</textarea>
       <div class="note">${data.type === 'snell' ? '此 Snell 二维码采用小火箭 Base64 链接格式，包含 PSK、服务端地址及版本。旧版已扫入且密码为空的节点，请升级总控后重新扫码或更新小火箭订阅。' : '二维码与下方导出的文本包含同一条完整节点连接，可直接导入兼容客户端。'}</div>
       <div class="toolbar" style="margin-top:16px">
         <button type="button" class="btn primary" onclick="copyText(decodeURIComponent('${encodedUri}'))">复制节点连接</button>
         <button type="button" class="btn" onclick="downloadNodeLink(decodeURIComponent('${encodedName}'), decodeURIComponent('${encodedUri}'))">导出 TXT</button>
+        ${hybrid&&!node.config?.['dialer-proxy']?'<button type="button" class="btn primary" id="downloadMihomoNode">下载 Mihomo 配置（保留兼容参数）</button>':''}
       </div>`);
+    if($('downloadMihomoNode'))$('downloadMihomoNode').onclick=()=>{try{downloadNodeLink(data.name+'.mihomo.yaml',mihomoSingleNodeConfig(node.config))}catch(error){notice(error.message)}};
   } catch (err) {
     notice(err.message);
   }
