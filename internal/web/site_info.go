@@ -14,13 +14,17 @@ import (
 )
 
 type siteInfo struct {
-	Logo         string `json:"logo,omitempty"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	Announcement string `json:"announcement"`
+	SubscriptionOrigin string `json:"subscriptionOrigin,omitempty"`
+	Logo               string `json:"logo,omitempty"`
+	Name               string `json:"name"`
+	Description        string `json:"description"`
+	Announcement       string `json:"announcement"`
 }
 
 func validSiteInfo(c siteInfo) bool {
+	if normalized, err := normalizeSubscriptionOrigin(c.SubscriptionOrigin); err != nil || normalized != c.SubscriptionOrigin {
+		return false
+	}
 	for _, field := range []struct {
 		text      string
 		limit     int
@@ -119,23 +123,33 @@ func (s *Server) siteInfoAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method == "PUT" {
 		var input struct {
 			Config *struct {
-				Name         string  `json:"name"`
-				Description  string  `json:"description"`
-				Announcement string  `json:"announcement"`
-				Logo         *string `json:"logo"`
+				Name               string  `json:"name"`
+				Description        string  `json:"description"`
+				Announcement       string  `json:"announcement"`
+				Logo               *string `json:"logo"`
+				SubscriptionOrigin *string `json:"subscriptionOrigin"`
 			} `json:"config"`
 			Revision string `json:"revision"`
 		}
-		if readJSON(w, r, &input) != nil {
+		if err := readJSON(w, r, &input); err != nil {
+			problem(w, 400, err.Error())
 			return true
 		}
 		if input.Config == nil {
 			problem(w, 400, "请提供网站信息")
 			return true
 		}
-		next := siteInfo{Name: input.Config.Name, Description: input.Config.Description, Announcement: input.Config.Announcement, Logo: c.Logo}
+		next := siteInfo{Name: input.Config.Name, Description: input.Config.Description, Announcement: input.Config.Announcement, Logo: c.Logo, SubscriptionOrigin: c.SubscriptionOrigin}
 		if input.Config.Logo != nil {
 			next.Logo = *input.Config.Logo
+		}
+		if input.Config.SubscriptionOrigin != nil {
+			origin, err := normalizeSubscriptionOrigin(*input.Config.SubscriptionOrigin)
+			if err != nil {
+				problem(w, 400, err.Error())
+				return true
+			}
+			next.SubscriptionOrigin = origin
 		}
 		if !validSiteInfo(next) {
 			problem(w, 400, "名称最多 60 字、简介最多 160 字且不能换行；公告最多 1000 字；Logo 仅支持 24 KiB 内、512×512 以内的 PNG/JPEG")
