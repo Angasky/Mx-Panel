@@ -215,7 +215,7 @@ func (m *Manager) Secret(record Record, key string) (string, error) {
 }
 func publicServer(record Record) Record {
 	result := Record{}
-	for _, key := range []string{"probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
+	for _, key := range []string{"agentOnly", "probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
 		if v, ok := record[key]; ok {
 			result[key] = v
 		}
@@ -345,6 +345,9 @@ func (m *Manager) Save(payload Record) (Record, error) {
 		if ok && job["serverId"] == id && job["status"] == "running" {
 			return nil, errors.New("安装任务进行中，不能修改服务器")
 		}
+	}
+	if record["agentOnly"] == true {
+		return nil, errors.New("Agent 接入服务器不接受 SSH 表单覆盖，请通过 Agent 配置管理权限")
 	}
 	previousKind := value(record["installType"])
 	previousHost, previousFingerprint, previousSSHPort := value(record["host"]), value(record["fingerprint"]), value(record["sshPort"])
@@ -565,6 +568,9 @@ func (m *Manager) Connection(id string) (Connection, error) {
 	return m.connectionRecord(record)
 }
 func (m *Manager) connectionRecord(record Record) (Connection, error) {
+	if record["agentOnly"] == true {
+		return Connection{}, errors.New("此服务器通过 Agent 接入，尚未配置 SSH 管理权限")
+	}
 	c := Connection{Host: value(record["host"]), User: value(record["sshUser"]), Fingerprint: value(record["fingerprint"])}
 	var err error
 	if value(record["sshPrivateKey"]) != "" {

@@ -260,6 +260,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/admin/api/") {
+		if s.agentEnrollPublic(w, r) {
+			return
+		}
 		if s.agentPublic(w, r) {
 			return
 		}
@@ -356,6 +359,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.agentControlAdmin(w, r) {
+		return
+	}
+	if s.agentEnrollAdmin(w, r) {
 		return
 	}
 	if s.agentAdmin(w, r) {

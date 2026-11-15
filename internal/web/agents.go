@@ -25,6 +25,14 @@ import (
 )
 
 type agentRegistration struct {
+	EnrollDigest  string `json:"enrollDigest,omitempty"`
+	EnrollExpires int64  `json:"enrollExpires,omitempty"`
+	EnrollName    string `json:"enrollName,omitempty"`
+	EnrollOrigin  string `json:"enrollOrigin,omitempty"`
+	EnrollClient  string `json:"enrollClient,omitempty"`
+	EnrollHost    string `json:"enrollHost,omitempty"`
+	EnrollDone    bool   `json:"enrollDone,omitempty"`
+
 	DeployHash string `json:"deployHash,omitempty"`
 	DeployJob  string `json:"deployJob,omitempty"`
 	Revision   string `json:"revision,omitempty"`
@@ -186,6 +194,9 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 	}
 	observation := s.agentViews[id]
 	result := map[string]any{"version": observation.Version, "deployJob": entries[id].DeployJob, "configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
+	if record, err := m.Record(id); err == nil {
+		result["agentOnly"] = record["agentOnly"] == true
+	}
 	if !observation.At.IsZero() {
 		result["lastSeen"] = observation.At.Unix()
 	}

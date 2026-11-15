@@ -2,6 +2,8 @@
 
 ## Agent 接入
 
+v0.2.48 新增无需预先登记 SSH 的 [复制命令自动接入](AGENT-ENROLLMENT.md)：服务器管理 → 复制命令接入 Agent。以下流程适用于已有服务器记录的手动配置方式。
+
 硬件监控 → 选择服务器 → Agent 接入。支持 HTTP 上报、WebSocket 上报、自动回退，以及 HTTPS Pull。生成凭据后下载配置，保存到目标服务器 `/etc/mxioc-agent.json`，权限设为 `0600`。
 
 ```bash
