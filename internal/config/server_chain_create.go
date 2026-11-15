@@ -11,6 +11,7 @@ import (
 
 type ServerChainImport struct {
 	Name, Entry, Exit, Request string
+	EntryServerID, EntryLabel  string
 	Groups                     any
 }
 
@@ -22,7 +23,7 @@ func (r *Repository) ServerChainSources(id string, chain *ServerChainImport) (Do
 		return nil, nil, errors.New("缺少有效的链路创建标识")
 	}
 	if chain.Name == "" || len([]rune(chain.Name)) > 100 || strings.ContainsAny(chain.Name, "\r\n\x00,") ||
-		chain.Entry == chain.Exit || chain.Name == chain.Entry || chain.Name == chain.Exit ||
+		(chain.EntryServerID == "" && (chain.Entry == chain.Exit || chain.Name == chain.Entry)) || chain.Name == chain.Exit ||
 		slices.Contains([]string{"DIRECT", "REJECT", "REJECT-DROP", "PASS"}, chain.Name) {
 		return nil, nil, errors.New("请填写有效的链路名称，并选择两个不同的普通节点")
 	}
@@ -60,11 +61,11 @@ func (r *Repository) ServerChainSources(id string, chain *ServerChainImport) (Do
 		if !ok {
 			return nil, nil, errors.New("服务器链路记录无效")
 		}
-		if stored["name"] == chain.Entry || stored["name"] == chain.Exit {
+		if (chain.EntryServerID == "" && stored["name"] == chain.Entry) || stored["name"] == chain.Exit {
 			return nil, nil, errors.New("入口和出口请选择普通节点")
 		}
 		if stored["name"] == chain.Name &&
-			(stored["requestId"] != chain.Request || stored["entry"] != chain.Entry || stored["exit"] != chain.Exit) {
+			(stored["requestId"] != chain.Request || stored["entry"] != chain.Entry || stored["exit"] != chain.Exit || stringValue(stored["entryServerId"]) != chain.EntryServerID) {
 			return nil, nil, errors.New("同名链路已存在")
 		}
 	}
@@ -76,17 +77,17 @@ func (r *Repository) ServerChainSources(id string, chain *ServerChainImport) (Do
 	var entry, exit Document
 	for _, item := range rows(doc, "proxies") {
 		node := item.(Document)
-		switch node["name"] {
-		case chain.Entry, chain.Exit:
+		switch {
+		case node["name"] == chain.Exit || (chain.EntryServerID == "" && node["name"] == chain.Entry):
 			if stringValue(node["dialer-proxy"]) != "" {
 				return nil, nil, errors.New("入口和出口请选择普通节点")
 			}
-			if node["name"] == chain.Entry {
+			if chain.EntryServerID == "" && node["name"] == chain.Entry {
 				entry = node
 			} else {
 				exit = node
 			}
-		case chain.Name:
+		case node["name"] == chain.Name:
 			owned := false
 			for _, item := range rows(record, "remoteNodes") {
 				binding := item.(Document)
@@ -99,6 +100,9 @@ func (r *Repository) ServerChainSources(id string, chain *ServerChainImport) (Do
 				return nil, nil, errors.New("链路名称与现有节点冲突")
 			}
 		}
+	}
+	if chain.EntryServerID != "" {
+		entry = Document{}
 	}
 	if entry == nil || exit == nil {
 		return nil, nil, errors.New("入口或出口节点不存在")
@@ -132,12 +136,13 @@ func prepareNamedChainRecord(record, binding Document, chain *ServerChainImport)
 		if current["name"] == chain.Name {
 			id, err := integer(binding["inboundId"])
 			if err != nil || !bindingInboundID(current, id) || current["serverId"] != binding["serverId"] ||
-				current["requestId"] != chain.Request || current["entry"] != chain.Entry || current["exit"] != chain.Exit {
+				current["requestId"] != chain.Request || current["entry"] != chain.Entry || current["exit"] != chain.Exit || stringValue(current["entryServerId"]) != chain.EntryServerID {
 				return nil, errors.New("同名服务器链路归属已变化")
 			}
 			return records, nil
 		}
 	}
 	return append(records, Document{"name": chain.Name, "entry": chain.Entry, "exit": chain.Exit,
+		"entryServerId": chain.EntryServerID, "entryLabel": chain.EntryLabel,
 		"requestId": chain.Request, "serverId": binding["serverId"], "inboundId": binding["inboundId"]}), nil
 }

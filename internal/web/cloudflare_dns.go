@@ -146,15 +146,17 @@ func (s *Server) cloudflareDNSRoute(w http.ResponseWriter, r *http.Request) bool
 		return true
 	}
 	var in struct {
-		UseSaved           bool   `json:"useSaved"`
-		CredentialRevision string `json:"credentialRevision"`
-		ID                 string `json:"id"`
-		Key                string `json:"key"`
-		Email              string `json:"email"`
-		Zone               string `json:"zone"`
-		Domain             string `json:"domain"`
-		Address            string `json:"address"`
-		Confirmed          bool   `json:"confirmed"`
+		UseSaved            bool    `json:"useSaved"`
+		CredentialRevision  string  `json:"credentialRevision"`
+		ID                  string  `json:"id"`
+		Key                 string  `json:"key"`
+		Email               string  `json:"email"`
+		Zone                string  `json:"zone"`
+		Domain              string  `json:"domain"`
+		Address             string  `json:"address"`
+		Confirmed           bool    `json:"confirmed"`
+		ExpectedHost        *string `json:"expectedHost"`
+		ExpectedNodeAddress *string `json:"expectedNodeAddress"`
 	}
 	if readJSON(w, r, &in) != nil {
 		problem(w, 400, "参数无效")
@@ -209,6 +211,10 @@ func (s *Server) cloudflareDNSRoute(w http.ResponseWriter, r *http.Request) bool
 	row, e := m.Record(in.ID)
 	if e != nil {
 		problem(w, 404, "服务器不存在")
+		return true
+	}
+	if (in.ExpectedHost != nil && *in.ExpectedHost != stringField(row, "host")) || (in.ExpectedNodeAddress != nil && *in.ExpectedNodeAddress != stringField(row, "nodeAddress") && domain != stringField(row, "nodeAddress")) {
+		problem(w, 409, "服务器地址已变化，请刷新后重新预览；未创建 DNS")
 		return true
 	}
 	if row["agentOnly"] == true {

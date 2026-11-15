@@ -102,7 +102,11 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 	}
 	chain := &config.ServerChainImport{
 		Name: strings.TrimSpace(text(input["name"])), Entry: text(input["entry"]), Exit: text(input["exit"]),
-		Request: text(input["operationId"]), Groups: input["groups"],
+		EntryServerID: text(input["entryServerId"]),
+		Request:       text(input["operationId"]), Groups: input["groups"],
+	}
+	if chain.EntryServerID != "" {
+		chain.Entry = ""
 	}
 	if chain.Groups == nil {
 		chain.Groups = []any{}
@@ -115,16 +119,42 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 	if err != nil {
 		return nil, err
 	}
-	ingress, err := matchChainServer(servers, entry)
-	if err != nil {
-		return nil, err
-	}
-	egress, err := matchChainServer(servers, exit)
-	if err != nil {
-		return nil, err
-	}
-	if ingress["id"] == egress["id"] {
-		return nil, errors.New("入口与出口需要选择不同的服务器")
+	var ingress, egress, ingressSnapshot Record
+	if chain.EntryServerID != "" {
+		for _, row := range servers {
+			if text(row["id"]) == chain.EntryServerID {
+				ingress = row
+				break
+			}
+		}
+		if ingress == nil {
+			return nil, errors.New("所选托管服务器不存在")
+		}
+		if ingress["agentOnly"] == true || ingress["probeDiscovery"] == true {
+			return nil, errors.New("请先为服务器启用管理权限并安装或接管内核")
+		}
+		chain.EntryLabel = text(ingress["name"])
+		ingressSnapshot, err = c.Backend.Record(chain.EntryServerID)
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range []string{"host", "domain", "nodeAddress"} {
+			if chainHost(text(ingress[key])) != "" && chainHost(text(ingress[key])) == chainHost(text(exit["server"])) {
+				return nil, errors.New("落地节点指向入口服务器，请选择其他服务器上的出口")
+			}
+		}
+	} else {
+		ingress, err = matchChainServer(servers, entry)
+		if err != nil {
+			return nil, err
+		}
+		egress, err = matchChainServer(servers, exit)
+		if err != nil {
+			return nil, err
+		}
+		if ingress["id"] == egress["id"] {
+			return nil, errors.New("入口与出口需要选择不同的服务器")
+		}
 	}
 	template := "vless-reality"
 	switch ingress["installType"] {
@@ -137,6 +167,9 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 	payload := Record{"operationId": chain.Request, "remark": chain.Name, "template": template,
 		"port": input["port"], "serverName": input["serverName"], "sniVerified": input["sniVerified"],
 		"sniAddress": input["sniAddress"], "chainEntry": chain.Entry, "chainExit": chain.Exit, "chainGroups": chain.Groups}
+	if chain.EntryServerID != "" {
+		payload["chainEntryServerId"] = chain.EntryServerID
+	}
 	prepare := func() error {
 		currentEntry, currentExit, err := c.Repository.ServerChainSources(profile, chain)
 		if err != nil {
@@ -144,6 +177,20 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 		}
 		if !reflect.DeepEqual(entry, currentEntry) || !reflect.DeepEqual(exit, currentExit) {
 			return errors.New("入口或出口节点已变化，请重新打开创建窗口")
+		}
+		if chain.EntryServerID != "" {
+			current, err := c.Backend.Record(chain.EntryServerID)
+			if err != nil {
+				return err
+			}
+			if remote.RegistrationFingerprint(current) != remote.RegistrationFingerprint(ingressSnapshot) {
+				return errors.New("入口服务器连接资料已变化，请重新打开创建窗口")
+			}
+			payload["landingLink"], err = links.Export(currentExit)
+			if err != nil {
+				return errors.New("出口节点不能导出为兼容的落地链接")
+			}
+			return nil
 		}
 		entryRows, err := c.Backend.Inbounds(ctx, text(ingress["id"]))
 		if err != nil {

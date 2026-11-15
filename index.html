@@ -2210,6 +2210,7 @@ function notice(text) {
 
 function showLogin() {
   S.managerEpoch=(S.managerEpoch||0)+1;
+ S.cfBatch=null;
  aiResetWidget();
  setNavigationOpen(false, false);
  document.body.classList.remove('member-mode');
@@ -3348,7 +3349,7 @@ function renderServers() {
     <div class="toolbar"><label for="serverGroupFilter">服务器分组</label><select id="serverGroupFilter">${serverGroupOptions(groupFilter,true)}</select><span class="hint">共 ${S.servers.filter(s=>groupFilter==='*'||(S.serverGroups?.assignments?.[s.id]||'')===groupFilter).length} 台</span></div>
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"><select id="serverKindFilter" aria-label="服务器类型">${[['','全部类型'],['3x-ui','3x-ui'],['x-ui','X-ui'],['x-panel','X-Panel'],['xray','Xray'],['sing-box','sing-box'],['probe','探针待接管'],['agent','Agent 免 SSH']].map(([id,label])=>`<option value="${id}" ${kind===id?'selected':''}>${label}</option>`).join('')}</select><select id="serverStatusFilter" aria-label="监控状态"><option value="">全部监控状态（${matching.length}）</option>${Object.entries(serverObservationLabels).map(([id,label])=>`<option value="${id}" ${status===id?'selected':''}>${label}（${counts[id]}）</option>`).join('')}</select><button type="button" class="btn" id="serverRefresh" ${S.serverLoading?'disabled':''}>${S.serverLoading?'正在刷新…':'刷新列表与状态'}</button><button type="button" class="btn" id="serverFilterClear">清除筛选</button></div>
     <p class="hint" id="serverObservationNote" role="status">${S.serverObservationError?'状态读取失败，已标记为未知；可点击刷新重试。':S.serverObservedAt?'状态快照：'+esc(new Date(S.serverObservedAt*1000).toLocaleString())+'。':'尚未读取监控状态。'}仅依据本地已有采样或 Agent 心跳，不代表代理连接可用；采样失败不等同离线。外部探针状态请打开硬件监控查看。</p>
-    <div class="toolbar"><button class="btn" id="serverSelectPage">选择本页</button><button class="btn" id="serverClearSelection">取消选择</button><span id="serverSelectionCount">已选 ${S.serverSelection.size} 台</span><button class="btn primary" onclick="serverBatchEdit()">批量编辑</button><button class="btn primary" onclick="serverBatchInstall()">批量安装 / 更新内核</button><button class="btn" onclick="serverBatchProgress()">批次进度</button><label for="serverGroupTarget">移动到</label><select id="serverGroupTarget">${serverGroupOptions()}</select><button class="btn primary" id="serverGroupMove" data-group-control>批量移动分组</button></div>
+    <div class="toolbar"><button class="btn" id="serverSelectPage">选择本页</button><button class="btn" id="serverClearSelection">取消选择</button><span id="serverSelectionCount">已选 ${S.serverSelection.size} 台</span><button class="btn primary" onclick="serverBatchEdit()">批量编辑</button><button class="btn primary" onclick="serverBatchInstall()">批量安装 / 更新内核</button><button class="btn" onclick="serverBatchProgress()">批次进度</button><button class="btn primary" onclick="serverBatchCF()">批量绑定 CF 域名</button><label for="serverGroupTarget">移动到</label><select id="serverGroupTarget">${serverGroupOptions()}</select><button class="btn primary" id="serverGroupMove" data-group-control>批量移动分组</button></div>
     <div class="profile-grid">${page.rows.map(s => {
       const id = encodeURIComponent(s.id), url = panelLink(s.panelUrl), running = s.job?.status === 'running', observation = serverObservationFor(s.id);
       if(s.agentOnly)return `<article class="profile-card">${serverGroupCard(s)}<div class="profile-card-head"><h4>${esc(s.name)}</h4><span class="pill">Agent · 待启用管理</span></div><p class="hint">登记来源 IP：${esc(s.host)}（可能是 NAT / CDN 出口，不作为节点地址）</p><p><span class="pill">${serverObservationLabels[observation.status]}</span> · Agent 心跳</p><p class="hint">旧版监控接入尚未配置管理密钥。点击“启用部署权限”，在服务器执行一次命令后即可安装内核和管理节点。</p><div class="toolbar"><button class="btn primary" onclick="agentEnableManagement()">启用部署权限</button><button class="btn" onclick="openHostMonitor('${id}')">硬件监控</button><button class="btn" onclick="agentManager('${id}').catch(e=>notice(e.message))">Agent 凭据与管理</button><button class="btn danger" onclick="serverRemove('${id}')">移除服务器</button></div></article>`;
@@ -3391,6 +3392,70 @@ function serverBatchEdit(){
  form.onsubmit=async e=>{e.preventDefault();if(!['batchNameOn','batchAddressOn','batchKindOn'].some(id=>$(id).checked)){notice('请至少勾选一个字段');return}const changes=payload(),button=form.querySelector('[type=submit]');button.disabled=true;
  try{if(!(await confirmAction('确认修改预览中的 '+rows.length+' 台服务器？逐台保存，失败项会保留原值，成功项不会自动回滚。')))return;const result=await api('/servers/batch-edit',jsonOpt('POST',{rows:changes,confirmed:true}));if(!form.isConnected){notice('批量编辑已返回，请刷新服务器列表');return}$('batchEditResults').innerHTML=result.results.map(r=>`<p class="${r.ok?'hint':'error'}">${esc(rows.find(s=>s.id===r.id)?.name||r.id)}：${r.ok?'已保存':esc(r.error)}</p>`).join('');await servers()}catch(error){if(form.isConnected)$('batchEditError').textContent=error.message;else notice(error.message)}finally{button.disabled=false}};
 }
+async function serverBatchCF(){
+ if(S.cfBatch?.started){renderCFBatchProgress(S.cfBatch);return}
+ const rows=selectedBatchServers();if(!rows)return;
+ if(rows.some(s=>s.agentOnly)){notice('所选服务器包含仅监控 Agent，请先启用管理权限');return}
+ openModal('批量绑定 CF 域名','<div id="batchCFLoading">正在读取 Cloudflare 设置…</div>');
+ const loading=$('batchCFLoading');
+ try{
+  const settings=await api('/cloudflare/settings');
+  if(!loading.isConnected)return;
+  if(!settings.configured||!settings.zones?.length){loading.innerHTML='<p>请先保存 Cloudflare 凭据并同步域名。</p><button class="btn primary" onclick="cloudflareSettingsManager()">打开 Cloudflare 设置</button>';return}
+  const random=()=> 'node-'+Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>b.toString(16).padStart(2,'0')).join('');
+  const prefixes=rows.map(random);
+  openModal('批量绑定 CF 域名',`<form id="batchCFForm"><p class="note">选择一个根域名，为每台服务器创建独立子域名。默认随机前缀，也可使用 hk-{n} 等模板。最多同时处理 3 台；创建 A / AAAA 灰云记录，并设为新节点的默认地址。</p><label for="batchCFZone">根域名</label><select id="batchCFZone">${settings.zones.map(z=>`<option value="${esc(z.name)}">${esc(z.name)}</option>`).join('')}</select><label for="batchCFPrefix">子域名前缀模板（留空随机，{n} 表示序号）</label><input id="batchCFPrefix" placeholder="例如 hk-{n}"><button class="btn" type="button" id="batchCFRandom">重新随机前缀</button><div class="tablewrap"><table><thead><tr><th>服务器</th><th>将绑定的域名</th><th>公网 IP（可修改）</th></tr></thead><tbody>${rows.map((s,i)=>`<tr><td>${esc(s.name)}</td><td data-cf-domain="${i}"></td><td><input data-cf-address="${i}" aria-label="${esc(s.name)} 公网 IP" required value="${esc(s.host)}"></td></tr>`).join('')}</tbody></table></div><p class="hint">同名冲突不会覆盖；已有节点和订阅不会自动改写，不修改 SSH 地址、Reality SNI 或证书。请核对云服务器公网 IP。执行后可关闭窗口，通过“批量绑定 CF 域名”查看结果；完成前请勿刷新浏览器。</p><p id="batchCFError" class="error"></p><button class="btn primary" type="submit">确认批量绑定</button></form>`);
+  const form=$('batchCFForm');
+  const domains=()=>rows.map((s,i)=>(val('batchCFPrefix')?val('batchCFPrefix').replaceAll('{n}',String(i+1)):prefixes[i])+'.'+val('batchCFZone'));
+  const preview=()=>domains().forEach((d,i)=>form.querySelector('[data-cf-domain="'+i+'"]').textContent=d);
+  form.oninput=preview;form.onchange=preview;
+  $('batchCFRandom').onclick=()=>{rows.forEach((_,i)=>prefixes[i]=random());$('batchCFPrefix').value='';preview()};preview();
+  form.onsubmit=async e=>{
+   e.preventDefault();const button=form.querySelector('[type=submit]');if(button.disabled)return;button.disabled=true;
+   try{
+    const zone=val('batchCFZone'),names=domains();
+    const labels=names.map(n=>n.slice(0,-zone.length-1));
+    if(labels.some(n=>n.length>63||!(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(n))))throw Error('前缀仅支持字母、数字及中间连字符，最长 63 字符');
+    if(new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('每台服务器需要不同的子域名，请在模板中加入 {n}');
+    const items=rows.map((s,i)=>({id:s.id,name:s.name,domain:names[i],address:form.querySelector('[data-cf-address="'+i+'"]').value.trim(),host:s.host,previous:s.nodeAddress||'',status:'pending'}));
+    if(!(await confirmAction('确认将 '+items.length+' 个独立子域名绑定到预览中的服务器？成功项保留，失败项单独报告；不会重装内核。')))return;
+    if(!form.isConnected)return;
+    const run={started:true,running:false,epoch:S.managerEpoch||0,zone,revision:settings.revision,items};
+    S.cfBatch=run;renderCFBatchProgress(run);await executeCFBatch(run);
+   }catch(error){if(form.isConnected)$('batchCFError').textContent=error.message;else notice(error.message)}finally{button.disabled=false}
+  };
+ }catch(error){if(loading.isConnected)loading.textContent=error.message;else notice(error.message)}
+}
+function renderCFBatchProgress(run){
+ openModal('批量 CF 域名绑定结果','<p id="batchCFState" role="status"></p><div class="tablewrap" id="batchCFResults"></div><div class="toolbar"><button class="btn primary" id="batchCFRetry">重试失败项</button><button class="btn" id="batchCFNew">结束本批次</button></div><p class="hint">重试使用本次相同域名与 IP，不会生成另一批 DNS。若提示 DNS 已创建但本地绑定失败，请核对服务器设置后处理。刷新浏览器后此临时结果不保留。</p>');
+ const root=$('batchCFResults');
+ run.draw=()=>{
+  if(!root.isConnected)return;
+  const names={pending:'等待',running:'绑定中',succeeded:'成功',failed:'失败 / 待核对'};
+  $('batchCFState').textContent=run.items.filter(r=>r.status==='succeeded').length+' / '+run.items.length+' 成功 · '+(run.running?'执行中':'已结束');
+  root.innerHTML='<table><thead><tr><th>服务器</th><th>域名 / IP</th><th>结果</th></tr></thead><tbody>'+run.items.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.domain)}<br>${esc(r.address)}</td><td class="${r.status==='failed'?'error':''}">${esc(names[r.status])}${r.error?'<br>'+esc(r.error):''}</td></tr>`).join('')+'</tbody></table>';
+  $('batchCFRetry').disabled=run.running||!run.items.some(r=>r.status==='failed');$('batchCFNew').disabled=run.running;
+ };
+ $('batchCFRetry').onclick=async()=>{if(run.running)return;if(!(await confirmAction('使用原来的域名和 IP 重试失败项？已成功服务器不会重复处理。')))return;run.items.forEach(r=>{if(r.status==='failed'){r.status='pending';r.error=''}});await executeCFBatch(run)};
+ $('batchCFNew').onclick=()=>{if(run.running)return;S.cfBatch=null;closeModal();if(S.page==='servers')void servers().catch(e=>notice(e.message))};
+ run.draw();
+}
+async function executeCFBatch(run){
+ if(run.running)return;run.running=true;run.draw();
+ const queue=run.items.filter(r=>r.status==='pending');
+ const worker=async()=>{while(queue.length){
+  const row=queue.shift();row.status='running';run.draw();
+  try{
+   if(S.role!=='admin'||(S.managerEpoch||0)!==run.epoch)throw Error('登录状态已变化，未继续派发');
+   const result=await api('/servers/cloudflare-dns',jsonOpt('POST',{id:row.id,useSaved:true,credentialRevision:run.revision,zone:run.zone,domain:row.domain,address:row.address,expectedHost:row.host,expectedNodeAddress:row.previous,confirmed:true}));
+   row.status='succeeded';row.domain=result.domain;const server=(S.managerEpoch||0)===run.epoch?S.servers.find(s=>s.id===row.id):null;if(server)server.nodeAddress=result.domain;
+  }catch(error){row.status='failed';row.error=error.message}
+  run.draw();
+ }};
+ await Promise.all(Array.from({length:Math.min(3,queue.length)},worker));
+ run.running=false;run.draw();notice('批量 CF 绑定已结束：'+run.items.filter(r=>r.status==='succeeded').length+'/'+run.items.length+' 成功');
+}
+
 function serverBatchInstall(){
  const rows=selectedBatchServers();if(!rows)return;
  const invalid=rows.filter(s=>s.agentOnly||s.connectionMode!=='install'||!['xray','sing-box'].includes(s.installType));
@@ -5562,7 +5627,7 @@ async function chains() {
   <section class="panel"><div class="panel-head"><h3>多入口负载均衡 · 主备切换</h3><button class="btn primary" onclick="failoverModal()">新增多入口主备</button></div>
   <p class="hint">多个入口 → 同一个出口。Mihomo 定期检测完整链路，按优先顺序选择可用入口，主入口恢复后自动切回。Mihomo 使用完整订阅；电脑 v2rayN、安卓 v2rayNG 使用 Xray 主备配置；小火箭需导入配套节点和策略配置。请在客户端订阅窗口选择。单节点分享链接不包含自动切换功能。全部入口失效时连接失败，不切换到直连。已有连接可能需要重连。出口 IP 取决于固定出口服务器的网络配置。</p>
   <div class="tablewrap"><table><thead><tr><th>名称</th><th>入口优先顺序</th><th>固定出口</th><th>检测间隔 / 状态</th><th>操作</th></tr></thead><tbody>${S.failovers.map(f => `<tr><td>${esc(f.name)}</td><td>${f.entries.map(esc).join(' → ')}</td><td>${esc(f.exit)}</td><td>${esc(f.interval)} 秒 / ${esc(f.cancelRequested ? '取消中，等待远端核对' : f.status === 'active' ? '已配置，客户端检测' : f.status)}${f.error ? `<div class="error">${esc(f.error)}</div>` : ''}</td><td><button class="btn small" onclick="profileClientLinks(encodeURIComponent(S.profile))">客户端导入</button>${f.status === 'creating' && f.operationId ? `${!f.cancelRequested ? `<button class="btn small" onclick="resumeFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',this)">继续创建</button>` : ''} <button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}',true)">${f.cancelRequested ? '继续取消' : '取消草稿'}</button>` : `<button class="btn small danger" onclick="deleteFailover('${encodeURIComponent(f.name).replace(/'/g, '%27')}')">${f.status === 'deleting' ? '继续清理' : '删除主备组'}</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">暂无多入口主备组</td></tr>'}</tbody></table></div></section>
-  <section class="panel"><div class="panel-head"><h3>服务器内部转发</h3></div><p class="hint">客户端只连接新生成的入口节点，可导出单节点链接。入口和出口服务器都须在总控登记。</p><div class="tablewrap"><table><thead><tr><th>名称</th><th>入口 → 出口</th><th>操作</th></tr></thead><tbody>${S.serverChains.filter(c => !(S.failovers || []).some(f => f.paths.includes(c.name))).map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.entry)} → ${esc(c.exit)}</td><td><button class="btn small danger" onclick="deleteServerChain('${encodeURIComponent(c.name).replace(/'/g, '%27')}')">删除服务器链路</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">暂无服务器链路</td></tr>'}</tbody></table></div></section>
+  <section class="panel"><div class="panel-head"><h3>服务器内部转发</h3><button class="btn primary" onclick="chainModal(null,'server')">选择托管服务器创建中转</button></div><p class="hint">直接选择托管服务器作为入口，在服务器内转发到当前订阅的落地节点，生成可分享的通用节点。直接选择模式无需先建入口节点，落地服务器无需托管。</p><div class="tablewrap"><table><thead><tr><th>名称</th><th>入口 → 出口</th><th>操作</th></tr></thead><tbody>${S.serverChains.filter(c => !(S.failovers || []).some(f => f.paths.includes(c.name))).map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.entryLabel || c.entry || c.entryServerId)} → ${esc(c.exit)}</td><td><button class="btn small danger" onclick="deleteServerChain('${encodeURIComponent(c.name).replace(/'/g, '%27')}')">删除服务器链路</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">暂无服务器链路</td></tr>'}</tbody></table></div></section>
   <section class="panel">
     <div class="note">Mihomo 客户端专用模式：链式两跳代理（Chained Relay Proxy）：客户端流量首先建立隧道至入口中转节点，再经由中转节点握手连接出口落地服务器。Clash/Mihomo 格式将完整保留此链路；转换为单节点分享链接时将自动跳过两跳节点。</div>
     <div class="tablewrap">
@@ -5717,14 +5782,15 @@ function groupChecks(selected, klass = 'chainGroup', choices = S.data.groups) {
   </div>`;
 }
 
-async function chainModal(index) {
+async function chainModal(index, initialMode = "mihomo") {
   const openingProfile=S.profile;
   let x = index == null ? null : S.data.nodes.find(n => n.index === index);
   let normal = ordinaryNodes();
-  if (normal.length < 2) return showMessage('至少需要两个普通节点才能创建链式代理');
+  if (!normal.length) return showMessage('请先添加至少一个落地节点');
   const serverData = await api('/servers');
   if(S.profile!==openingProfile)return;
   const managedServers = serverData.servers || [];
+  const directServers=managedServers.filter(s=>!s.agentOnly&&!s.probeDiscovery&&s.job?.status!=='running'&&['xray','sing-box','3x-ui','x-ui','x-panel'].includes(s.installType));
   let selected = x
     ? S.data.groups.filter(g => (g.config.proxies || []).includes(x.name)).map(g => g.name)
     : S.data.groups.filter(g => !g.name.includes('广告拦截')).map(g => g.name);
@@ -5740,9 +5806,9 @@ async function chainModal(index) {
           <input id="chainName" required value="${esc(x?.name || '')}" placeholder="例如 美国 CN2 → 落地 VLESS">
         </div>
         <div>
-          <label>入口节点（中转）</label>
+          <label for="chainIngressSource" id="chainIngressSourceLabel">入口选择方式</label><select id="chainIngressSource"><option value="server">直接选择托管服务器</option><option value="node">从已有入口节点匹配服务器</option></select><div id="chainDirectServerBox"><label for="chainDirectServer">中转服务器</label><select id="chainDirectServer">${directServers.map(s=>`<option value="${esc(s.id)}">${esc(s.name)} · ${esc(s.host)} · ${esc(s.installType)}</option>`).join('')}</select><p class="hint">直接在服务器内创建入口、落地出站和专属路由，无需预先创建入口节点。</p>${directServers.length?'':'<p class="error">暂无可用服务器，请先到服务器管理启用权限并安装或接管内核。</p>'}</div><div id="chainEntryNodeBox"><label>入口节点（中转）</label>
           <select id="chainEntry">${options(normal.map(n => n.name), x?.config?.['dialer-proxy'] || normal[0].name)}</select>
-          <div class="hint">客户端优先连接的中继前置节点。</div>
+          <div class="hint">客户端优先连接的中继前置节点。</div></div>
         </div>
         <div>
           <label>出口节点（落地）</label>
@@ -5762,21 +5828,27 @@ async function chainModal(index) {
   </form>`);
 
   const chainProfile = openingProfile, chainOperationId = crypto.randomUUID().replaceAll('-', '');
-  const entryServer = () => chainNodeServer(normal.find(n => n.name === val('chainEntry')), managedServers);
+  const directIngress=()=>val('chainMode')==='server' && val('chainIngressSource')==='server';
+  const entryServer = () => directIngress()?directServers.find(s=>s.id===val('chainDirectServer')):chainNodeServer(normal.find(n => n.name === val('chainEntry')), managedServers);
   const refreshChainIngress=()=>{
     const serverMode=val('chainMode')==='server',sing=entryServer()?.installType==='sing-box';
     const reality=!sing || val('chainSingTemplate')==='vless-reality';
+    $('chainIngressSource').classList.toggle('hidden',!serverMode);$('chainIngressSourceLabel').classList.toggle('hidden',!serverMode);
+    $('chainDirectServerBox').classList.toggle('hidden',!directIngress());$('chainDirectServer').disabled=!directIngress();$('chainDirectServer').required=directIngress();
+    $('chainEntryNodeBox').classList.toggle('hidden',directIngress());$('chainEntry').disabled=directIngress();
+    delete $('chainSni').dataset.sniVerified;delete $('chainSni').dataset.sniAddress;
     $('chainServerFields').classList.toggle('hidden',!serverMode);
     $('chainSingTemplateField').classList.toggle('hidden',!sing);
     $('chainSniTest').classList.toggle('hidden',!reality);
     $('chainSni').disabled=!serverMode || !reality;
     $('chainSni').required=serverMode && reality;
   };
-  $('chainMode').onchange=$('chainEntry').onchange=$('chainSingTemplate').onchange=refreshChainIngress;
+  $('chainMode').onchange=$('chainEntry').onchange=$('chainSingTemplate').onchange=$('chainIngressSource').onchange=$('chainDirectServer').onchange=refreshChainIngress;
+  if(!x)$('chainMode').value=normal.length<2?'server':initialMode;
   refreshChainIngress();
   $('chainSniTest').onclick = () => {
     const ingress = entryServer();
-    if (!ingress) return $('formError').textContent = '入口节点未添加到服务器，请选择 Mihomo 客户端专用链式代理模式';
+    if (!ingress) return $('formError').textContent = '请选择已授权并安装或接管内核的托管服务器';
     openSniScanner(ingress.id, 'chainSni');
   };
   const chainForm=$('editForm'),chainError=$('formError');let submittedChain=null;
@@ -5788,13 +5860,15 @@ async function chainModal(index) {
         operationId: chainOperationId,
         mode: val('chainMode'), port: val('chainPort'), serverName: val('chainSni'), sniVerified:$('chainSni')?.dataset.sniVerified === val('chainSni'),sniAddress:$('chainSni')?.dataset.sniVerified === val('chainSni') ? $('chainSni')?.dataset.sniAddress : undefined,
         name: val('chainName'),
-        entry: val('chainEntry'),
+        entry: directIngress()?'':val('chainEntry'),
+        entryServerId:directIngress()?val('chainDirectServer'):undefined,
         singBoxTemplate:val('chainMode')==='server' && entryServer()?.installType==='sing-box' ? val('chainSingTemplate') : undefined,
         exit: val('chainExit'),
         oldName: x?.name,
         groups: [...document.querySelectorAll('.chainGroup:checked')].map(z => z.value)
       };
       if (S.profile !== chainProfile) throw Error('订阅已切换，请重新打开创建窗口');
+      if(!submittedChain&&body.mode==='server'){if(!entryServer())throw Error('请选择可管理的中转服务器');if(!(await confirmAction('确认在 '+entryServer().name+' 内创建中转入口、出站和专属路由？对应内核可能重启，并将生成的节点加入当前订阅。')))return;if(!chainForm.isConnected||S.profile!==chainProfile)return;}
       if(S.idempotentCreate && body.mode==='server' && !x){submittedChain=structuredClone(body);chainForm.querySelectorAll('input,select,textarea,button').forEach(control=>{if(control!==button)control.disabled=true;});}
       const options = jsonOpt(x ? 'PUT' : 'POST', body);
       options.headers['X-Profile'] = chainProfile;
