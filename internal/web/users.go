@@ -354,6 +354,8 @@ func (s *Server) memberRoutes(w http.ResponseWriter, r *http.Request, u panelUse
 		return
 	}
 	switch {
+	case r.URL.Path == "/admin/api/portal/qrcode":
+		s.memberSubscriptionQR(w, r, u)
 	case r.URL.Path == "/admin/api/portal/preferences":
 		s.memberPreferences(w, r, u)
 	case r.URL.Path == "/admin/api/account" && r.Method == "GET":

@@ -2752,19 +2752,31 @@ async function memberPortal() {
   await siteInfoReady;
   const data=await api('/portal'); S.page='portal'; $('content').dataset.page='portal';
   const preferred=data.preferredClient||'clash';
-  const primary=p=>{const chosen=(p.formats||[]).find(f=>f.id===preferred&&f.available);return chosen?{url:chosen.url,name:chosen.name,note:chosen.note||'',fallback:false}:{url:p.url,name:'Clash / Mihomo',fallback:preferred!=='clash'}};
+  const primary=p=>{const chosen=(p.formats||[]).find(f=>f.id===preferred&&f.available);return chosen?{id:chosen.id,url:chosen.url,name:chosen.name,note:chosen.note||'',fallback:false}:{id:'clash',url:p.url,name:'Clash / Mihomo',fallback:preferred!=='clash'}};
   $('title').textContent='我的订阅'; $('subtitle').textContent='查看管理员分配给你的订阅和用量'; $('titleBreadcrumb').textContent='portal';
   $('content').innerHTML=`<section class="panel"><div class="panel-head"><h3>订阅中心</h3><button class="btn primary" onclick="aiAssistant().catch(e=>notice(e.message))">AI 协助</button><select id="memberTheme" aria-label="界面主题"><option value="craft">我的世界主题</option><option value="slate">云白主题</option><option value="high">科技主题</option><option value="low">简洁主题</option><option value="pink">猛男主题</option><option value="amber">暖橙主题</option></select></div><p class="muted">密码重置或订阅授权变更，请联系管理员。订阅链接包含访问凭据，请勿转发给他人。</p><form id="memberPreferences" class="toolbar"><label for="memberClient">首选客户端</label><select id="memberClient">${(data.clients||[]).map(c=>`<option value="${esc(c.id)}" ${c.id===preferred?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn" type="submit">保存偏好</button><span id="memberPreferenceStatus" role="status"></span></form><p class="hint">只影响本账号的主要复制与下载入口，不修改共享配置。所选格式不可用时回退到 Clash / Mihomo；部分转换不包含原分流和防泄露设置。</p><div class="profile-grid">${data.profiles.map((p,i)=>{
     const t=p.traffic||{},chosen=primary(p);
-    return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制 ${esc(chosen.name)}</button><a class="btn" href="${esc(subscriptionURL(chosen.url))}" referrerpolicy="no-referrer" download>下载 ${esc(chosen.name)}</a></div>${chosen.fallback?'<p class="hint">首选格式暂不可用，当前回退到 Clash / Mihomo。</p>':''}${chosen.note?`<p class="hint">${esc(chosen.note)}</p>`:''}<details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(subscriptionURL(f.url))}" referrerpolicy="no-referrer" download>${esc(f.name)}</a>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
+    return `<article class="profile-card"><h4>${esc(p.name)}</h4>${p.unavailable?'<p class="error">订阅暂不可用，请联系管理员。</p>':`<p class="profile-usage">${t.configured?`已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire?'到期 '+esc(new Date(t.expire*1000).toLocaleDateString('zh-CN')):'长期有效'}${t.expired?' · 已到期':t.exhausted?' · 额度已用尽':''}`:'尚未设置流量额度'}</p><div class="toolbar"><button class="btn primary" data-member-copy="${i}">复制 ${esc(chosen.name)}</button><a class="btn" href="${esc(subscriptionURL(chosen.url))}" referrerpolicy="no-referrer" download>下载 ${esc(chosen.name)}</a><button type="button" class="btn" data-member-qr="${i}" data-member-format="${esc(chosen.id)}">二维码</button></div>${chosen.fallback?'<p class="hint">首选格式暂不可用，当前回退到 Clash / Mihomo。</p>':''}${chosen.note?`<p class="hint">${esc(chosen.note)}</p>`:''}<details style="margin-top:12px"><summary>其他客户端格式</summary><div class="toolbar" style="margin-top:12px">${(p.formats||[]).filter(f=>f.available).map(f=>`<a class="btn small" href="${esc(subscriptionURL(f.url))}" referrerpolicy="no-referrer" download>${esc(f.name)}</a><button type="button" class="btn small" data-member-qr="${i}" data-member-format="${esc(f.id)}">${esc(f.name)}二维码</button>`).join('')||'<span class="muted">暂无兼容格式</span>'}</div><p class="muted">转换格式可能跳过不支持的节点；Clash / Mihomo 保留原始配置。</p></details>`}</article>`;
   }).join('')||'<div class="empty">尚未分配订阅，请联系管理员。</div>'}</div></section>`;
   $('memberPreferences').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,button=form.querySelector('button'),select=$('memberClient'),status=$('memberPreferenceStatus');button.disabled=select.disabled=true;try{await api('/portal/preferences',jsonOpt('PUT',{client:select.value,expected:preferred}));if(form.isConnected)await memberPortal()}catch(err){if(form.isConnected)status.textContent=err.message}finally{if(form.isConnected)button.disabled=select.disabled=false}};
+  document.querySelectorAll('[data-member-qr]').forEach(button=>button.onclick=()=>memberSubscriptionQR(data.profiles[Number(button.dataset.memberQr)].id,button.dataset.memberFormat));
   refreshThemeLabels();
   $('memberTheme').value=document.documentElement.dataset.theme;
   $('memberTheme').onchange=e=>setTheme(e.target.value);
   document.querySelectorAll('[data-member-copy]').forEach(b=>b.onclick=async()=>{
     try { await navigator.clipboard.writeText(subscriptionURL(primary(data.profiles[Number(b.dataset.memberCopy)]).url)); notice('订阅链接已复制'); } catch(e) { notice('复制失败，请使用下载按钮或允许剪贴板访问'); }
   });
+}
+
+async function memberSubscriptionQR(profile,format){
+ openModal('订阅二维码','<p id="memberQRLoading" role="status">正在核验订阅授权并生成二维码…</p>');
+ const loading=$('memberQRLoading'),epoch=S.modalEpoch;
+ try{
+  const data=await api('/portal/qrcode',jsonOpt('POST',{profile,format}));
+  if(!loading.isConnected||S.modalEpoch!==epoch||S.role!=='user')return;
+  openModal('订阅二维码 · '+data.client,`<div id="memberQRContent" style="text-align:center"><h4>${esc(data.name)}</h4><img src="${esc(data.image)}" alt="${esc(data.client)}订阅二维码" style="width:min(320px,100%);height:auto;background:#fff;border-radius:10px"><p class="hint">请使用对应客户端扫码。二维码包含订阅访问凭据，请勿公开分享。</p><input id="memberQRLink" aria-label="订阅地址" readonly value="${esc(data.url)}" style="width:100%"><div class="toolbar"><button type="button" class="btn primary" id="memberQRCopy">复制链接</button><a class="btn" href="${esc(data.image)}" download="subscription-qr.png">保存二维码</a></div></div>`);
+  $('memberQRCopy').onclick=()=>copyText(data.url);$('memberQRLink').onclick=e=>e.currentTarget.select();
+ }catch(e){if(loading.isConnected&&S.modalEpoch===epoch)loading.textContent=e.message}
 }
 
 const aiProtocols={
@@ -6484,7 +6496,7 @@ function closeModal() {
   if (S.modalFocus?.isConnected && S.modalFocus.getClientRects().length && !S.modalFocus.closest('[inert]')) S.modalFocus.focus();
   else if (!$('app').classList.contains('hidden')) $('content').focus({preventScroll:true});
   S.modalFocus = null;
-  if ($('shareLink')||$('downloadAgentConfig')||$('acContent')) $('modalBody').replaceChildren();
+  if ($('shareLink')||$('downloadAgentConfig')||$('acContent')||$('memberQRContent')||$('memberQRLoading')) $('modalBody').replaceChildren();
 }
 
 const OPTION_LABELS = {
