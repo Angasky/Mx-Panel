@@ -1,8 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="slate">
+<html lang="zh-CN" data-theme="slate" data-workspace="v2" data-type="software">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Mx-Panel：管理服务器、订阅、节点与路由配置。">
+<meta name="page-type" content="software">
+<meta name="site-kind" content="software">
 <title>Mx-Panel · 订阅与服务器管理</title>
 <link id="siteFavicon" rel="icon" href="/site-icon">
 <script>
@@ -1222,7 +1225,7 @@ html[data-theme="pink"] .toast { background: var(--bg-card); border-color: var(-
 
 
 :where(button,a,summary,[tabindex]):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
-.modalbox:focus { outline: none; }
+.modalbox:focus { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .modalbox:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 #monitorNic { width: auto; max-width: 260px; }
 .chart-axis { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 11px; margin-top: 6px; }
@@ -1549,7 +1552,7 @@ html[data-theme="craft"] :is(.pagination,.pill,.node-card-meta,.node-card-addres
 .nav-children {border-left:1px solid var(--border);margin-left:21px;padding-left:8px}
 .nav.nav-child {min-height:38px;padding:8px 10px;font-size:13px;white-space:normal;line-height:1.4}
 .nav-section.current>summary {color:var(--blue-bright)}
-@media(min-width:601px) and (max-width:768px){html .side,html[data-theme="pink"] .side {width:200px}.nav.nav-child {justify-content:flex-start}.nav.nav-child span {display:block}.main {min-width:0}}
+@media(min-width:601px) and (max-width:1024px){html .side,html[data-theme="pink"] .side {width:200px}.nav.nav-child {justify-content:flex-start}.nav.nav-child span {display:block}.main {min-width:0}}
 @media(max-width:600px){.nav-group {display:block;overflow-y:auto;max-height:38vh}.side .nav-section {margin:2px 0}.nav-section summary {min-height:38px;padding:7px 10px}.nav-children {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-left:12px}.nav.nav-child {width:100%;justify-content:flex-start;margin:0}.nav-group>.nav {width:100%;justify-content:flex-start}.side {position:relative}.nav-section summary span {display:block}}
 
 /* Console design system. References and rationale: docs/go/INTERFACE-DESIGN.md. */
@@ -1728,7 +1731,7 @@ body:has(#app.hidden) .skip-link{display:none}
 @media(max-width:600px){.settings-shortcuts{grid-template-columns:1fr}.settings-shortcut{padding:16px}.probe-batch-actions{padding:12px}html[data-theme] .client-navigation{padding:12px;gap:8px}html[data-theme] .subscription-actions .btn{font-size:12px;padding:7px 9px}}
 @media(min-width:769px){html[data-theme] #content[data-page=system],html[data-theme] #content[data-page=maintenance]{max-width:1060px}}
 @media(min-width:769px) and (max-width:1100px){:root{--ui-sidebar:216px}html[data-theme] .main{padding-inline:24px}.workspace-context{display:none}html[data-theme] .top-title-area{flex-basis:200px}html[data-theme] .panel{padding:20px}}
-@media(max-width:768px){
+@media(max-width:1024px){
  :root{--ui-control:44px}
  html[data-theme] .app{display:block}
  html[data-theme] .main{width:100%;max-width:none;padding:0 16px 28px}
@@ -1792,7 +1795,7 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
    Reference and rationale: docs/go/AI-CHAT-LAYOUT.md */
 .ai-launcher{position:fixed!important;right:24px;bottom:24px;z-index:75;width:56px;height:56px;min-width:56px;padding:8px!important;border-radius:18px!important;display:flex;flex-direction:column;gap:2px!important;touch-action:none;user-select:none;cursor:grab;box-shadow:0 8px 24px rgb(var(--shadow-rgb)/.2)!important}.ai-launcher:active{cursor:grabbing}.ai-launcher span{font-size:11px;font-weight:700}.ai-launcher .icon{width:22px;height:22px}
 .ai-float-window{position:fixed;right:24px;bottom:96px;z-index:76;width:min(720px,calc(100vw - 32px));height:min(820px,calc(100dvh - 112px));min-height:160px;display:flex;flex-direction:column;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:20px;box-shadow:0 16px 60px rgb(var(--shadow-rgb)/.2);overflow:hidden}
-.ai-float-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 10px;touch-action:none;user-select:none;cursor:grab;flex-shrink:0}.ai-float-head:active{cursor:grabbing}.ai-float-head strong:focus{outline:none}.ai-float-head strong{display:flex;align-items:center;gap:10px;font-size:15px}.ai-float-head small{font-size:11px;font-weight:400;color:var(--text-muted)}.ai-float-head button{touch-action:manipulation;cursor:pointer}
+.ai-float-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 10px;touch-action:none;user-select:none;cursor:grab;flex-shrink:0}.ai-float-head:active{cursor:grabbing}.ai-float-head strong:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px}.ai-float-head strong{display:flex;align-items:center;gap:10px;font-size:15px}.ai-float-head small{font-size:11px;font-weight:400;color:var(--text-muted)}.ai-float-head button{touch-action:manipulation;cursor:pointer}
 #aiFloatWindow .btn{min-height:34px;padding:7px 10px;border-radius:9px;font-size:12px;gap:6px;box-shadow:none;background-image:none;text-shadow:none;letter-spacing:normal}
 #aiFloatWindow .ai-quiet{background:transparent;border-color:transparent;color:var(--text-muted)}#aiFloatWindow .ai-quiet:hover{background:var(--bg-input);color:var(--text)}#aiFloatWindow .btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
 .ai-float-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;overscroll-behavior:contain}
@@ -1847,6 +1850,7 @@ html[data-theme] .server-group-picker > span {white-space:nowrap;flex:none}
 html[data-theme] .server-group-picker > select {width:100%;min-width:0;max-width:100%;flex:1}
 #serverGroupsEditor .panel {min-width:0;max-width:100%;overflow-wrap:anywhere}
 </style>
+<link rel="stylesheet" href="/sub/workspace.css?v=0.3.0">
 </head>
 <body>
 <!-- Lucide Icons / ISC License
@@ -2048,7 +2052,7 @@ SOFTWARE.
         <span class="window-dot dot-yellow"></span>
         <span class="window-dot dot-green"></span>
       </div>
-      <span><span data-site-name>MXIOC</span> / 账号登录</span>
+      <span data-site-name>MXIOC</span><div class="ws-login-intro"><h1>服务器与订阅，<br>在一个工作区管理。</h1><p>连接服务器、配置节点与路由，为用户分发订阅。</p><ul><li>服务器与资源监控</li><li>订阅、节点与流量策略</li><li>AI 诊断与操作协助</li></ul></div><span class="hint">Mx-Panel · 管理工作区</span>
     </div>
     <div class="login-body">
       <div class="site-login-logo hidden" data-site-logo></div><div class="login-identity"><b data-site-name>MXIOC</b><span data-site-description>订阅管理控制台</span></div><div class="note site-announcement hidden" data-site-announcement role="note"></div>
@@ -2084,18 +2088,19 @@ SOFTWARE.
       </div>
       <button class="btn ghost icon-button side-close" id="navClose" type="button" aria-label="关闭导航">×</button>
     </div>
+    <button class="btn ws-search-trigger" id="workspaceSearch" type="button" aria-keyshortcuts="Control+k Meta+k"><span>搜索功能与订阅</span><kbd>⌘ / Ctrl K</kbd></button>
     <div class="nav-group">
-      <div class="nav-section-title">工作空间</div>
-      <button class="nav active" type="button" data-page="overview" title="总览"><i aria-hidden="true"><svg class="icon"><use href="#icon-layout-dashboard"/></svg></i><span>总览</span></button>
-<details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="subscriptionAccessManager" title="订阅 IP 白名单"><span>订阅 IP 白名单</span></button><button class="nav nav-child" type="button" data-nav-action="subscriptionBrowserManager" title="浏览器订阅访问"><span>浏览器订阅访问</span></button><button class="nav nav-child" type="button" data-nav-action="usageDisplayManager" title="流量信息节点"><span>流量信息节点</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
-<details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="serverNodes" title="服务器节点"><span>服务器节点</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
-<details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点管理</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
+      <div class="nav-section-title">工作导航</div>
+      <button class="nav active" type="button" data-page="overview" title="工作台"><i aria-hidden="true"><svg class="icon"><use href="#icon-layout-dashboard"/></svg></i><span>工作台</span></button>
+<details class="nav-section" data-nav-section="profiles" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-folders"/></svg><span>订阅与用户</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="profiles" title="订阅列表"><span>订阅列表</span></button><button class="nav nav-child" type="button" data-nav-action="userManager" title="用户与权限"><span>用户与权限</span></button><button class="nav nav-child" type="button" data-page="traffic" title="流量与到期"><span>流量与到期</span></button><button class="nav nav-child" type="button" data-page="subscriptions" title="订阅转换工具"><span>订阅转换工具</span></button><button class="nav nav-child" type="button" data-nav-action="clientOptionsManager" title="安全与客户端兼容"><span>安全与客户端兼容</span></button><button class="nav nav-child" type="button" data-nav-action="subscriptionAccessManager" title="订阅 IP 白名单"><span>订阅 IP 白名单</span></button><button class="nav nav-child" type="button" data-nav-action="subscriptionBrowserManager" title="浏览器订阅访问"><span>浏览器订阅访问</span></button><button class="nav nav-child" type="button" data-nav-action="usageDisplayManager" title="流量信息节点"><span>流量信息节点</span></button><button class="nav nav-child" type="button" data-nav-action="externalTrafficManager" title="外部订阅流量"><span>外部订阅流量</span></button></div></details>
+<details class="nav-section" data-nav-section="servers" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span>服务器与监控</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="servers" title="服务器列表"><span>服务器列表</span></button><button class="nav nav-child" type="button" data-page="serverNodes" title="服务器节点"><span>服务器节点</span></button><button class="nav nav-child" type="button" data-page="monitoring" title="硬件与历史监控"><span>硬件与历史监控</span></button><button class="nav nav-child" type="button" data-nav-action="agentEnrollManager" title="Agent 命令接入"><span>Agent 命令接入</span></button><button class="nav nav-child" type="button" data-page="probeSync" title="同步探针服务器"><span>同步探针服务器</span></button><button class="nav nav-child" type="button" data-nav-action="agentRolloutManager" title="Agent 分批升级"><span>Agent 分批升级</span></button><button class="nav nav-child" type="button" data-nav-action="monitorShareManager" title="监控分享"><span>监控分享</span></button></div></details>
+<details class="nav-section" data-nav-section="nodes" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-network"/></svg><span>节点与路由</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="nodes" title="节点列表"><span>节点列表</span></button><button class="nav nav-child" type="button" data-page="chains" title="链式代理"><span>链式代理</span></button><button class="nav nav-child" type="button" data-page="groups" title="策略组"><span>策略组</span></button><button class="nav nav-child" type="button" data-page="rules" title="路由规则"><span>路由规则</span></button><button class="nav nav-child" type="button" data-page="dns" title="DNS 分流"><span>DNS 分流</span></button><button class="nav nav-child" type="button" data-page="raw" title="原始配置"><span>原始配置</span></button></div></details>
 <button class="nav" type="button" data-page="assistant" title="AI 协助"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"/></svg><span>AI 协助</span></button>
-<details class="nav-section" data-nav-section="settings" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-palette"/></svg><span>系统设置</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="settings" title="主题与外观"><span>主题与外观</span></button><button class="nav nav-child" type="button" data-nav-action="userManager" title="用户与权限"><span>用户与权限</span></button><button class="nav nav-child" type="button" data-nav-action="notificationManager" title="通知中心"><span>通知中心</span></button><button class="nav nav-child" type="button" data-page="system" title="账号与备份"><span>账号与备份</span></button><button class="nav nav-child" type="button" data-page="maintenance" title="升级与卸载"><span>升级与卸载</span></button></div></details>
+<details class="nav-section" data-nav-section="settings" open><summary><svg class="icon" aria-hidden="true"><use href="#icon-palette"/></svg><span>系统设置</span><span class="nav-chevron" aria-hidden="true">⌄</span></summary><div class="nav-children"><button class="nav nav-child" type="button" data-page="settings" title="主题与外观"><span>主题与外观</span></button><button class="nav nav-child" type="button" data-nav-action="notificationManager" title="通知中心"><span>通知中心</span></button><button class="nav nav-child" type="button" data-page="system" title="账号与备份"><span>账号与备份</span></button><button class="nav nav-child" type="button" data-page="maintenance" title="升级与卸载"><span>升级与卸载</span></button></div></details>
     </div>
     <div class="side-status">
       <span class="status-indicator"></span>
-      <span>控制台已就绪</span>
+      <span>管理工作区</span>
     </div>
   </aside>
 
@@ -2175,7 +2180,7 @@ const S = {
 };
 
 function setNavigationOpen(open, restore = true) {
-  const mobile = matchMedia('(max-width:768px)').matches;
+  const mobile = matchMedia('(max-width:1024px)').matches;
   open = !!open && mobile && S.role !== 'user';
   const wasOpen = document.body.classList.contains('nav-open');
   document.body.classList.toggle('nav-open', open);
@@ -2259,7 +2264,7 @@ async function showAuthenticatedApp() {
   $('sectionTabs').classList.remove('hidden');
   await loadProfiles();
   if (S.profiles.length) await reload(false);
-  await go(S.profiles.length ? 'overview' : 'profiles');
+  const requested=location.hash.slice(1);await go(S.profiles.length && Object.hasOwn(pageInfo,requested)?requested:S.profiles.length?'overview':'profiles');
   $('boot').classList.add('hidden');
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
@@ -2368,7 +2373,7 @@ async function checkUpdateNotice(force = false) {
 
 async function manualUpdateCheck() {
   let status = await checkUpdateNotice(true);
-  if (!status) return alert('暂时无法连接仓库检查更新');
+  if (!status) return showMessage('暂时无法连接仓库检查更新');
   if (!status.available) notice(status.checkError ? '检查失败，请稍后重试' : '当前已经是最新版本');
   if (S.page === 'maintenance') maintenance();
 }
@@ -2380,12 +2385,12 @@ async function dismissSoftwareUpdate() {
     notice('已忽略本次版本；仓库出现下一次更新时会再次提醒');
     if (S.page === 'maintenance') maintenance();
   } catch (error) {
-    alert(error.message);
+    showMessage(error.message);
   }
 }
 
 async function confirmSoftwareUpdate(force = false) {
-  if (!confirm(force ? '确认重新安装当前版本？现有用户数据都会保留。' : '确认安装仓库最新版本？现有订阅、节点、规则、域名和证书都会保留。')) return;
+  if (!(await confirmAction(force ? '确认重新安装当前版本？现有用户数据都会保留。' : '确认安装仓库最新版本？现有订阅、节点、规则、域名和证书都会保留。'))) return;
   try {
     let result = await api('/updates/apply', jsonOpt('POST', { force }));
     let target = result.task.sha;
@@ -2404,9 +2409,9 @@ async function confirmSoftwareUpdate(force = false) {
         if (error.message.includes('更新失败')) throw error;
       }
     }
-    alert('更新仍在后台执行，请稍后刷新页面查看版本状态');
+    showMessage('更新仍在后台执行，请稍后刷新页面查看版本状态');
   } catch (error) {
-    alert(error.message);
+    showMessage(error.message);
   }
 }
 
@@ -2451,7 +2456,7 @@ const managerPages = {
  externalTrafficManager: {title:'外部订阅流量',section:'profiles',profile:false,render:render_externalTrafficManager},
  agentRolloutManager: {title:'Agent 分批升级',section:'servers',profile:false,render:render_agentRolloutManager},
  monitorShareManager: {title:'监控分享',section:'servers',profile:false,render:render_monitorShareManager},
- userManager: {title:'用户与权限',section:'settings',profile:false,render:render_userManager},
+ userManager: {title:'用户与权限',section:'profiles',profile:false,render:render_userManager},
  notificationManager: {title:'通知中心',section:'settings',profile:false,render:render_notificationManager},
 };
 function openManagerView(name,title,html) {
@@ -2471,10 +2476,10 @@ function monitorShareManager(...args) { if(S.page!=='monitorShareManager')return
 function userManager(...args) { if(S.page!=='userManager')return go('userManager'); return render_userManager(...args); }
 function notificationManager(...args) { if(S.page!=='notificationManager')return go('notificationManager'); return render_notificationManager(...args); }
 const pageInfo = {
-  overview: ['总览', '综合订阅配置状态与核心运行指标'],
-  profiles: ['订阅管理', '搜索、切换和管理所有订阅配置与分享链接'],
+  overview: ['工作台', '查看当前订阅，继续配置节点或获取客户端链接'],
+  profiles: ['订阅', '管理订阅配置、流量额度与客户端访问链接'],
   probeSync: ['同步探针服务器', '复用 Komari Agent 授权，免重复填写 SSH 密码，两边独立管理'],
-  servers: ['服务器管理', '通过 SSH 选择安装 3x-ui、Xray 或 sing-box'],
+  servers: ['服务器', '按分组管理服务器，查看监控状态与节点配置'],
   monitoring: ['硬件监控', '查看已登记服务器的 CPU、内存、磁盘和实时网速'],
   serverNodes: ['服务器节点', '管理面板与独立内核的入站、中转和节点分享链接'],
   nodes: ['节点管理', '节点的新增、修改、删除与策略组同步'],
@@ -2487,7 +2492,7 @@ const pageInfo = {
   raw: ['原始配置', '直接编辑并校验底层 Clash / Mihomo YAML'],
   system: ['账号与安全', '修改管理员用户名、密码以及查看历史配置备份'],
   assistant: ['AI 协助', '配置自己的模型，问答、分析配置与诊断故障'],
-  settings: ['设置', '安全、通知、权限与界面外观'],
+  settings: ['设置', '面板外观、账号权限、通知与接入偏好'],
   maintenance: ['升级与卸载', '检查升级、重新安装或安全卸载管理后台']
 };
 
@@ -2503,10 +2508,11 @@ for(const [name,info] of Object.entries(managerPages)){pageInfo[name]=[info.titl
 const sectionFor = page => Object.keys(pageSections).find(key => pageSections[key].includes(page)) || 'overview';
 
 async function go(page) {
+  S.navigationEpoch=(S.navigationEpoch||0)+1;
   S.managerEpoch=(S.managerEpoch||0)+1;
   S.modalEpoch=(S.modalEpoch||0)+1;
   closeModal();
-  if(page==='assistant'){setNavigationOpen(false,false);return aiOpenWindow();}
+  if(S.page==='assistant'&&page!=='assistant')window.WorkspaceUI?.undockAI();
   if (S.role === "user") return memberPortal();
   if (!S.profiles.length && (!managerPages[page] || managerPages[page].profile) && !['profiles','settings','system','maintenance','servers','serverNodes','monitoring','probeSync','assistant'].includes(page)) {
     page = 'profiles';
@@ -2515,8 +2521,9 @@ async function go(page) {
   if(page!=='probeSync')clearTimeout(S.probeBatchTimer);
   window.cancelNodeDrag?.();
   if (page !== 'monitoring') stopMonitoring();
-  if (S.page !== page) $('content').innerHTML = '<div class="empty" role="status">正在加载…</div>';
+  if (S.page !== page) $('content').innerHTML = '<div class="ws-skeleton" role="status" aria-live="polite">正在加载页面数据…</div>';
   S.page = page;
+  window.WorkspaceUI?.navigated(page);
   $('content').dataset.page = page;
   setNavigationOpen(false, false);
   const section = sectionFor(page);
@@ -2528,7 +2535,7 @@ async function go(page) {
     if ((n.dataset.page || n.dataset.navAction) === page) n.setAttribute('aria-current', 'page');
     else n.removeAttribute('aria-current');
   });
-  document.querySelectorAll('[data-nav-section]').forEach(d=>{d.classList.toggle('current',d.dataset.navSection===section);if(d.dataset.navSection===section)d.open=true});
+  document.querySelectorAll('[data-nav-section]').forEach(d=>{d.classList.toggle('current',d.dataset.navSection===section);d.open=d.dataset.navSection===section});
   if (matchMedia('(max-width: 600px)').matches) {
     const active = document.querySelector('.nav[aria-current="page"]'), group = document.querySelector('.nav-group');
     if (active && group) group.scrollLeft = Math.max(0, active.offsetLeft - group.offsetLeft - (group.clientWidth - active.clientWidth) / 2);
@@ -2567,12 +2574,9 @@ function tableSlice(rows, key) {
 }
 
 function pagination(p) {
-  return `<div class="pagination"><span>共 ${p.count} 项 · 每页 ${p.size || 50} 项</span><div class="toolbar">
-    <button class="btn small" onclick="turnTablePage('${p.key}',-1)" ${p.page === 1 ? 'disabled' : ''}>上一页</button>
-    <span>${p.page} / ${p.pages}</span>
-    <button class="btn small" onclick="turnTablePage('${p.key}',1)" ${p.page === p.pages ? 'disabled' : ''}>下一页</button>
-  </div></div>`;
+ return `<div class="pagination"><span>${p.count?((p.page-1)*p.size+1)+'–'+Math.min(p.page*p.size,p.count):0} / ${p.count} 项</span><div class="toolbar"><button class="btn small" onclick="turnTablePage('${p.key}',-1)" ${p.page===1?'disabled':''} aria-label="上一页">上一页</button><label>第 <input type="number" min="1" max="${p.pages}" value="${p.page}" aria-label="跳转页码" onchange="jumpTablePage('${p.key}',this.value,${p.pages})"> / ${p.pages} 页</label><button class="btn small" onclick="turnTablePage('${p.key}',1)" ${p.page===p.pages?'disabled':''} aria-label="下一页">下一页</button></div></div>`;
 }
+function jumpTablePage(key,value,max){const n=Number(value);if(!Number.isInteger(n)||n<1||n>max){notice('请输入 1 到 '+max+' 之间的页码');return;}S.tablePages[key]=n;draw();}
 
 function turnTablePage(key, delta) {
   S.tablePages[key] = (S.tablePages[key] || 1) + delta;
@@ -2656,7 +2660,7 @@ async function render_userManager(view = {query:'',status:'',profile:'',page:1})
     list.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>editPanelUser(rows[Number(b.dataset.editUser)], profiles.profiles));
     list.querySelectorAll('[data-delete-user]').forEach(b=>b.onclick=async()=>{
       const u=rows[Number(b.dataset.deleteUser)];
-      if (!confirm(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`)) return;
+      if (!(await confirmAction(`删除用户 ${u.username}？其登录会话将立即失效。已复制的订阅地址仍需单独轮换。`))) return;
       b.disabled=true;
       try { await api('/users',jsonOpt('DELETE',{id:u.id})); if(list.isConnected)await userManager(view); notice('用户已删除'); } catch(e) { notice(e.message); }finally{if(b.isConnected)b.disabled=false}
     });
@@ -2755,12 +2759,15 @@ function aiPlace(el,x,y){
 }
 function aiFit(){
  const v=aiViewport();$('aiFloatWindow').style.maxHeight=Math.max(160,v.h-16)+'px';
- for(const id of ['aiLauncher','aiFloatWindow']){const el=$(id);if(!el.classList.contains('hidden')){const r=el.getBoundingClientRect();aiPlace(el,r.left,r.top);}}
+ let launcherPosition=null;try{launcherPosition=JSON.parse(localStorage.getItem('mx-ai-launcher-position'))}catch{}
+ const customLauncher=Number.isFinite(launcherPosition?.x)&&Number.isFinite(launcherPosition?.y);
+ if(!customLauncher)for(const prop of ['left','top','right','bottom'])$('aiLauncher').style.removeProperty(prop);
+ for(const id of ['aiLauncher','aiFloatWindow']){const el=$(id);if((id!=='aiLauncher'||customLauncher)&&!el.classList.contains('hidden')&&el.getClientRects().length&&!el.closest('#wsAIHost')){const r=el.getBoundingClientRect();aiPlace(el,r.left,r.top);}}
 }
 function aiDrag(handle,el,key){
  let drag=null,suppress=false;
  handle.addEventListener('pointerdown',e=>{
-  if(el.classList.contains('ai-maximized'))return;
+  if(el.classList.contains('ai-maximized')||S.page==='assistant')return;
   if(e.button!==0||e.target.closest('button')&&e.target.closest('button')!==handle)return;
   const r=el.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,moved:false};suppress=false;handle.setPointerCapture(e.pointerId);
  });
@@ -2776,6 +2783,7 @@ function aiDrag(handle,el,key){
 function aiRestorePosition(el,key){try{const p=JSON.parse(localStorage.getItem(key));if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))aiPlace(el,p.x,p.y);}catch{}aiFit();}
 function aiShowLauncher(){if(!S.role)return;$('aiLauncher').classList.remove('hidden');aiRestorePosition($('aiLauncher'),'mx-ai-launcher-position');}
 function aiMinimize(){
+ if(S.page==='assistant'){void go('overview');return;}
  $('aiFloatWindow').classList.add('hidden');$('aiLauncher').setAttribute('aria-expanded','false');$('aiLauncher').focus({preventScroll:true});
 }
 async function aiOpenWindow(refresh=false){
@@ -2800,10 +2808,10 @@ function aiInitWidget(){
  $('aiFloatMaximize').onclick=()=>{const box=$('aiFloatWindow'),large=box.classList.toggle('ai-maximized');$('aiFloatMaximize').textContent=large?'还原':'放大';$('aiFloatMaximize').setAttribute('aria-label',large?'还原 AI 窗口':'最大化 AI 工作区');aiFit();};
  $('aiFloatWindow').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').classList.contains('hidden')){e.stopPropagation();aiMinimize();}});
  // Keyboard users can reposition the launcher without a pointer.
- $('aiLauncher').addEventListener('keydown',e=>{const d={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[e.key];if(!d)return;e.preventDefault();const r=$('aiLauncher').getBoundingClientRect();aiPlace($('aiLauncher'),r.left+d[0],r.top+d[1]);});
+ $('aiLauncher').addEventListener('keydown',e=>{const d={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[e.key];if(!d)return;e.preventDefault();const r=$('aiLauncher').getBoundingClientRect();aiPlace($('aiLauncher'),r.left+d[0],r.top+d[1]);try{const moved=$('aiLauncher').getBoundingClientRect();localStorage.setItem('mx-ai-launcher-position',JSON.stringify({x:moved.left,y:moved.top}));}catch{}});
  window.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('scroll',aiFit);
 }
-async function aiAssistant(){return aiOpenWindow();}
+async function aiAssistant(){return S.page==='assistant'&&window.WorkspaceUI?WorkspaceUI.dockAI():aiOpenWindow();}
 
 async function aiActionCards(view){
  clearTimeout(S.aiActionTimer);
@@ -2866,8 +2874,8 @@ async function aiAssistantRender(){
  $('aiOpenSettings').onclick=()=>aiSettingsManager().catch(e=>notice(e.message));
  $('aiNewChat').onclick=async()=>{if(view.busy)return;view.busy=true;controls();try{await newChat();}catch(e){notice(e.message);}finally{view.busy=false;controls();}};
  $('aiConversation').onchange=()=>{view.conversation=val('aiConversation');S.aiConversation=view.conversation;loadMessages().catch(e=>notice(e.message));};
- $('aiRenameChat').onclick=async()=>{if(!view.conversation)return;const title=prompt('对话名称',view.chats.find(c=>c.id===view.conversation)?.title||'');if(!title?.trim())return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('PUT',{title}));await loadChats();}catch(e){notice(e.message);}};
- $('aiDeleteChat').onclick=async()=>{if(!view.conversation||!confirm('删除这个对话及其记录？'))return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('DELETE',{}));view.conversation='';await loadChats();await loadMessages();}catch(e){notice(e.message);}};
+ $('aiRenameChat').onclick=async()=>{if(!view.conversation)return;const title=(await promptAction('对话名称',view.chats.find(c=>c.id===view.conversation)?.title||''));if(!title?.trim())return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('PUT',{title}));await loadChats();}catch(e){notice(e.message);}};
+ $('aiDeleteChat').onclick=async()=>{if(!view.conversation||!(await confirmAction('删除这个对话及其记录？')))return;try{await api('/ai/conversations?id='+encodeURIComponent(view.conversation),jsonOpt('DELETE',{}));view.conversation='';await loadChats();await loadMessages();}catch(e){notice(e.message);}};
  $('aiMessages').onclick=e=>{const b=e.target.closest('[data-ai-starter]');if(!b)return;input.value=starters[Number(b.dataset.aiStarter)];input.focus();};
  $('aiPreviewContext').onclick=async()=>{const id=val('aiContextProfile');if(!id)return notice('请先选择一份订阅');try{const data=await api('/ai/context?profile='+encodeURIComponent(id));if(!valid())return;openModal('将发送给 AI 的配置摘要','<p class="hint">发送消息时会重新读取这份摘要。这里只展示，不调用 AI。</p><pre class="ai-preview">'+esc(JSON.stringify(data,null,2))+'</pre>');}catch(e){notice(e.message);}};
  $('aiStop').onclick=()=>{view.controller.abort();$('aiStatus').textContent='正在停止；上游可能已产生调用费用';};
@@ -2972,12 +2980,12 @@ function settings() {
   const theme = document.documentElement.dataset.theme;
   const shortcuts=[['settings-2','网站信息','面板外观、公告与独立订阅域名','siteInfoManager'],['cpu','AI 协助','我的 API Key、模型与回答偏好','aiSettingsManager'],['shield-check','订阅安全与兼容','DNS、WebRTC 与客户端设置','clientOptionsManager'],['shield-check','订阅 IP 白名单','限制订阅下载的 IP 与网段','subscriptionAccessManager'],['shield-check','浏览器订阅访问','按订阅控制浏览器直接下载','subscriptionBrowserManager'],['gauge','流量信息节点','提示节点名称与独立显示开关','usageDisplayManager'],['gauge','外部订阅流量','流量读取与自动更新','externalTrafficManager'],['activity','通知中心','告警、日报与发送记录','notificationManager'],['server','Agent 自动接入','自动检测 hostname 与命令接入设置','agentEnrollManager'],['server','Agent 分批升级','升级计划与执行进度','agentRolloutManager'],['globe','监控分享','公开范围与分享外观','monitorShareManager'],['settings-2','用户与权限','账号、授权与订阅分配','userManager']];
   $('content').innerHTML = `<section class="panel"><div class="panel-head"><div><h3>常用设置</h3><p class="muted">按任务选择设置，主题与显示偏好位于下方。</p></div></div><div class="settings-shortcuts">${shortcuts.map(([icon,title,description,action])=>`<button class="settings-shortcut" type="button" onclick="${action}().catch(e=>notice(e.message))">${uiIcon(icon)}<span><strong>${title}</strong><small>${description}</small></span>${uiIcon('chevron-right')}</button>`).join('')}</div></section><section class="panel"><div class="panel-head"><div><h3>主题与外观</h3><p class="muted">六种配色，共用一致的按钮、表单与排版。</p></div></div>
-    <p class="muted">首次使用默认云白主题。选择会保存在当前浏览器，不影响其他设备；切换立即生效。</p>
+    <p class="muted">选择配色后立即生效，偏好保存在当前浏览器。所有主题使用相同的菜单与操作流程。</p>
     <div class="theme-options">
-      <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>原版物品栏与立体按钮，草地绿和石灰配色，像素英文搭配清晰中文。</p></button>
-      <button type="button" class="theme-option" data-theme-choice="slate" aria-pressed="${theme === 'slate'}" onclick="setTheme('slate')"><span class="theme-preview slate" aria-hidden="true"></span><strong>云白主题 · 清晰控制台</strong><p>冷白背景、靛蓝操作色和轻量卡片，采用 Inter 与中文无衬线字体，突出内容和常用操作。</p></button>
+      <button type="button" class="theme-option" data-theme-choice="craft" aria-pressed="${theme === 'craft'}" onclick="setTheme('craft')"><span class="theme-preview craft" aria-hidden="true"></span><strong>我的世界 · 方块工作台</strong><p>草地绿、方块边角与主世界插画，保留清晰的中英文字体。</p></button>
+      <button type="button" class="theme-option" data-theme-choice="slate" aria-pressed="${theme === 'slate'}" onclick="setTheme('slate')"><span class="theme-preview slate" aria-hidden="true"></span><strong>云白主题 · 清晰控制台</strong><p>冷白界面、蓝色操作与清晰描边，适合日常管理。</p></button>
       <button type="button" class="theme-option" data-theme-choice="high" aria-pressed="${theme === 'high'}" onclick="setTheme('high')">
-        <span class="theme-preview high" aria-hidden="true"></span><strong>科技主题 · 终端工作台</strong><p>深色背景与蓝色强调色，保留品牌动效，采用统一易读字体和紧凑控件。</p>
+        <span class="theme-preview high" aria-hidden="true"></span><strong>石墨主题 · 深色工作区</strong><p>石墨灰界面与暖橙操作色，适合长时间查看监控、配置与日志。</p>
       </button>
       <button type="button" class="theme-option" data-theme-choice="low" aria-pressed="${theme === 'low'}" onclick="setTheme('low')">
         <span class="theme-preview low" aria-hidden="true"></span><strong>简洁主题 · 轻量界面</strong><p>保留当前简洁界面，减少阴影和动画，关闭背景模糊。适合手机、旧电脑与省电场景。</p>
@@ -2986,7 +2994,7 @@ function settings() {
         <span class="theme-preview pink" aria-hidden="true"></span><strong>猛男主题 · 温柔粉色</strong><p>暖粉底色、柔和边框与舒展留白，搭配统一无衬线字体和圆角组件，让复杂配置也从容清晰。</p>
       </button>
       <button type="button" class="theme-option" data-theme-choice="amber" aria-pressed="${theme === 'amber'}" onclick="setTheme('amber')">
-        <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白底色、珊瑚橙操作按钮与细描边，搭配轻量硬边阴影，清晰区分内容与操作。</p>
+        <span class="theme-preview amber" aria-hidden="true"></span><strong>暖橙主题 · 清爽工作台</strong><p>暖白界面、陶橙操作与细描边，适合偏好柔和配色的用户。</p>
       </button>
     </div><div class="note">六套主题拥有相同的功能和分页优化。所有组件使用当前主题的统一设计变量。系统开启“减少动态效果”时，科技主题也会降低动画。图标来自 Lucide（ISC），已本地嵌入。</div>
   </section>`;
@@ -3042,7 +3050,7 @@ async function render_subscriptionAccessManager(){
    if(!active())return;
    $('saPreview').textContent=(payload.enabled?(result.currentAllowed?'当前识别 IP 在允许范围内。':'当前识别 IP 不在允许范围内，当前网络将无法更新订阅；面板管理不受影响。'):'限制已关闭，持有链接的客户端均可下载。')+' 规范化后 '+result.options.networks.length+' 项。';
    if(!save)return;
-   if(payload.enabled&&!result.currentAllowed&&!confirm('当前识别 IP 不在白名单中，保存后当前网络可能无法下载此订阅。面板登录不受影响，仍可在这里关闭限制。是否继续保存？'))return;
+   if(payload.enabled&&!result.currentAllowed&&!(await confirmAction('当前识别 IP 不在白名单中，保存后当前网络可能无法下载此订阅。面板登录不受影响，仍可在这里关闭限制。是否继续保存？')))return;
    await api('/subscription-access',{...jsonOpt('PUT',result.options),headers:{'Content-Type':'application/json',...headers}});
    if(active()){closeModal();notice('订阅 IP 白名单已保存，对下一次下载立即生效');}
   }catch(e){if(active())$('saError').textContent=e.message;}
@@ -3073,7 +3081,7 @@ async function render_clientOptionsManager() {
  $('coAndroidPreset').onclick=()=>{for(const key of ['webRTC','dnsProtection','domesticRealIP'])$('co-'+key).checked=true;for(const key of ['ipv6','basicAds','strongAds'])$('co-'+key).checked=false;$('co-dnsMode').value='domestic';$('co-webRTCMode').value='chrome-proxy';};
  const form=$('clientOptionsForm'),active=()=>form.isConnected&&S.page==='clientOptionsManager';
  const save=async reset=>{const categories=[...form.querySelectorAll('[data-co-category]:checked')].map(e=>e.dataset.coCategory);if(!reset&&!categories.length){$('clientOptionsError').textContent='至少保留一个分类；若不需要保护，请关闭 WebRTC 开关或切换模式。';return;}const payload={appCategories:categories.join(','),appExtraPackages:$('co-appExtraPackages').value,dnsMode:$('co-dnsMode').value,webRTCMode:$('co-webRTCMode').value};for(const key of ['webRTC','dnsProtection','domesticRealIP','ipv6','basicAds','strongAds','xrayExport','singBoxExport'])payload[key]=$('co-'+key).checked;form.querySelectorAll('button').forEach(b=>b.disabled=true);try{await api('/client-options',{...jsonOpt(reset?'DELETE':'PUT',payload),headers:{'Content-Type':'application/json','X-Profile':profile}});if(active()){closeModal();notice(reset?'已恢复原配置，请更新手机订阅':'设置已保存，请更新手机订阅并重连');}}catch(e){if(active()){$('clientOptionsError').textContent=e.message;form.querySelectorAll('button').forEach(b=>b.disabled=false);}}};
- form.onsubmit=e=>{e.preventDefault();void save(false)};$('clientOptionsReset').onclick=()=>{if(confirm('清除当前订阅的安全与兼容覆盖，恢复原 YAML 配置？'))void save(true)};
+ form.onsubmit=e=>{e.preventDefault();void save(false)};$('clientOptionsReset').onclick=async ()=>{if((await confirmAction('清除当前订阅的安全与兼容覆盖，恢复原 YAML 配置？')))void save(true)};
 }
 
 function externalTrafficChart(samples){
@@ -3094,9 +3102,9 @@ async function render_externalTrafficManager(){
  const form=$('externalTrafficForm'),list=$('etList');const active=()=>$('externalTrafficForm')===form;
  const action=async(method,path,payload)=>{form.querySelectorAll('button').forEach(b=>b.disabled=true);list.querySelectorAll('button').forEach(b=>b.disabled=true);try{await api(path,jsonOpt(method,payload));if(active())await externalTrafficManager()}catch(e){if(active()){$('etError').textContent=e.message;form.querySelectorAll('button').forEach(b=>b.disabled=false);list.querySelectorAll('button').forEach(b=>b.disabled=false)}}};
  form.onsubmit=e=>{e.preventDefault();void action('POST','/external-traffic',{name:$('etName').value,url:$('etURL').value})};
- list.querySelectorAll('[data-et-schedule]').forEach(b=>b.onclick=()=>{const id=b.dataset.etSchedule,auto=[...list.querySelectorAll('[data-et-auto]')].find(e=>e.dataset.etAuto===id).checked,interval=Number([...list.querySelectorAll('[data-et-interval]')].find(e=>e.dataset.etInterval===id).value);if(auto&&!confirm('允许面板按所选间隔自动请求此订阅服务商并保存每日流量快照？'))return;void action('PUT','/external-traffic',{id,auto,interval})});
+ list.querySelectorAll('[data-et-schedule]').forEach(b=>b.onclick=async ()=>{const id=b.dataset.etSchedule,auto=[...list.querySelectorAll('[data-et-auto]')].find(e=>e.dataset.etAuto===id).checked,interval=Number([...list.querySelectorAll('[data-et-interval]')].find(e=>e.dataset.etInterval===id).value);if(auto&&!(await confirmAction('允许面板按所选间隔自动请求此订阅服务商并保存每日流量快照？')))return;void action('PUT','/external-traffic',{id,auto,interval})});
  list.querySelectorAll('[data-et-refresh]').forEach(b=>b.onclick=()=>action('POST','/external-traffic',{id:b.dataset.etRefresh}));
- list.querySelectorAll('[data-et-delete]').forEach(b=>b.onclick=()=>{if(confirm('删除这个外部订阅及其全部流量快照？'))void action('DELETE','/external-traffic?id='+encodeURIComponent(b.dataset.etDelete),{})});
+ list.querySelectorAll('[data-et-delete]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('删除这个外部订阅及其全部流量快照？')))void action('DELETE','/external-traffic?id='+encodeURIComponent(b.dataset.etDelete),{})});
 }
 
 async function render_notificationManager() {
@@ -3155,13 +3163,13 @@ function profiles() {
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索订阅" placeholder="搜索订阅名称或标识…" value="${esc(q)}">
       <select id="profileFilter" aria-label="筛选订阅"><option value="all">全部订阅</option><option value="current">当前订阅</option><option value="configured">已设置流量</option><option value="expired">已到期</option></select>
       <select id="profileSort" aria-label="订阅排序"><option value="default">默认顺序</option><option value="latest">最近创建优先</option><option value="name">名称排序</option></select></div>
-    <div class="profiles-pager">${pagination(page)}</div><div class="profile-grid">${page.rows.map(p => {
+    <div class="profile-grid">${page.rows.map(p => {
       const id = encodeURIComponent(p.id).replace(/'/g, '%27'), t = p.traffic || {}, active = p.id === S.profile;
       return `<article class="profile-card ${active ? 'is-current' : ''}" data-profile-id="${esc(p.id)}"><div class="profile-card-head"><div><h4 title="${esc(p.name)}">${esc(p.name)}</h4><div class="profile-id">${esc(p.id)}</div></div>
         ${active ? '<span class="pill">当前订阅</span>' : p.protected ? '<span class="pill">主订阅</span>' : ''}</div>
         <div class="profile-usage">${t.configured ? `已用 ${formatBytes(t.used)} · 总额 ${formatBytes(t.total)}<br>${t.expire ? '到期 ' + esc(new Date(t.expire * 1000).toLocaleDateString('zh-CN')) : '长期有效'}${t.expired ? ' · 已到期' : t.exhausted ? ' · 额度已用尽' : ''}` : '尚未设置流量额度'}</div>
         <details><summary>查看订阅地址</summary><code>${esc(subscriptionURL(p.url))}</code></details>
-        <div class="toolbar"><button class="btn primary small" onclick="useProfile('${id}')">进入配置</button><button class="btn small" onclick="useProfile('${id}','traffic')">套餐 / 流量</button>
+        <div class="toolbar"><button class="btn small" onclick="useProfile('${id}')">进入配置</button><button class="btn small" onclick="useProfile('${id}','traffic')">套餐 / 流量</button>
           <button class="btn small" onclick="profileCopyLink('${id}')" title="复制 Clash / Mihomo 订阅地址">复制链接</button><button class="btn small" onclick="profileClientLinks('${id}')">订阅 / 二维码</button></div>
         <details class="card-secondary"><summary>订阅设置与更多操作</summary><div class="toolbar"><button class="btn small" onclick="profileEdit('${id}')">重命名 / 设置</button><button class="btn small" onclick="profileDuplicate('${id}')">复制为新订阅</button>
           ${p.protected ? '<span class="hint">主订阅不可删除</span>' : `<button class="btn small danger" onclick="profileDelete('${id}')">删除</button>`}</div></details>
@@ -3210,6 +3218,7 @@ async function subscriptionRotationManager() {
 }
 
 async function useProfile(encoded, page = 'nodes') {
+  const navigationEpoch=S.navigationEpoch||0;
   const id = decodeURIComponent(encoded), profile = S.profiles.find(p => p.id === id);
   if (!profile) return notice('该订阅已不存在，请刷新列表');
   try {
@@ -3225,7 +3234,7 @@ async function useProfile(encoded, page = 'nodes') {
     $('currentProfileName').textContent = profile.name;
     closeModal();
     if (!S.data) await reload(false);
-    if (S.profile !== id) return;
+    if (S.profile !== id || (S.navigationEpoch||0)!==navigationEpoch) return;
     await go(page);
     notice('当前订阅：' + profile.name);
   } catch (error) { notice('切换失败：' + error.message); }
@@ -3321,7 +3330,7 @@ function renderServers() {
   const matching = S.servers.filter(s => `${s.name} ${s.host} ${s.domain} ${s.nodeAddress || ''}`.toLowerCase().includes(q.toLowerCase()) && (!kind || serverKind(s) === kind) && (groupFilter==='*'||(S.serverGroups?.assignments?.[s.id]||'')===groupFilter));
   const counts = Object.fromEntries(Object.keys(serverObservationLabels).map(key=>[key,matching.filter(s=>serverObservationFor(s.id).status===key).length]));
   const page = tableSlice(matching.filter(s => !status || serverObservationFor(s.id).status === status), 'servers');
-  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div class="profile-summary"><h3>远端服务器</h3><p class="muted">可选择 3x-ui 面板、独立 Xray 或 sing-box，也可接入现有 X-ui。SSH 账号须为 root 或具有 sudo 权限。</p></div><div class="toolbar"><button class="btn" onclick="serverForm('',true)">接入已有面板 / 内核</button><button class="btn primary" onclick="agentEnrollManager()">复制命令接入 Agent</button><button class="btn" onclick="serverForm()">${uiIcon('circle-plus')}添加 SSH 服务器</button></div></div>
+  $('content').innerHTML = `<section class="panel"><div class="panel-head"><div class="profile-summary"><h3>服务器列表</h3><p class="muted">按分组查看机器，选择服务器后可批量移动分组。</p></div><div class="toolbar"><button class="btn primary" onclick="WorkspaceUI.addServer()">${uiIcon('circle-plus')}添加服务器</button></div></div>
     <details class="card-secondary" id="serverGroupsEditor"><summary>管理服务器分组（${S.serverGroups?.groups?.length||0}）</summary><p class="hint">每台服务器归属一个分组。删除分组仅将成员移回未分组，不删除服务器、节点或监控数据。</p><form id="groupCreate" class="toolbar"><input id="groupNewName" aria-label="新分组名称" placeholder="例如：分组 A / 香港 / 测试环境" maxlength="60" required><button class="btn primary" type="submit">创建分组</button></form><div class="toolbar">${(S.serverGroups?.groups||[]).map(g=>`<div class="panel"><strong>${esc(g.name)}</strong><p>${S.servers.filter(s=>S.serverGroups.assignments[s.id]===g.id).length} 台服务器</p><button class="btn small" data-group-control data-group-rename="${esc(g.id)}">改名</button> <button class="btn small danger" data-group-control data-group-delete="${esc(g.id)}">删除分组</button></div>`).join('')||'<p class="muted">尚未创建分组，所有服务器都在未分组中。</p>'}</div></details>
     <div class="toolbar"><label for="serverGroupFilter">服务器分组</label><select id="serverGroupFilter">${serverGroupOptions(groupFilter,true)}</select><span class="hint">共 ${S.servers.filter(s=>groupFilter==='*'||(S.serverGroups?.assignments?.[s.id]||'')===groupFilter).length} 台</span></div>
     <div class="toolbar profiles-toolbar"><input id="search" aria-label="搜索服务器" placeholder="搜索名称、IP 或域名…" value="${esc(q)}"><select id="serverKindFilter" aria-label="服务器类型">${[['','全部类型'],['3x-ui','3x-ui'],['x-ui','X-ui'],['x-panel','X-Panel'],['xray','Xray'],['sing-box','sing-box'],['probe','探针待接管'],['agent','Agent 免 SSH']].map(([id,label])=>`<option value="${id}" ${kind===id?'selected':''}>${label}</option>`).join('')}</select><select id="serverStatusFilter" aria-label="监控状态"><option value="">全部监控状态（${matching.length}）</option>${Object.entries(serverObservationLabels).map(([id,label])=>`<option value="${id}" ${status===id?'selected':''}>${label}（${counts[id]}）</option>`).join('')}</select><button type="button" class="btn" id="serverRefresh" ${S.serverLoading?'disabled':''}>${S.serverLoading?'正在刷新…':'刷新列表与状态'}</button><button type="button" class="btn" id="serverFilterClear">清除筛选</button></div>
@@ -3343,8 +3352,8 @@ function renderServers() {
   $('serverGroupsEditor').open=groupEditorOpen;
   $('serverGroupFilter').value=groupFilter;
   $('groupCreate').onsubmit=e=>{e.preventDefault();changeServerGroup({action:'create',name:$('groupNewName').value})};
-  $('content').querySelectorAll('[data-group-rename]').forEach(b=>b.onclick=()=>{const g=S.serverGroups.groups.find(g=>g.id===b.dataset.groupRename);const name=prompt('修改分组名称',g.name);if(name!==null)changeServerGroup({action:'rename',id:g.id,name})});
-  $('content').querySelectorAll('[data-group-delete]').forEach(b=>b.onclick=()=>{if(confirm('删除此分组？组内服务器将移回未分组，服务器本身不会被删除。'))changeServerGroup({action:'delete',id:b.dataset.groupDelete})});
+  $('content').querySelectorAll('[data-group-rename]').forEach(b=>b.onclick=async ()=>{const g=S.serverGroups.groups.find(g=>g.id===b.dataset.groupRename);const name=(await promptAction('修改分组名称',g.name));if(name!==null)changeServerGroup({action:'rename',id:g.id,name})});
+  $('content').querySelectorAll('[data-group-delete]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('删除此分组？组内服务器将移回未分组，服务器本身不会被删除。')))changeServerGroup({action:'delete',id:b.dataset.groupDelete})});
   $('content').querySelectorAll('[data-server-group]').forEach(el=>el.onchange=()=>changeServerGroup({action:'assign',id:el.value,servers:[el.dataset.serverGroup]}));
   $('content').querySelectorAll('[data-server-select]').forEach(el=>el.onchange=()=>{if(el.checked)S.serverSelection.add(el.dataset.serverSelect);else S.serverSelection.delete(el.dataset.serverSelect);$('serverSelectionCount').textContent='已选 '+S.serverSelection.size+' 台'});
   $('serverSelectPage').onclick=()=>{page.rows.forEach(s=>S.serverSelection.add(s.id));renderServers()};
@@ -3364,7 +3373,7 @@ async function render_agentEnrollManager(){
  const form=$('enrollForm'),active=()=>form.isConnected&&S.page==='agentEnrollManager'&&S.managerEpoch===epoch;let busy=false;
  const applyNameMode=()=>{const name=$('enrollName'),automatic=autoHostname||$('enrollReusable').checked;name.disabled=automatic;name.required=!automatic;name.placeholder=automatic?'运行命令后自动读取服务器 hostname':'例如：香港服务器'};applyNameMode();$('enrollReusable').onchange=()=>{applyNameMode();form.querySelector('button[type=submit]').textContent=$('enrollReusable').checked?'生成长期多服务器命令':'生成 30 分钟单机命令'};
  $('enrollSettingsForm').onsubmit=async e=>{e.preventDefault();const button=$('enrollSettingsSave'),box=$('enrollAutoHostname');button.disabled=true;box.disabled=true;try{const result=await api('/servers/agent/enroll-settings',jsonOpt('PUT',{autoHostname:box.checked,revision:settingsRevision}));if(!active())return;settingsRevision=result.revision;autoHostname=result.autoHostname;applyNameMode();$('enrollSettingsStatus').textContent='已保存，仅对新生成命令生效。';}catch(error){if(active())$('enrollSettingsStatus').textContent=error.message}finally{button.disabled=false;box.disabled=false}};
- const draw=rows=>{const target=$('enrollEntries');target.innerHTML=(rows||[]).sort((a,b)=>b.expires-a.expires).map(e=>`<article class="panel" style="padding:14px;margin:10px 0"><strong>${esc(e.name)}</strong><p>${e.reusable?'长期令牌 · 已登记 '+e.registeredCount+' 台':e.connected?'已收到心跳 · 在线':e.status==='registered'?'已登记 · 等待心跳或已离线':e.status==='removed'?'服务器已移除':e.status==='expired'?'命令已过期':'等待服务器执行命令'} · ${e.expires?'命令截止 '+esc(new Date(e.expires*1000).toLocaleString()):'长期有效（可撤销）'}</p>${e.status==='removed'?'':e.status==='registered'?`<button class="btn small" data-enroll-monitor="${esc(e.id)}">硬件监控</button>`:`<button class="btn small danger" data-enroll-revoke="${esc(e.id)}">撤销命令</button>`}</article>`).join('')||'<p class="empty">暂无接入记录</p>';target.querySelectorAll('[data-enroll-monitor]').forEach(b=>b.onclick=()=>openHostMonitor(b.dataset.enrollMonitor));target.querySelectorAll('[data-enroll-revoke]').forEach(b=>b.onclick=async()=>{if(!confirm('撤销此接入令牌？将阻止新服务器使用此命令登记，已接入服务器继续运行。'))return;b.disabled=true;try{await api('/servers/agent/enroll?id='+encodeURIComponent(b.dataset.enrollRevoke),jsonOpt('DELETE',{}));await refresh()}catch(e){if(active())$('enrollError').textContent=e.message}finally{b.disabled=false}})};
+ const draw=rows=>{const target=$('enrollEntries');target.innerHTML=(rows||[]).sort((a,b)=>b.expires-a.expires).map(e=>`<article class="panel" style="padding:14px;margin:10px 0"><strong>${esc(e.name)}</strong><p>${e.reusable?'长期令牌 · 已登记 '+e.registeredCount+' 台':e.connected?'已收到心跳 · 在线':e.status==='registered'?'已登记 · 等待心跳或已离线':e.status==='removed'?'服务器已移除':e.status==='expired'?'命令已过期':'等待服务器执行命令'} · ${e.expires?'命令截止 '+esc(new Date(e.expires*1000).toLocaleString()):'长期有效（可撤销）'}</p>${e.status==='removed'?'':e.status==='registered'?`<button class="btn small" data-enroll-monitor="${esc(e.id)}">硬件监控</button>`:`<button class="btn small danger" data-enroll-revoke="${esc(e.id)}">撤销命令</button>`}</article>`).join('')||'<p class="empty">暂无接入记录</p>';target.querySelectorAll('[data-enroll-monitor]').forEach(b=>b.onclick=()=>openHostMonitor(b.dataset.enrollMonitor));target.querySelectorAll('[data-enroll-revoke]').forEach(b=>b.onclick=async()=>{if(!(await confirmAction('撤销此接入令牌？将阻止新服务器使用此命令登记，已接入服务器继续运行。')))return;b.disabled=true;try{await api('/servers/agent/enroll?id='+encodeURIComponent(b.dataset.enrollRevoke),jsonOpt('DELETE',{}));await refresh()}catch(e){if(active())$('enrollError').textContent=e.message}finally{b.disabled=false}})};
  const refresh=async()=>{if(!active()||busy)return;busy=true;try{const d=await api('/servers/agent/enroll');if(active())draw(d.entries)}catch(e){if(active())$('enrollError').textContent=e.message}finally{busy=false}};
  draw(data.entries);$('enrollRefresh').onclick=refresh;
  const poll=()=>{setTimeout(async()=>{if(!active())return;await refresh();if(active())poll()},5000)};poll();
@@ -3467,24 +3476,24 @@ async function attachDetectedSingBox(button) {
 async function serverAttach(encoded, button) {
   button.disabled = true;
   try { const result = await api('/servers/attach', jsonOpt('POST', {id:decodeURIComponent(encoded)})); await servers(); notice(result.message); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
   finally { if (button.isConnected) button.disabled = false; }
 }
 
 async function serverTest(encoded, button) {
   button.disabled = true; button.textContent = '测试中…';
   try { const result = await api('/servers/test', jsonOpt('POST', {id:decodeURIComponent(encoded)})); notice(result.message); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
   finally { if (button.isConnected) { button.disabled = false; button.textContent = '测试 SSH'; } }
 }
 
 async function serverInstall(encoded) {
   const id = decodeURIComponent(encoded), s = S.servers.find(x => x.id === id);
-  if (!s || !confirm(`将在 ${s.host}:${s.sshPort} 上安装或更新 ${s.installType || '3x-ui'}。${panelType(s.installType) ? '面板账号设为 ' + s.panelUser + '。' : '将校验内核配置并重启服务；此操作不安装 Web 面板。'}${s.domain ? '绑定域名：'+s.domain : '使用无域名自动安装模式'}。确认执行？`)) return;
+  if (!s || !(await confirmAction(`将在 ${s.host}:${s.sshPort} 上安装或更新 ${s.installType || '3x-ui'}。${panelType(s.installType) ? '面板账号设为 ' + s.panelUser + '。' : '将校验内核配置并重启服务；此操作不安装 Web 面板。'}${s.domain ? '绑定域名：'+s.domain : '使用无域名自动安装模式'}。确认执行？`))) return;
   try {
     const result = await api('/servers/install', jsonOpt('POST', {id,confirmed:true}));
     await servers(); showServerJob(result.job.id);
-  } catch (error) { alert(error.message); }
+  } catch (error) { showMessage(error.message); }
 }
 
 async function showServerJob(jobId) {
@@ -3518,9 +3527,9 @@ async function serverDiagnose(encoded) {
 }
 
 async function serverRemove(encoded) {
-  if (!confirm('仅解除本总控对这台服务器的管理和订阅绑定？远端软件、节点、限速及其他总控的配置均保留。本总控将停止对此服务器计量和到期撤销；已导入的节点链接仍保留。')) return;
+  if (!(await confirmAction('仅解除本总控对这台服务器的管理和订阅绑定？远端软件、节点、限速及其他总控的配置均保留。本总控将停止对此服务器计量和到期撤销；已导入的节点链接仍保留。'))) return;
   try { await api('/servers', jsonOpt('DELETE',{id:decodeURIComponent(encoded),detach:true})); S.servers = S.servers.filter(s => s.id !== decodeURIComponent(encoded)); S.data = null; await loadProfiles(); await servers(); notice('已解除本总控管理，远端节点保持不变'); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
 }
 
 async function chooseNodeServer(action = 'browse') {
@@ -3862,7 +3871,7 @@ function rawPanelInboundForm(shadowsocks = false) {
       if(S.page==='serverNodes' && S.serverId===serverId)await serverNodes();
       notice('入站已创建，未自动绑定订阅；可从服务器列表查看链接');
     } catch(error) {
-      if(created)alert('入站已创建，但列表刷新失败，请刷新核对，勿重复创建。');
+      if(created)showMessage('入站已创建，但列表刷新失败，请刷新核对，勿重复创建。');
       else if(form.isConnected){errorBox.textContent=error.message;button.disabled=false;button.textContent=submitted?'重试核对':'创建入站';}
     }
   };
@@ -3975,10 +3984,10 @@ function remoteNodeForm(relay) {
       if(form.isConnected)closeModal(); S.remoteLoaded = false;
       if (S.page === 'serverNodes' && S.serverId === serverId) await serverNodes();
       if (relay && autoImport && data.bound!==true && data.shareLinks?.length && S.profile === profile) {
-        try { await importRemoteLinks(data.shareLinks, {serverId, inboundId:data.inbound.id}); } catch (error) { return alert('远端节点已创建，但订阅导入失败：'+error.message+'。请从“链接 / 导入”重试导入，不要重复创建。'); }
+        try { await importRemoteLinks(data.shareLinks, {serverId, inboundId:data.inbound.id}); } catch (error) { return showMessage('远端节点已创建，但订阅导入失败：'+error.message+'。请从“链接 / 导入”重试导入，不要重复创建。'); }
       }
       notice('远端'+(relay ? '中转' : '节点')+'已创建'+(autoImport && S.profile !== profile ? '；当前订阅已切换，未自动导入' : autoImport && !data.shareLinks?.length ? '；未返回兼容链接，请在远端面板核对后导入' : ''));
-    } catch (error) { if (created) alert('远端节点已创建，但刷新列表失败：'+error.message+'。请刷新确认，勿重复创建。'); else if (form.isConnected && $('remoteError')) { $('remoteError').textContent = error.message; $('rnSave').disabled = false; $('rnSave').textContent=submittedPayload?'重试核对':'重新创建'; } else alert(error.message); }
+    } catch (error) { if (created) showMessage('远端节点已创建，但刷新列表失败：'+error.message+'。请刷新确认，勿重复创建。'); else if (form.isConnected && $('remoteError')) { $('remoteError').textContent = error.message; $('rnSave').disabled = false; $('rnSave').textContent=submittedPayload?'重试核对':'重新创建'; } else showMessage(error.message); }
   };
 }
 
@@ -4075,9 +4084,9 @@ function openSniScanner(serverId,targetId) {
 
 
 async function deleteServerChain(encoded) {
-  if (!confirm('删除服务器中转入站、出站、路由和当前订阅中的生成节点？')) return;
+  if (!(await confirmAction('删除服务器中转入站、出站、路由和当前订阅中的生成节点？'))) return;
   try { await api('/server-chains', jsonOpt('DELETE', {name: decodeURIComponent(encoded)})); await reload(); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
 }
 
 
@@ -4153,9 +4162,9 @@ async function serverMetadataManager(id){
  const path='/servers/metadata?id='+encodeURIComponent(id),data=await api(path);
  openModal('服务器地域与续费',`<p class="note">手动记录服务器的地域、服务商、到期日和续费价格。不会自动扣费或续费；不同币种不自动换算。</p><form id="serverMetadataForm"><div class="grid"><div><label for="smRegion">地域</label><input id="smRegion" maxlength="80" value="${esc(data.region||'')}" placeholder="香港 / 日本东京"></div><div><label for="smProvider">服务商</label><input id="smProvider" maxlength="80" value="${esc(data.provider||'')}"></div></div><div class="grid"><div><label for="smLatitude">纬度（可选 -90～90）</label><input id="smLatitude" type="number" min="-90" max="90" step="any" value="${data.latitude==null?'':esc(data.latitude)}"></div><div><label for="smLongitude">经度（可选 -180～180）</label><input id="smLongitude" type="number" min="-180" max="180" step="any" value="${data.longitude==null?'':esc(data.longitude)}"></div></div><p class="hint">用于地球视图；两项同时填写或同时留空，不会自动查询 IP 位置。</p><label for="smURL">服务商网站（可选 HTTPS）</label><input id="smURL" type="url" value="${esc(data.providerURL||'')}"><div class="grid"><div><label for="smExpires">到期日期（UTC）</label><input id="smExpires" type="date" value="${esc(data.expires||'')}"></div><div><label for="smPrice">续费价格（可留空）</label><input id="smPrice" type="number" min="0" max="100000000" step="0.01" value="${data.price==null?'':esc(data.price)}"></div><div><label for="smCurrency">币种</label><select id="smCurrency">${['','CNY','USD','EUR','GBP','JPY','HKD','TWD','SGD','CAD','AUD'].map(v=>`<option value="${v}">${v||'未选择'}</option>`).join('')}</select></div><div><label for="smCycle">计费周期</label><select id="smCycle"><option value="">未选择</option><option value="month">每月</option><option value="quarter">每季度</option><option value="half-year">每半年</option><option value="year">每年</option><option value="one-time">一次性</option></select></div></div><label><input id="smPublic" type="checkbox" ${data.public?'checked':''}>在已启用的监控分享页/API 中公开这些信息</label><p class="hint">默认仅管理员可见；开启后经纬度也会公开。此开关不自动启用监控分享。</p><p id="smError" class="error"></p><div class="toolbar"><button class="btn primary" type="submit">保存</button><button class="btn" type="button" id="smRenew">我已续费 · 登记新到期日</button>${data.providerURL?`<a class="btn" href="${esc(data.providerURL)}" target="_blank" rel="noopener noreferrer">前往服务商</a>`:''}<button class="btn danger" type="button" id="smClear">清空</button></div></form>`);
  $('smCurrency').value=data.currency||'';$('smCycle').value=data.cycle||'';
- $('serverMetadataForm').onsubmit=async event=>{event.preventDefault();const payload={latitude:$('smLatitude').value===''?null:Number($('smLatitude').value),longitude:$('smLongitude').value===''?null:Number($('smLongitude').value),region:$('smRegion').value.trim(),provider:$('smProvider').value.trim(),providerURL:$('smURL').value.trim(),expires:$('smExpires').value,price:$('smPrice').value===''?null:Number($('smPrice').value),currency:$('smCurrency').value,cycle:$('smCycle').value,public:$('smPublic').checked};if(payload.public&&(!data.public||payload.latitude!==(data.latitude??null)||payload.longitude!==(data.longitude??null))&&!confirm('确认在监控分享中公开地域、经纬度、服务商、到期日期及价格？'))return;try{await api(path,jsonOpt('PUT',payload));if(S.servers){const server=S.servers.find(s=>s.id===id);if(server)server.metadata=payload}closeModal();notice('地域与续费信息已保存')}catch(e){$('smError').textContent=e.message}};
- $('smRenew').onclick=()=>{if(confirm('将按已保存的周期和到期日预览；当前未保存的表单修改不会计入。继续？'))serverRenewalManager(id).catch(e=>notice(e.message))};
- $('smClear').onclick=async()=>{if(!confirm('清空这台服务器的地域与续费信息？'))return;try{await api(path,jsonOpt('DELETE',{}));await serverMetadataManager(id)}catch(e){$('smError').textContent=e.message}};
+ $('serverMetadataForm').onsubmit=async event=>{event.preventDefault();const payload={latitude:$('smLatitude').value===''?null:Number($('smLatitude').value),longitude:$('smLongitude').value===''?null:Number($('smLongitude').value),region:$('smRegion').value.trim(),provider:$('smProvider').value.trim(),providerURL:$('smURL').value.trim(),expires:$('smExpires').value,price:$('smPrice').value===''?null:Number($('smPrice').value),currency:$('smCurrency').value,cycle:$('smCycle').value,public:$('smPublic').checked};if(payload.public&&(!data.public||payload.latitude!==(data.latitude??null)||payload.longitude!==(data.longitude??null))&&!(await confirmAction('确认在监控分享中公开地域、经纬度、服务商、到期日期及价格？')))return;try{await api(path,jsonOpt('PUT',payload));if(S.servers){const server=S.servers.find(s=>s.id===id);if(server)server.metadata=payload}closeModal();notice('地域与续费信息已保存')}catch(e){$('smError').textContent=e.message}};
+ $('smRenew').onclick=async ()=>{if((await confirmAction('将按已保存的周期和到期日预览；当前未保存的表单修改不会计入。继续？')))serverRenewalManager(id).catch(e=>notice(e.message))};
+ $('smClear').onclick=async()=>{if(!(await confirmAction('清空这台服务器的地域与续费信息？')))return;try{await api(path,jsonOpt('DELETE',{}));await serverMetadataManager(id)}catch(e){$('smError').textContent=e.message}};
 }
 
 
@@ -4166,23 +4175,23 @@ async function probeSync(){
  $('content').innerHTML=`<section class="panel"><h3>同步 Komari 探针服务器</h3><p class="note">先连接探针，再选择服务器接入。不需要重新填写 SSH 密码：原探针 Agent 将为本面板添加独立 SSH 公钥，核对主机指纹并验证连接后登记。原探针不受影响，两边可管理同一台服务器。</p><form id="probeConfig"><label for="psURL">探针地址</label><input id="psURL" type="url" required value="${esc(data.url||'https://monitor.mxioc.com')}" autocomplete="url"><label for="psKey">Komari 管理 API Key</label><input id="psKey" type="password" autocomplete="new-password" placeholder="${data.configured?'已加密保存，留空保留':'在 Komari 管理设置中获取'}"><p class="hint">API Key 加密保存在服务器，页面不回显。使用公网 HTTPS 地址；接口不跟随跳转。</p><button class="btn primary">保存并读取服务器</button></form></section><section class="panel"><div class="panel-head"><h3>探针服务器 · ${(data.clients||[]).length} 台</h3><button class="btn" id="psRefresh">刷新列表</button><button class="btn primary" id="psResyncAll" ${batchActive?'disabled':''}>重新同步已接入服务器</button></div><div class="probe-batch-actions"><div class="toolbar"><label for="psDefaultPort">默认 SSH 端口</label><input id="psDefaultPort" type="number" min="1" max="65535" value="22" style="width:100px"><button class="btn" id="psSelectAll" ${batchActive?'disabled':''}>全选未接入</button><button class="btn primary" id="psBatchSelected" ${batchActive?'disabled':''}>批量接入所选</button><button class="btn" id="psBatchAll" ${batchActive?'disabled':''}>一键接入全部未接入服务器</button></div><div class="toolbar probe-recovery-actions"><span class="hint">失败恢复</span><button class="btn" id="psBatchRetry" ${batchActive?'disabled':''}>批量重试失败 / 超时</button><button class="btn" id="psBatchRepair" ${batchActive?'disabled':''}>开启公钥登录并批量重试</button></div></div><div id="psBatchPanel" role="status"></div><p class="note">一次确认后，后台自动授权并核对结果，最多 200 台、同时最多 3 台等待验证；关闭网页仍继续。关联服务器的硬件与历史数据直接读取 Komari，不重复 SSH 采样。自动识别 sshd 实际端口，IPv4 不通时尝试 IPv6；NAT 映射端口可手动填写。</p><p class="hint">接入要求：Linux、root 或免密码 sudo 权限 Agent、允许 root 公钥登录的 SSH，以及本面板能连接其公网 SSH 端口。接入仅增加密钥，不安装代理内核、不修改已有节点、不重启服务器。请避免两边同时修改同一份服务配置。</p><div class="tablewrap"><table><thead><tr><th>选择</th><th>服务器</th><th>地址</th><th>状态</th><th>操作</th></tr></thead><tbody>${(data.clients||[]).map(c=>{const b=bindings.get(c.uuid);return `<tr><td><input type="checkbox" data-ps-select="${esc(c.uuid)}" aria-label="选择 ${esc(c.name)}" ${b||batchActive?'disabled':''}></td><td>${esc(c.name)}<br><small>${esc(c.os||'')} · ${esc(c.region||'')}</small></td><td>${esc(c.ipv4||c.ipv6||'暂无公网地址')}${b?.host?`<br><small>本面板：${esc(b.host)}:${b.port}</small>`:''}${b?.synced?`<br><small>同步于 ${esc(new Date(b.synced*1000).toLocaleString())}</small>`:''}</td><td>${b?esc(labels[b.status]||b.status):'尚未接入'}${b?.error?`<p class="error">${esc(b.error)}</p>`:''}${b?.keyFingerprint?`<details><summary>授权密钥指纹</summary><small>${esc(b.keyFingerprint)}</small></details>`:''}</td><td>${b?.status==='bound'?`<button class="btn" data-ps-open="${esc(b.serverId)}">管理服务器</button><button class="btn" data-ps-resync="${esc(c.uuid)}" ${batchActive?'disabled':''}>重新同步 IP</button>`:b?`${b.status==='failed'?`<button class="btn" data-ps-retry="${esc(c.uuid)}">使用新版重试</button><button class="btn" data-ps-repair="${esc(c.uuid)}" ${batchActive?'disabled':''}>启用公钥登录并重试</button>`:!b.task?`<button class="btn" data-ps-recover="${esc(c.uuid)}">自动找回授权任务</button>`:''}<button class="btn" data-ps-check="${esc(c.uuid)}" ${b.task?'':'disabled'}>核对接入结果</button><button class="btn" data-ps-address="${esc(c.uuid)}" ${batchActive?'disabled':''}>修改公网 SSH 地址/端口</button>`:`<input type="number" data-ps-port="${esc(c.uuid)}" min="1" max="65535" placeholder="默认端口" aria-label="${esc(c.name)} SSH 端口" style="width:100px"><button class="btn primary" data-ps-bind="${esc(c.uuid)}" ${batchActive?'disabled':''}>授权并接入</button>`}</td></tr>`}).join('')||'<tr><td colspan="5">保存探针连接后显示服务器，无需重复手动绑定。</td></tr>'}</tbody></table></div><p id="psError" class="error" role="alert">${esc(data.connectionError||'')}</p><p class="hint">删除本面板服务器记录不会撤销远端公钥；需要停用访问时，请从远端 /root/.ssh/authorized_keys 删除标记 mx-panel-probe-sync 的对应公钥。接入失败的任务不会自动重发，可在原探针核对原因。</p></section>`;
 
  const batchNames=new Map((data.clients||[]).map(c=>[c.uuid,c.name]));
- const renderBatch=batch=>{const el=$('psBatchPanel');if(!el)return;const names={running:'批量接入中',completed:'全部接入完成',partial:'已结束，部分服务器需核对',stopped:'已停止后续操作',queued:'排队中',starting:'正在授权',waiting:'等待结果并验证',bound:'已接入',failed:'失败 / 超时',unknown:'结果待核对'};el.innerHTML=batch?`<p><strong>${esc(names[batch.status]||batch.status)}</strong> · 已接入 ${batch.items.filter(i=>i.status==='bound').length} / ${batch.items.length} 台 ${batch.status==='running'?'<button class="btn danger" id="psBatchStop">停止后续接入</button>':''}</p><details><summary>查看每台进度与失败原因</summary>${batch.items.map(i=>`<p>${esc(batchNames.get(i.uuid)||i.uuid)} · ${esc(names[i.status]||i.status)} ${esc(i.error||'')}</p>`).join('')}</details>`:'';if($('psBatchStop'))$('psBatchStop').onclick=async()=>{if(!confirm('停止后续派发与自动核对？已发送的远端授权任务仍可能完成。'))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'stop',id:batch.id,confirmed:true}));await probeSync()}catch(e){notice(e.message)}}};
+ const renderBatch=batch=>{const el=$('psBatchPanel');if(!el)return;const names={running:'批量接入中',completed:'全部接入完成',partial:'已结束，部分服务器需核对',stopped:'已停止后续操作',queued:'排队中',starting:'正在授权',waiting:'等待结果并验证',bound:'已接入',failed:'失败 / 超时',unknown:'结果待核对'};el.innerHTML=batch?`<p><strong>${esc(names[batch.status]||batch.status)}</strong> · 已接入 ${batch.items.filter(i=>i.status==='bound').length} / ${batch.items.length} 台 ${batch.status==='running'?'<button class="btn danger" id="psBatchStop">停止后续接入</button>':''}</p><details><summary>查看每台进度与失败原因</summary>${batch.items.map(i=>`<p>${esc(batchNames.get(i.uuid)||i.uuid)} · ${esc(names[i.status]||i.status)} ${esc(i.error||'')}</p>`).join('')}</details>`:'';if($('psBatchStop'))$('psBatchStop').onclick=async()=>{if(!(await confirmAction('停止后续派发与自动核对？已发送的远端授权任务仍可能完成。')))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'stop',id:batch.id,confirmed:true}));await probeSync()}catch(e){notice(e.message)}}};
  renderBatch(data.batch);
- const retryBatch=async repairSSH=>{if(!confirm(repairSSH?'允许对失败服务器开启 SSH 公钥登录并批量重试？备份配置、校验后重载 SSH，保留密码登录，不解除 root 禁止策略。已授权服务器只核对连接。':'批量重试已确认失败的任务，并核对超时服务器？自动识别 SSH 端口、尝试 IPv6，不更改 SSH 配置。未知任务不会重复派发。'))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'retry',confirmed:true,repairSSH}));await probeSync()}catch(e){notice(e.message)}};
+ const retryBatch=async repairSSH=>{if(!(await confirmAction(repairSSH?'允许对失败服务器开启 SSH 公钥登录并批量重试？备份配置、校验后重载 SSH，保留密码登录，不解除 root 禁止策略。已授权服务器只核对连接。':'批量重试已确认失败的任务，并核对超时服务器？自动识别 SSH 端口、尝试 IPv6，不更改 SSH 配置。未知任务不会重复派发。')))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'retry',confirmed:true,repairSSH}));await probeSync()}catch(e){notice(e.message)}};
  $('psBatchRetry').onclick=()=>void retryBatch(false);$('psBatchRepair').onclick=()=>void retryBatch(true);
 
- const startBatch=async all=>{const selected=[...document.querySelectorAll('[data-ps-select]')].filter(el=>!el.disabled&&(all||el.checked));const defaultPort=Number($('psDefaultPort').value),ports=new Map([...document.querySelectorAll('[data-ps-port]')].map(el=>[el.dataset.psPort,el.value]));const items=selected.map(el=>({uuid:el.dataset.psSelect,port:Number(ports.get(el.dataset.psSelect)||defaultPort)}));if(!items.length||items.length>200||items.some(i=>!Number.isInteger(i.port)||i.port<1||i.port>65535)){notice('请选择 1–200 台服务器并填写有效 SSH 端口');return}if(!confirm('确认批量授权并接入 '+items.length+' 台服务器？每台使用独立 root SSH 公钥，保留原探针；硬件和历史监控复用探针数据。'))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'start',items,confirmed:true}));await probeSync()}catch(e){if($('psError'))$('psError').textContent=e.message}};
+ const startBatch=async all=>{const selected=[...document.querySelectorAll('[data-ps-select]')].filter(el=>!el.disabled&&(all||el.checked));const defaultPort=Number($('psDefaultPort').value),ports=new Map([...document.querySelectorAll('[data-ps-port]')].map(el=>[el.dataset.psPort,el.value]));const items=selected.map(el=>({uuid:el.dataset.psSelect,port:Number(ports.get(el.dataset.psSelect)||defaultPort)}));if(!items.length||items.length>200||items.some(i=>!Number.isInteger(i.port)||i.port<1||i.port>65535)){notice('请选择 1–200 台服务器并填写有效 SSH 端口');return}if(!(await confirmAction('确认批量授权并接入 '+items.length+' 台服务器？每台使用独立 root SSH 公钥，保留原探针；硬件和历史监控复用探针数据。')))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'start',items,confirmed:true}));await probeSync()}catch(e){if($('psError'))$('psError').textContent=e.message}};
  $('psSelectAll').onclick=()=>document.querySelectorAll('[data-ps-select]:not(:disabled)').forEach(el=>el.checked=true);$('psBatchSelected').onclick=()=>void startBatch(false);$('psBatchAll').onclick=()=>void startBatch(true);
  if(batchActive){$('probeConfig').querySelectorAll('input,button').forEach(el=>el.disabled=true);const el=$('psBatchPanel');const poll=async()=>{if(S.page!=='probeSync'||!el.isConnected)return;try{if(!document.hidden){const res=await api('/probe-sync/batch');if(!el.isConnected)return;renderBatch(res.batch);if(res.batch?.status!=='running'){await probeSync();return}}}catch(e){if($('psError'))$('psError').textContent=e.message}if(el.isConnected)S.probeBatchTimer=setTimeout(poll,5000)};S.probeBatchTimer=setTimeout(poll,5000)}
 
  const run=async body=>{const el=$('psError');document.querySelectorAll('#content button').forEach(b=>b.disabled=true);try{await api('/probe-sync',jsonOpt('POST',body));if(S.page==='probeSync')await probeSync()}catch(e){if(el.isConnected){el.textContent=e.message;document.querySelectorAll('#content button').forEach(b=>b.disabled=false)}}};
- $('psResyncAll').onclick=async()=>{if(!confirm('从原探针重新读取所有已接入服务器的 IP？验证原主机指纹和密钥后更新管理地址；保留节点、订阅与授权，不重复安装。'))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'resync',confirmed:true}));await probeSync()}catch(e){notice(e.message)}};
- document.querySelectorAll('[data-ps-resync]').forEach(b=>b.onclick=()=>{if(confirm('从探针重新同步此服务器的管理 IP？必须通过原主机指纹与密钥验证，失败保留旧地址。'))void run({action:'resync',uuid:b.dataset.psResync,confirmed:true})});
+ $('psResyncAll').onclick=async()=>{if(!(await confirmAction('从原探针重新读取所有已接入服务器的 IP？验证原主机指纹和密钥后更新管理地址；保留节点、订阅与授权，不重复安装。')))return;try{await api('/probe-sync/batch',jsonOpt('POST',{action:'resync',confirmed:true}));await probeSync()}catch(e){notice(e.message)}};
+ document.querySelectorAll('[data-ps-resync]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('从探针重新同步此服务器的管理 IP？必须通过原主机指纹与密钥验证，失败保留旧地址。')))void run({action:'resync',uuid:b.dataset.psResync,confirmed:true})});
  $('probeConfig').onsubmit=e=>{e.preventDefault();void run({action:'configure',url:$('psURL').value,key:$('psKey').value})};$('psRefresh').onclick=()=>probeSync().catch(e=>notice(e.message));
- document.querySelectorAll('[data-ps-bind]').forEach(b=>b.onclick=()=>{const port=prompt('此服务器的 SSH 端口','22');if(port===null)return;if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535){notice('请输入 1–65535 的 SSH 端口');return}if(confirm('允许原探针 Agent 为 Mx-Panel 添加独立 root SSH 公钥？这将授权本面板管理此服务器，保留原探针。'))void run({action:'bind',uuid:b.dataset.psBind,port:Number(port),confirmed:true})});
- document.querySelectorAll('[data-ps-retry]').forEach(b=>b.onclick=()=>{if(confirm('使用新版脚本重试？自动识别 SSH 端口并支持免密码 sudo，复用原公钥，不更改 SSH 登录策略。'))void run({action:'retry',uuid:b.dataset.psRetry,confirmed:true})});document.querySelectorAll('[data-ps-recover]').forEach(b=>b.onclick=()=>{if(confirm('从原探针任务记录查找相同服务器与公钥的授权任务？不会重新发送授权。'))void run({action:'recover',uuid:b.dataset.psRecover,confirmed:true})});
- document.querySelectorAll('[data-ps-repair]').forEach(b=>b.onclick=()=>{if(confirm('允许为此服务器开启 SSH 公钥登录？会备份 sshd_config，仅添加 PubkeyAuthentication yes 并校验、重载 SSH；保留密码登录，不放开被禁止的 root 登录。之后复用原公钥重试。'))void run({action:'retry',uuid:b.dataset.psRepair,confirmed:true,repairSSH:true})});
- document.querySelectorAll('[data-ps-address]').forEach(b=>b.onclick=()=>{const row=bindings.get(b.dataset.psAddress);const host=prompt('公网 SSH 地址（IPv4 或 IPv6；NAT 请输入映射地址）',row.host||'');if(host===null)return;const port=prompt('公网 SSH 端口',String(row.port||22));if(port===null)return;void run({action:'connection',uuid:b.dataset.psAddress,host,port:Number(port),confirmed:true})});
+ document.querySelectorAll('[data-ps-bind]').forEach(b=>b.onclick=async ()=>{const port=(await promptAction('此服务器的 SSH 端口','22'));if(port===null)return;if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535){notice('请输入 1–65535 的 SSH 端口');return}if((await confirmAction('允许原探针 Agent 为 Mx-Panel 添加独立 root SSH 公钥？这将授权本面板管理此服务器，保留原探针。')))void run({action:'bind',uuid:b.dataset.psBind,port:Number(port),confirmed:true})});
+ document.querySelectorAll('[data-ps-retry]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('使用新版脚本重试？自动识别 SSH 端口并支持免密码 sudo，复用原公钥，不更改 SSH 登录策略。')))void run({action:'retry',uuid:b.dataset.psRetry,confirmed:true})});document.querySelectorAll('[data-ps-recover]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('从原探针任务记录查找相同服务器与公钥的授权任务？不会重新发送授权。')))void run({action:'recover',uuid:b.dataset.psRecover,confirmed:true})});
+ document.querySelectorAll('[data-ps-repair]').forEach(b=>b.onclick=async ()=>{if((await confirmAction('允许为此服务器开启 SSH 公钥登录？会备份 sshd_config，仅添加 PubkeyAuthentication yes 并校验、重载 SSH；保留密码登录，不放开被禁止的 root 登录。之后复用原公钥重试。')))void run({action:'retry',uuid:b.dataset.psRepair,confirmed:true,repairSSH:true})});
+ document.querySelectorAll('[data-ps-address]').forEach(b=>b.onclick=async ()=>{const row=bindings.get(b.dataset.psAddress);const host=(await promptAction('公网 SSH 地址（IPv4 或 IPv6；NAT 请输入映射地址）',row.host||''));if(host===null)return;const port=(await promptAction('公网 SSH 端口',String(row.port||22)));if(port===null)return;void run({action:'connection',uuid:b.dataset.psAddress,host,port:Number(port),confirmed:true})});
  document.querySelectorAll('[data-ps-check]').forEach(b=>b.onclick=()=>void run({action:'check',uuid:b.dataset.psCheck}));document.querySelectorAll('[data-ps-open]').forEach(b=>b.onclick=()=>{S.serverId=b.dataset.psOpen;go('servers').catch(e=>notice(e.message))});
 }
 
@@ -4194,8 +4203,8 @@ async function render_agentRolloutManager(){
  if(S.page!=='agentRolloutManager' || S.managerEpoch!==managerTicket || S.profile!==managerProfile || S.modalEpoch!==managerModalEpoch)return;
  openManagerView('agentRolloutManager','Agent 分批升级',`<p class="note">目标固定为 Agent v0.1.35，保留远端配置。每次只升级一台，首台收到升级后的新上报后暂停，确认验收才继续其余服务器。失败或 3 分钟未收到新上报即停止；面板重启不会自动续跑。</p><p class="hint">支持标准 systemd Agent 的 auto/websocket/http/pull 模式，所有所选 Agent 须最近 90 秒有有效采样。Pull 请先打开服务器监控刷新；批次执行中由后台拉取当前服务器状态，不需要一直打开网页。短暂中断 Agent 采样，不重启代理节点。停止后续派发不会强杀正在运行的远端任务。</p><p><strong>${esc(labels[state.status]||state.status)}</strong> · ${esc(state.message||'')}</p><div class="tablewrap"><table><thead><tr><th>顺序</th><th>服务器</th><th>状态</th><th>任务</th></tr></thead><tbody>${(state.items||[]).map((v,i)=>`<tr><td>${i+1}${i===0?' · 首台':''}</td><td>${esc(v.name)}</td><td>${esc(labels[v.status]||v.status)}</td><td>${v.job?`<button class="btn small" data-rollout-job="${i}">查看任务</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="4">尚未选择服务器</td></tr>'}</tbody></table></div><div class="toolbar" style="margin:16px 0"><button class="btn" id="arRefresh">刷新批次</button><button class="btn primary" id="arContinue" ${state.status==='canary'?'':'disabled'}>首台验收通过，继续剩余服务器</button><button class="btn danger" id="arStop" ${active?'':'disabled'}>停止后续派发</button></div>${active?'':`<form id="arForm"><label for="arFirst">选择首台验证服务器</label><select id="arFirst">${(servers.servers||[]).filter(v=>!v.agentOnly).map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}</select><p class="hint">首台将自动纳入；以下勾选后续服务器，按列表顺序执行。最多 20 台，重复选择首台会自动去重。</p><div class="grid">${(servers.servers||[]).filter(v=>!v.agentOnly).map(v=>`<label class="check"><input type="checkbox" data-ar-server="${esc(v.id)}">${esc(v.name)}</label>`).join('')}</div><button class="btn primary" type="submit" style="margin-top:16px">创建升级批次</button></form>`}<p id="arError" class="error" role="alert"></p><p class="hint">本验证核对固定发布包、完成后的新上报与目标版本；版本为已认证 Agent 自报，不是远程硬件证明或长期稳定性验收。请在首台阶段检查实际业务。仅保留最近一个批次，独立安装任务另有记录。</p>`);
  const marker=$('arError');const action=async(payload)=>{document.querySelectorAll('#content[data-page="agentRolloutManager"] button').forEach(b=>b.disabled=true);try{await api('/servers/agent/rollout',jsonOpt('POST',{...payload,confirmed:true}));if(marker.isConnected)await agentRolloutManager()}catch(e){if(marker.isConnected){marker.textContent=e.message;$('arRefresh').disabled=false}}};
- $('arRefresh').onclick=()=>agentRolloutManager().catch(e=>notice(e.message));$('arContinue').onclick=()=>{if(confirm('已核对首台 Agent 新采样和业务正常，允许继续逐台升级其余服务器？'))void action({action:'continue',id:state.id})};$('arStop').onclick=()=>{if(confirm('停止后续派发？当前远端任务仍会执行，请另行检查其结果。'))void action({action:'stop',id:state.id})};
- if($('arForm'))$('arForm').onsubmit=e=>{e.preventDefault();const ids=[...new Set([$ ('arFirst').value,...[...document.querySelectorAll('[data-ar-server]:checked')].map(e=>e.dataset.arServer)])].filter(Boolean);if(ids.length<1||ids.length>20){marker.textContent='请选择 1–20 台服务器';return}if(confirm('确认按所选顺序通过 SSH 升级 '+ids.length+' 台 Agent？首台完成验证后将暂停等待验收。'))void action({action:'start',ids})};
+ $('arRefresh').onclick=()=>agentRolloutManager().catch(e=>notice(e.message));$('arContinue').onclick=async ()=>{if((await confirmAction('已核对首台 Agent 新采样和业务正常，允许继续逐台升级其余服务器？')))void action({action:'continue',id:state.id})};$('arStop').onclick=async ()=>{if((await confirmAction('停止后续派发？当前远端任务仍会执行，请另行检查其结果。')))void action({action:'stop',id:state.id})};
+ if($('arForm'))$('arForm').onsubmit=async e=>{e.preventDefault();const ids=[...new Set([$ ('arFirst').value,...[...document.querySelectorAll('[data-ar-server]:checked')].map(e=>e.dataset.arServer)])].filter(Boolean);if(ids.length<1||ids.length>20){marker.textContent='请选择 1–20 台服务器';return}if((await confirmAction('确认按所选顺序通过 SSH 升级 '+ids.length+' 台 Agent？首台完成验证后将暂停等待验收。')))void action({action:'start',ids})};
  document.querySelectorAll('[data-rollout-job]').forEach(b=>b.onclick=()=>{const item=state.items[Number(b.dataset.rolloutJob)];agentDeployStatus(item.id,item.job).catch(e=>notice(e.message))});
 }
 
@@ -4203,15 +4212,15 @@ async function agentManager(id){
  const path='/servers/agent?id='+encodeURIComponent(id),data=await api(path);
  openModal('Agent 采样与管理',`<p class="note">Agent 提供资源采样和本机授权的服务配置管理。节点创建与部署仍可使用现有 SSH 管理。支持 WebSocket、HTTP 上报和 HTTPS Pull；自动模式先尝试 WebSocket，连接失败后使用 HTTP，并定期重试 WebSocket。启用 Agent 后监控改用 Agent 数据；撤销后只有已配置 SSH 的服务器才可恢复 SSH 采样。</p><p>运行版本：${esc(data.version||'未知（旧版 Agent 或尚未上报）')}</p><p>状态：${data.enabled?(data.connected?'已连接 · '+esc(data.mode):'等待 Agent / 数据过期'):'未启用'}${data.lastSeen?' · '+esc(new Date(data.lastSeen*1000).toLocaleString()):''}</p><label for="agentMode">连接模式</label><select id="agentMode"><option value="auto">自动（WebSocket → HTTP）</option><option value="websocket">仅 WebSocket</option><option value="http">仅 HTTP 上报</option><option value="pull">HTTPS Pull</option></select><label for="agentPullURL">Pull 地址（仅 Pull 模式填写）</label><input id="agentPullURL" value="${esc(data.pullURL||'')}" placeholder="https://已登记主机:62579/metrics"><p class="hint">Pull 必须提供受信任 TLS 证书，域名须与服务器登记主机一致。上报模式无需远端开放端口。</p><details><summary>授权 Agent 管理一个服务（可选）</summary><p class="hint">授权会写入下载的配置，需要安装到远端后才生效。已有自定义 targets 请自行保留；重新生成配置会替换此表单中的授权。</p><label for="agentTargetKind">服务类型</label><select id="agentTargetKind"><option value="">仅监控</option><option value="xray">Xray</option><option value="sing-box">sing-box</option><option value="nginx">Nginx</option></select><div id="agentTargetFields" class="hidden"><label for="agentTargetConfig">远端配置绝对路径</label><input id="agentTargetConfig"><label for="agentTargetBinary">远端程序绝对路径</label><input id="agentTargetBinary"><label for="agentTargetService">systemd 服务名称</label><input id="agentTargetService"><label><input type="checkbox" id="agentTargetWritable">允许应用配置、回滚和重启</label></div></details><details><summary>TCP / ICMP 探测目标（可选）</summary><p class="hint">从远端 Agent 发起 TCP 建连或 ICMP Echo，约每 30 秒一次。仅允许公网目标；ICMP 需要远端原始套接字权限。此功能不做三网回程分析。目标名称可能展示到监控分享页，请勿填写私密信息。</p>${[0,1,2].map(i=>`<div class="grid"><div><label for="apName${i}">目标名称</label><input id="apName${i}" maxlength="40" placeholder="例如：自有香港服务"></div><div><label for="apHost${i}">公网主机</label><input id="apHost${i}" placeholder="example.com"></div><div><label for="apMethod${i}">探测方式</label><select id="apMethod${i}" onchange="document.getElementById('apPort${i}').disabled=this.value==='icmp'"><option value="tcp">TCP</option><option value="icmp">ICMP Echo</option></select><label for="apPort${i}">TCP 端口</label><input id="apPort${i}" type="number" min="1" max="65535" value="443"></div></div>`).join('')}</details><p id="agentError" class="error"></p><div class="toolbar"><button class="btn primary" id="agentGenerate">${data.enabled?'轮换凭据并生成配置':'启用并生成配置'}</button><button class="btn danger" id="agentRevoke" ${data.enabled?'':'disabled'}>撤销 Agent</button><button class="btn" id="agentRefresh">刷新状态</button><button class="btn" id="agentUpgrade" ${data.enabled?'':'disabled'}>保留配置升级 Agent</button><button class="btn" id="agentDeployStatus" ${data.deployJob?'':'disabled'}>部署任务</button><button class="btn" id="agentControlOpen" ${data.enabled?'':'disabled'}>服务配置管理</button></div>`);
  $('agentTargetKind').onchange=()=>{const kind=$('agentTargetKind').value;$('agentTargetFields').classList.toggle('hidden',!kind);const defaults={xray:['/usr/local/etc/xray/config.json','/usr/local/bin/xray','xray'],'sing-box':['/etc/sing-box/config.json','/usr/local/bin/sing-box','sing-box'],nginx:['/etc/nginx/nginx.conf','/usr/sbin/nginx','nginx']}[kind]||['','',''];['agentTargetConfig','agentTargetBinary','agentTargetService'].forEach((key,i)=>$(key).value=defaults[i]);};
- $('agentDeployStatus').onclick=()=>agentDeployStatus(id,data.deployJob).catch(e=>notice(e.message));$('agentControlOpen').onclick=()=>agentControlManager(id).catch(e=>notice(e.message)); $('agentUpgrade').onclick=async()=>{if(!confirm('将通过 SSH 升级为固定校验的 Agent v0.1.35，保留远端配置与服务文件，仅短暂重启 Agent；不会重启代理节点。仅适用于标准 systemd 安装。继续？'))return;const button=$('agentUpgrade');button.disabled=true;try{const result=await api('/servers/agent/upgrade',jsonOpt('POST',{id,confirmed:true}));await agentDeployStatus(id,result.job.id)}catch(e){notice(e.message);if(button.isConnected)button.disabled=false}};
+ $('agentDeployStatus').onclick=()=>agentDeployStatus(id,data.deployJob).catch(e=>notice(e.message));$('agentControlOpen').onclick=()=>agentControlManager(id).catch(e=>notice(e.message)); $('agentUpgrade').onclick=async()=>{if(!(await confirmAction('将通过 SSH 升级为固定校验的 Agent v0.1.35，保留远端配置与服务文件，仅短暂重启 Agent；不会重启代理节点。仅适用于标准 systemd 安装。继续？')))return;const button=$('agentUpgrade');button.disabled=true;try{const result=await api('/servers/agent/upgrade',jsonOpt('POST',{id,confirmed:true}));await agentDeployStatus(id,result.job.id)}catch(e){notice(e.message);if(button.isConnected)button.disabled=false}};
 if(data.agentOnly){$('agentUpgrade').disabled=true;$('agentUpgrade').title='未配置 SSH，请在服务器本机升级 Agent';}
 $('agentMode').value=data.configuredMode||'auto';$('agentRefresh').onclick=()=>agentManager(id).catch(e=>notice(e.message));
- $('agentRevoke').onclick=async()=>{if(!confirm('撤销 Agent 凭据？远端服务需自行停止；免 SSH 接入的服务器撤销后将停止监控。'))return;try{await api(path,jsonOpt('DELETE',{}));await agentManager(id)}catch(e){$('agentError').textContent=e.message}};
- $('agentGenerate').onclick=async()=>{if(data.enabled&&!confirm('新凭据会使旧 Agent 失效，请及时更新远端配置。继续？'))return;const mode=$('agentMode').value;try{const probes=[0,1,2].map(i=>({name:$('apName'+i).value.trim(),host:$('apHost'+i).value.trim(),port:Number($('apPort'+i).value),method:$('apMethod'+i).value})).filter(t=>t.name||t.host);if(probes.some(t=>!t.name||!t.host||(t.method!=='icmp'&&(!Number.isInteger(t.port)||t.port<1||t.port>65535))))throw Error('请填写完整探测名称、主机和有效端口');const r=await api(path,jsonOpt('POST',{mode,url:$('agentPullURL').value}));const config={url:location.origin+r.path,token:r.token,mode};if(probes.length)config.probes=probes;const kind=$('agentTargetKind').value;if(kind){config.targets={[kind]:{kind,config:$('agentTargetConfig').value.trim(),binary:$('agentTargetBinary').value.trim(),service:$('agentTargetService').value.trim(),writable:$('agentTargetWritable').checked}};config.stateDir='/var/lib/mxioc-agent'}if(mode==='pull'){config.listen='0.0.0.0:62579';config.certificate='/etc/mxioc-agent/fullchain.pem';config.key='/etc/mxioc-agent/privkey.pem'}
+ $('agentRevoke').onclick=async()=>{if(!(await confirmAction('撤销 Agent 凭据？远端服务需自行停止；免 SSH 接入的服务器撤销后将停止监控。')))return;try{await api(path,jsonOpt('DELETE',{}));await agentManager(id)}catch(e){$('agentError').textContent=e.message}};
+ $('agentGenerate').onclick=async()=>{if(data.enabled&&!(await confirmAction('新凭据会使旧 Agent 失效，请及时更新远端配置。继续？')))return;const mode=$('agentMode').value;try{const probes=[0,1,2].map(i=>({name:$('apName'+i).value.trim(),host:$('apHost'+i).value.trim(),port:Number($('apPort'+i).value),method:$('apMethod'+i).value})).filter(t=>t.name||t.host);if(probes.some(t=>!t.name||!t.host||(t.method!=='icmp'&&(!Number.isInteger(t.port)||t.port<1||t.port>65535))))throw Error('请填写完整探测名称、主机和有效端口');const r=await api(path,jsonOpt('POST',{mode,url:$('agentPullURL').value}));const config={url:location.origin+r.path,token:r.token,mode};if(probes.length)config.probes=probes;const kind=$('agentTargetKind').value;if(kind){config.targets={[kind]:{kind,config:$('agentTargetConfig').value.trim(),binary:$('agentTargetBinary').value.trim(),service:$('agentTargetService').value.trim(),writable:$('agentTargetWritable').checked}};config.stateDir='/var/lib/mxioc-agent'}if(mode==='pull'){config.listen='0.0.0.0:62579';config.certificate='/etc/mxioc-agent/fullchain.pem';config.key='/etc/mxioc-agent/privkey.pem'}
  openModal('安装 Agent',`<p class="note">凭据仅显示一次。下载配置后保存为远端 /etc/mxioc-agent.json，并设置权限 0600。不要把此配置发给他人。</p><div class="toolbar"><button class="btn primary" id="deployAgentConfig">通过 SSH 自动安装</button><button class="btn" id="downloadAgentConfig">下载 Agent 配置</button><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/Angasky/Mx-Panel/releases">下载对应架构 Agent 发布包</a></div><p>在目标 Linux 服务器解压 <code>mxioc-agent-版本-linux-架构.tar.gz</code>，校验 SHA256 后执行：</p><pre>sudo chmod 600 /etc/mxioc-agent.json
 sudo bash install-agent.sh</pre><p>也可以在保存配置后使用一键安装：</p><pre>curl -fsSL https://raw.githubusercontent.com/Angasky/Mx-Panel/main/deploy/quick-install-agent.sh -o /tmp/mx-agent-install.sh &amp;&amp; sudo bash /tmp/mx-agent-install.sh</pre><p class="hint">${mode==='pull'?'Pull 模式还需先部署有效证书及私钥，并开放指定 HTTPS 端口。':'上报地址使用面板当前 HTTPS 域名，目标服务器须能访问该域名。'} 安装后回到“Agent 接入”刷新状态，再按需启用历史采样。</p><button class="btn" id="agentDone">已保存，返回状态</button>`);
  if(data.agentOnly){$('deployAgentConfig').disabled=true;$('deployAgentConfig').title='此服务器未配置 SSH，请下载配置并在服务器本机安装';}
- $('deployAgentConfig').onclick=async()=>{if(!confirm('通过已登记的 SSH 连接安装 Agent，并替换远端 Agent 配置？配置内勾选的服务权限也会生效。'))return;const button=$('deployAgentConfig');button.disabled=true;try{const result=await api('/servers/agent/deploy',jsonOpt('POST',{id,confirmed:true,config}));await agentDeployStatus(id,result.job.id)}catch(e){notice(e.message);if(button.isConnected)button.disabled=false}};
+ $('deployAgentConfig').onclick=async()=>{if(!(await confirmAction('通过已登记的 SSH 连接安装 Agent，并替换远端 Agent 配置？配置内勾选的服务权限也会生效。')))return;const button=$('deployAgentConfig');button.disabled=true;try{const result=await api('/servers/agent/deploy',jsonOpt('POST',{id,confirmed:true,config}));await agentDeployStatus(id,result.job.id)}catch(e){notice(e.message);if(button.isConnected)button.disabled=false}};
  $('downloadAgentConfig').onclick=()=>{const blob=new Blob([JSON.stringify(config,null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mxioc-agent.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('agentDone').onclick=()=>agentManager(id).catch(e=>notice(e.message));
  }catch(e){if($('agentError'))$('agentError').textContent=e.message}};
 }
@@ -4230,7 +4239,7 @@ async function agentControlManager(id){
  const render=task=>{if(!modal.isConnected)return;waiting=task.status==='pending';modal.disabled=waiting;$('acTarget').disabled=waiting;document.querySelectorAll('[data-ac]').forEach(b=>b.disabled=waiting||!state.targets?.length);$('acStatus').textContent=task.status==='pending'?'任务已排队，等待 Agent 执行…':task.status==='expired'?'任务已超时；结果未确认，请重新读取配置和状态。':task.result?(task.result.ok?'操作完成'+(task.result.state?' · '+task.result.state:''):'操作失败'):'';if(task.result){$('acError').textContent=task.result.error||'';if(task.result.ok&&task.action==='read'){$('acTarget').value=task.target;modal.value=task.result.content;revision=task.result.revision;loadedTarget=task.target}else if(task.result.ok&&task.action==='rollback'){modal.value='';revision='';loadedTarget='';$('acStatus').textContent='恢复完成，请重新读取配置。'}else if(task.result.ok&&task.result.revision&&loadedTarget===task.target){revision=task.result.revision}else if(!task.result.ok){revision='';loadedTarget=''}}};
  const refresh=async()=>{try{const task=await api(path);render(task);if(waiting&&modal.isConnected)setTimeout(refresh,1500)}catch(e){if(modal.isConnected)$('acError').textContent=e.message}};
  $('acRefresh').onclick=refresh;$('acTarget').onchange=()=>{revision='';loadedTarget='';modal.value=''};
- document.querySelectorAll('[data-ac]').forEach(button=>button.onclick=async()=>{const action=button.dataset.ac,target=$('acTarget').value;try{if(['apply','rollback'].includes(action)&&(!revision||loadedTarget!==target))throw Error('请先读取当前服务的配置');if(['apply','rollback','restart','start','stop','reload'].includes(action)&&!confirm('确认对 '+target+' 执行此操作？可能短暂中断现有连接。'))return;const command={target,action,revision:loadedTarget===target?revision:'',content:['apply','validate'].includes(action)?modal.value:''};$('acError').textContent='';document.querySelectorAll('[data-ac]').forEach(b=>b.disabled=true);render(await api(path,jsonOpt('POST',command)));if(waiting)setTimeout(refresh,1000)}catch(e){$('acError').textContent=e.message;document.querySelectorAll('[data-ac]').forEach(b=>b.disabled=false)}});
+ document.querySelectorAll('[data-ac]').forEach(button=>button.onclick=async()=>{const action=button.dataset.ac,target=$('acTarget').value;try{if(['apply','rollback'].includes(action)&&(!revision||loadedTarget!==target))throw Error('请先读取当前服务的配置');if(['apply','rollback','restart','start','stop','reload'].includes(action)&&!(await confirmAction('确认对 '+target+' 执行此操作？可能短暂中断现有连接。')))return;const command={target,action,revision:loadedTarget===target?revision:'',content:['apply','validate'].includes(action)?modal.value:''};$('acError').textContent='';document.querySelectorAll('[data-ac]').forEach(b=>b.disabled=true);render(await api(path,jsonOpt('POST',command)));if(waiting)setTimeout(refresh,1000)}catch(e){$('acError').textContent=e.message;document.querySelectorAll('[data-ac]').forEach(b=>b.disabled=false)}});
  render(state);if(waiting)setTimeout(refresh,1500);
 }
 
@@ -4250,15 +4259,15 @@ async function render_monitorShareManager() {
   const save=async(method)=>{
     if(shareLogoLoading&&method!=='DELETE'){$('shareError').textContent='Logo 正在读取，请稍候再保存';return;}
     const body=method==='DELETE'?{}:payload();
-    if(method!=='DELETE'&&body.public&&!cfg.public&&!confirm('确认公开这些服务器的名称、资源指标、TCP / ICMP 探测名称与延迟以及 24 小时历史？无需访问凭据即可读取。'))return;
+    if(method!=='DELETE'&&body.public&&!cfg.public&&!(await confirmAction('确认公开这些服务器的名称、资源指标、TCP / ICMP 探测名称与延迟以及 24 小时历史？无需访问凭据即可读取。')))return;
     if(method!=='DELETE'&&body.servers.some(s=>!s.label)){$('shareError').textContent='请为每台选中的服务器填写公开名称';return;}
     document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=true);
     try{const result=await api('/servers/sharing',jsonOpt(method,body));if(!active())return;if(result.token)showMonitorShareSecret(result);else{await monitorShareManager();notice(method==='DELETE'?'原链接与令牌已撤销':'监控分享设置已保存');}}
     catch(e){if(active()){$('shareError').textContent=e.message;document.querySelectorAll('#monitorShareForm button').forEach(b=>b.disabled=false);}}
   };
   $('monitorShareForm').onsubmit=e=>{e.preventDefault();void save('PUT');};
-  $('shareGenerate').onclick=()=>{if(!cfg.hasLink||confirm('生成新链接和 API 令牌后，旧凭据立即失效。继续？'))void save('POST');};
-  $('shareRevoke').onclick=()=>{if(confirm('撤销后，现有分享链接和 API 令牌立即失效，无法恢复。继续？'))void save('DELETE');};
+  $('shareGenerate').onclick=async ()=>{if(!cfg.hasLink||(await confirmAction('生成新链接和 API 令牌后，旧凭据立即失效。继续？')))void save('POST');};
+  $('shareRevoke').onclick=async ()=>{if((await confirmAction('撤销后，现有分享链接和 API 令牌立即失效，无法恢复。继续？')))void save('DELETE');};
 }
 function showMonitorShareSecret(result) {
   const url=location.origin+result.url, endpoint=location.origin+result.api;
@@ -4289,7 +4298,7 @@ async function openProbeHistory(id){
  const errors={'socket-unavailable':'无法打开 ICMP 套接字（检查权限）','local-error':'本机错误','send-failed':'未能发送','cancelled':'探测取消','timeout':'未收到回包','dns-failed':'DNS 解析失败','blocked-address':'目标地址被拒绝','connect-failed':'TCP 连接失败'};
  const chart=points=>{const valid=points.filter(p=>p.ok&&Number.isFinite(p.milliseconds));if(!valid.length)return '<p class="hint">暂无成功记录</p>';const max=Math.max(1,...valid.map(p=>p.milliseconds));let d='',last=0;for(const p of points){if(!p.ok){last=0;continue}d+=(last&&p.time-last<=90?'L':'M')+Math.max(0,(p.time-(now-86400))*600/86400).toFixed(2)+' '+(140-p.milliseconds/max*130).toFixed(2)+' ';last=p.time}return `<svg class="monitor-chart" style="height:140px" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="24小时网络探测延迟"><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2"/></svg><p class="hint">最近 24 小时 · 纵轴上限 ${max.toFixed(1)} ms · 失败和采样缺口不连线</p>`};
  openModal('Agent 网络探测',`<p class="note">探测方向为 Agent → 指定公网目标。TCP 显示建连失败比例；ICMP 显示实际发出的 Echo 中未收到回包的比例，权限/解析/发送错误不计丢包。ICMP 超时可能是目标过滤，不代表代理不可用，也不是三网回程分析。历史需另行启用后台采样。</p><div class="toolbar"><button class="btn" id="probeRefresh">刷新</button><button class="btn danger" id="probeClear">清空探测历史</button></div>${keys.map(key=>{const [name,method]=JSON.parse(key),matches=p=>p.name===name&&(p.method||'tcp')===method,points=data.points.filter(matches).sort((a,b)=>a.time-b.time),latest=data.current.find(matches),observed=method==='icmp'?points.filter(p=>p.sent&&p.error!=='cancelled'):points,failures=observed.filter(p=>!p.ok).length;return `<h4>${esc(name)} · ${method.toUpperCase()}</h4><p>当前：${!latest||now-latest.time>120?'数据过期 / 暂无记录':latest.ok?latest.milliseconds.toFixed(1)+' ms':esc(errors[latest.error]||'探测失败')} · ${observed.length?(method==='icmp'?'已发送 ':'已观测 ')+observed.length+' 次，'+(method==='icmp'?'未回包 ':'失败 ')+(100*failures/observed.length).toFixed(1)+'%':'暂无可计入统计的历史'}${method==='icmp'&&points.length>observed.length?' · 未计入 '+(points.length-observed.length)+' 次':''}</p>${chart(points)}`}).join('')||'<p class="empty">尚未收到探测结果。请配置 Agent 目标并等待上报。</p>'}`);
- $('probeRefresh').onclick=()=>openProbeHistory(id).catch(e=>notice(e.message));$('probeClear').onclick=async()=>{if(!confirm('清空探测历史？Agent 仍会继续探测。'))return;try{await api(path,jsonOpt('DELETE',{}));await openProbeHistory(id)}catch(e){notice(e.message)}};
+ $('probeRefresh').onclick=()=>openProbeHistory(id).catch(e=>notice(e.message));$('probeClear').onclick=async()=>{if(!(await confirmAction('清空探测历史？Agent 仍会继续探测。')))return;try{await api(path,jsonOpt('DELETE',{}));await openProbeHistory(id)}catch(e){notice(e.message)}};
 }
 
 async function serverBillingManager(id){
@@ -4303,7 +4312,7 @@ async function serverBillingManager(id){
  form.onsubmit=e=>{e.preventDefault();const limit=Math.round(Number($('sbLimit').value)*1073741824);if(!Number.isSafeInteger(limit)||limit<0){$('sbError').textContent='限额必须是可精确表示的非负数';return}void save('PUT',{anchor:$('sbAnchor').value,months:Number($('sbMonths').value),mode:$('sbMode').value,limit})};
  $('sbRefresh').onclick=()=>serverBillingManager(id).catch(e=>notice(e.message));
  $('sbRange').onclick=()=>serverTrafficRange(id);
- $('sbClear').onclick=()=>{if(confirm('停用周期统计并清除长周期日汇总？最近 30 天历史记录保留。'))void save('DELETE',{})};
+ $('sbClear').onclick=async ()=>{if((await confirmAction('停用周期统计并清除长周期日汇总？最近 30 天历史记录保留。')))void save('DELETE',{})};
 }
 
 function serverTrafficRange(id){
@@ -4331,7 +4340,7 @@ async function openMonitorHistory(id) {
   };
   $('historyToggle').onclick=()=>action('PUT',{enabled:!data.enabled});
   $('historyRefresh').onclick=()=>openMonitorHistory(id).catch(e=>notice(e.message));
-  $('historyClear').onclick=()=>{if(confirm('清空这台服务器的全部历史监控记录、周期设置和长周期日汇总，并停止后台采样？此操作无法撤销。'))void action('DELETE',{});};
+  $('historyClear').onclick=async ()=>{if((await confirmAction('清空这台服务器的全部历史监控记录、周期设置和长周期日汇总，并停止后台采样？此操作无法撤销。')))void action('DELETE',{});};
 }
 
 function renderMonitorOverview() {
@@ -4509,7 +4518,7 @@ async function editNativeCoreInbound(encodedTag = '') {
       if (save.disabled) return;
       const deleting = event.submitter === remove;
       const creating = choice.value === '';
-      if (deleting && (creating || !confirm('确定删除这个入站？该端口上的连接可能中断。'))) return;
+      if (deleting && (creating || !(await confirmAction('确定删除这个入站？该端口上的连接可能中断。')))) return;
       save.disabled = remove.disabled = choice.disabled = true;
       try {
         const config = deleting ? null : JSON.parse(editor.value);
@@ -4546,9 +4555,9 @@ function remoteNodeEdit(id) {
 async function remoteNodeToggle(id) {
   const row = S.remoteRows.find(x => x.id === id); if (!row) return;
   const serverId=S.serverId,page=S.page,expectedIdentity=row.editToken;
-  if (!confirm('此操作会启停整个入站，影响其中全部订阅用户。仅调整一个订阅的权限请到流量与有效期操作。确定继续？')) return;
+  if (!(await confirmAction('此操作会启停整个入站，影响其中全部订阅用户。仅调整一个订阅的权限请到流量与有效期操作。确定继续？'))) return;
   try { await api('/servers/inbounds',jsonOpt('PUT',{serverId,inboundId:id,expectedIdentity,inbound:{...(expectedIdentity?{}:row),enable:!row.enable}})); if(S.serverId===serverId && S.page===page)await serverNodes(true); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
 }
 
 function remoteNodeEditManaged(id) {
@@ -4615,9 +4624,9 @@ async function remoteNodeDelete(id) {
   const row=S.remoteRows.find(x=>x.id===id);if(!row)return;
   const serverId=S.serverId,page=S.page,expectedIdentity=row.deleteToken || row.editToken;
   const message = row.deletePending ? '重试删除此托管入站及其订阅绑定？' : '删除整个远端入站及其中全部用户？其他订阅也会断开。本面板为其创建的中转路由也会清理；仅删除本地绑定记录请到流量与有效期操作。';
-  if (!confirm(message)) return;
+  if (!(await confirmAction(message))) return;
   try { await api('/servers/inbounds',jsonOpt('DELETE',{serverId,inboundId:id,expectedIdentity})); if(S.serverId===serverId && S.page===page)await serverNodes(true); notice('远端入站已删除'); }
-  catch (error) { alert(error.message); }
+  catch (error) { showMessage(error.message); }
 }
 
 function adoptLegacyRelay(id) {
@@ -4643,13 +4652,13 @@ function adoptLegacyRelay(id) {
 
 async function bindDedicatedRemoteNode(id) {
   const serverId=S.serverId,profile=S.profile;
-  if(!confirm('将此入站专属绑定到当前订阅？保留原凭据，从当前流量开始计费。有认证用户时到期撤销该用户；单密码 Shadowsocks / 单连接 HTTP、SOCKS 到期删除整个入站、月额度用尽停用整个入站；独立内核会初始化并核对专属端口计量。其他订阅不得共用；多用户或归属冲突会拒绝。'))return;
+  if(!(await confirmAction('将此入站专属绑定到当前订阅？保留原凭据，从当前流量开始计费。有认证用户时到期撤销该用户；单密码 Shadowsocks / 单连接 HTTP、SOCKS 到期删除整个入站、月额度用尽停用整个入站；独立内核会初始化并核对专属端口计量。其他订阅不得共用；多用户或归属冲突会拒绝。')))return;
   try {
     const opt=jsonOpt('POST',{serverId,inboundId:id,confirmed:true});opt.headers['X-Profile']=profile;
     await api('/servers/bind',opt);
     if(S.profile===profile)await reload(false);
     notice('专属入站已绑定，计量和到期限制已启用');
-  } catch(error){alert(error.message+'；结果待核对时请在同一入站重试。');}
+  } catch(error){showMessage(error.message+'；结果待核对时请在同一入站重试。');}
 }
 
 async function importRemoteLinks(links, source) {
@@ -4663,12 +4672,12 @@ async function remoteNodeLinks(id, sourceRows = S.remoteRows, sourceServerId = S
   if (!rows.length || rows.some(row=>!row)) return;
   if (rows.some(row=>!remoteSupportsIndependentUser(row))) {
     if (ids.length===1) return remoteNodeLegacyLinks(ids[0]);
-    return alert('请选择支持独立订阅用户的节点');
+    return showMessage('请选择支持独立订阅用户的节点');
   }
   const profile=S.profile,page=S.page,serverId=sourceServerId;
   let status;
   try { status=await api('/servers/users/targets',jsonOpt('POST',{serverId,inboundIds:ids})); }
-  catch(error){return alert(error.message);}
+  catch(error){return showMessage(error.message);}
   if(S.profile!==profile || S.page!==page)return;
   const imported=new Map(status.profiles.map(p=>[p.id,new Set(p.importedInboundIds||[])]));
   const missing=p=>ids.filter(id=>!imported.get(p.id)?.has(id));
@@ -4742,8 +4751,8 @@ function bandwidthLabel(value) {
 function nodeBandwidthModal(encoded, id) {
   const serverId = decodeURIComponent(encoded), profile = S.profile;
   const binding = (S.data?.profile?.traffic?.bindings || []).find(b=>b.serverId===serverId && b.inboundId===id && b.status==='active');
-  if (!binding) return alert('请先绑定当前订阅');
-  if (binding.scope === 'user') return alert('共用入站暂不支持单用户带宽限制，不能限制整个端口');
+  if (!binding) return showMessage('请先绑定当前订阅');
+  if (binding.scope === 'user') return showMessage('共用入站暂不支持单用户带宽限制，不能限制整个端口');
   const value = binding.bandwidth || {};
   openModal('订阅节点带宽限制', `<form id="nodeBandwidthForm"><p>当前订阅：${esc(S.data.profile.name)}<br>专属入站：${esc(binding.name || '')} · ${esc(serverId)} / ${id} · 端口 ${esc(binding.port)}</p>
     <div class="grid"><div><label for="bandwidthUpload">客户端上传上限（Mbps）</label><input id="bandwidthUpload" type="number" min="0.1" max="10000" step="0.001" value="${value.uploadKbps ? value.uploadKbps/1000 : ''}" placeholder="留空不限"></div>
@@ -4846,7 +4855,7 @@ function subscriptionPlanModal(encoded = '') {
 
 async function deleteSubscriptionPlan(encoded) {
   const id = decodeURIComponent(encoded), profile = S.profile;
-  if (!confirm('删除这个套餐模板？已套用订阅的额度、用量、有效期和节点配置保持不变。')) return;
+  if (!(await confirmAction('删除这个套餐模板？已套用订阅的额度、用量、有效期和节点配置保持不变。'))) return;
   try {
     const result = await api('/traffic/plans/delete', jsonOpt('PUT', {id}));
     if (S.profile !== profile) return;
@@ -4860,7 +4869,7 @@ async function removeTrafficBinding(index, button, migrate = false) {
   if (bindingRemovalPending) return notice('正在删除绑定记录，请稍候');
   const profile = S.profile, binding = S.data.profile?.traffic?.bindings?.[index];
   if (!binding) return notice('记录已变更，请刷新列表');
-  if (!confirm(migrate ? `核对并迁移这条旧绑定？保留原连接、订阅地址和已计费用量。有认证用户时迁移到用户计量；专属单连接代理保留整入站计量及到期删除。缺少身份摘要时必须与当前订阅中唯一保存的连接一致。` : `删除「${binding.name || '未命名'} : ${binding.port}」这条绑定记录？\n只删除本地记录，保留已计费用量、订阅链接和远端节点；服务器已有的限速或暂停状态不会改变。\n如果节点仍存在，移除后总控不再通过这条绑定计量或执行到期限制。`)) return;
+  if (!(await confirmAction(migrate ? `核对并迁移这条旧绑定？保留原连接、订阅地址和已计费用量。有认证用户时迁移到用户计量；专属单连接代理保留整入站计量及到期删除。缺少身份摘要时必须与当前订阅中唯一保存的连接一致。` : `删除「${binding.name || '未命名'} : ${binding.port}」这条绑定记录？\n只删除本地记录，保留已计费用量、订阅链接和远端节点；服务器已有的限速或暂停状态不会改变。\n如果节点仍存在，移除后总控不再通过这条绑定计量或执行到期限制。`))) return;
   if (button?.disabled) return;
   bindingRemovalPending = true;
   if (button) button.disabled = true;
@@ -4881,7 +4890,7 @@ async function removeTrafficBinding(index, button, migrate = false) {
 async function clearTrafficLegacyMeter(index, button) {
   if (bindingRemovalPending || button.disabled) return;
   const profile = S.profile, binding = S.data.profile?.traffic?.bindings?.[index];
-  if (!binding || !confirm('清理这个入站的旧端口计量规则？认证用户计量和已计费用量会保留。')) return;
+  if (!binding || !(await confirmAction('清理这个入站的旧端口计量规则？认证用户计量和已计费用量会保留。'))) return;
   bindingRemovalPending = button.disabled = true;
   try {
     const options = jsonOpt('PUT', {recordIndex:binding.recordIndex, recordToken:binding.recordToken, confirmed:true});
@@ -4915,8 +4924,8 @@ async function subscriptionOnline(){
  const refresh=async()=>{if(busy||!target.isConnected||profile!==S.profile)return;busy=true;$('onlineRefresh').disabled=true;try{
  const data=await api('/traffic/online');if(!target.isConnected||profile!==S.profile)return;
  target.innerHTML=`<p><strong>已观测在线 IP：${data.availableBindings?data.observedIPs:'未知'}</strong> · 可读取 ${data.availableBindings} / ${data.activeBindings} 个活动绑定</p><p class="hint">${data.unavailableBindings?'部分绑定不可用，不能视为完整在线人数。':''}采集：${esc(new Date(data.sampledAt*1000).toLocaleString())}</p>${data.rows.length?'':'<p class="note">此订阅没有活动的托管用户绑定。仅导入分享链接无法查询远端连接者。</p>'}${data.rows.map(row=>`<section class="panel"><h4>${esc(row.node||('绑定 '+row.binding))}</h4>${row.status==='ok'?(row.ips.length?row.ips.map(p=>`<p style="overflow-wrap:anywhere"><code>${esc(p.ip)}</code> · ${p.lastSeen?esc(new Date(p.lastSeen*1000).toLocaleString()):'时间未知'} <button type="button" class="btn small" data-online-city="${esc(p.ip)}">查询城市</button><span class="hint"></span></p>`).join(''):'<p>内核当前返回 0 个在线 IP</p>'):`<p class="note">${esc(row.error)}</p><button type="button" class="btn" data-online-enable="${row.binding}" data-online-token="${esc(row.token)}">启用 Xray 在线统计</button>`}</section>`).join('')}`;
- target.querySelectorAll('[data-online-enable]').forEach(button=>button.onclick=async()=>{if(profile!==S.profile)return;if(!confirm('仅支持已托管的独立 Xray。将启用该用户策略级别的在线 IP 统计（同级别用户一同生效）并重启内核，可能短暂断开连接。确认继续？'))return;button.disabled=true;try{await api('/traffic/online/enable',jsonOpt('POST',{binding:Number(button.dataset.onlineEnable),token:button.dataset.onlineToken,confirmed:true}));if(target.isConnected&&profile===S.profile)await refresh()}catch(e){notice(e.message)}finally{if(button.isConnected)button.disabled=false}});
- target.querySelectorAll('[data-online-city]').forEach(button=>button.onclick=async()=>{if(!confirm('将此 IP 发送给 ipwho.is 查询大致城市？IP 定位不代表真实住址。'))return;button.disabled=true;const label=button.nextElementSibling;try{const d=await api('/traffic/online/city',jsonOpt('POST',{ip:button.dataset.onlineCity,confirmed:true}));if(label.isConnected)label.textContent=' '+[d.country,d.region,d.city].filter(Boolean).join(' / ')}catch(e){if(label.isConnected)label.textContent=e.message}finally{if(button.isConnected)button.disabled=false}});
+ target.querySelectorAll('[data-online-enable]').forEach(button=>button.onclick=async()=>{if(profile!==S.profile)return;if(!(await confirmAction('仅支持已托管的独立 Xray。将启用该用户策略级别的在线 IP 统计（同级别用户一同生效）并重启内核，可能短暂断开连接。确认继续？')))return;button.disabled=true;try{await api('/traffic/online/enable',jsonOpt('POST',{binding:Number(button.dataset.onlineEnable),token:button.dataset.onlineToken,confirmed:true}));if(target.isConnected&&profile===S.profile)await refresh()}catch(e){notice(e.message)}finally{if(button.isConnected)button.disabled=false}});
+ target.querySelectorAll('[data-online-city]').forEach(button=>button.onclick=async()=>{if(!(await confirmAction('将此 IP 发送给 ipwho.is 查询大致城市？IP 定位不代表真实住址。')))return;button.disabled=true;const label=button.nextElementSibling;try{const d=await api('/traffic/online/city',jsonOpt('POST',{ip:button.dataset.onlineCity,confirmed:true}));if(label.isConnected)label.textContent=' '+[d.country,d.region,d.city].filter(Boolean).join(' / ')}catch(e){if(label.isConnected)label.textContent=e.message}finally{if(button.isConnected)button.disabled=false}});
  }catch(e){if(target.isConnected)target.textContent=e.message}finally{busy=false;if(target.isConnected)$('onlineRefresh').disabled=false}};
  $('onlineRefresh').onclick=refresh;await refresh();
 }
@@ -4953,7 +4962,7 @@ function traffic() {
     const planId = $('trafficPlan').value;
     if (!planId) { $('trafficPlanError').textContent = '请先选择套餐模板'; return; }
     const plan = (t.plans || []).find(p=>p.id===planId);
-    if (!plan || !confirm(`将“${plan.name}”套用到当前订阅？${planDescription(plan)}。保留已用量，再次套用不自动续期。`)) return;
+    if (!plan || !(await confirmAction(`将“${plan.name}”套用到当前订阅？${planDescription(plan)}。保留已用量，再次套用不自动续期。`))) return;
     const profile = S.profile, button = $('trafficPlanApply');
     $('trafficSave').disabled = $('trafficDisable').disabled = true;
     button.disabled = true; button.textContent = '正在结算并套用…';
@@ -4976,7 +4985,7 @@ function traffic() {
     }
   };
   if ($('trafficCleanup')) $('trafficCleanup').onclick = async () => {
-    if (!confirm('只清理当前订阅已解绑、已撤销和远端缺失的历史绑定？已计费用量保留，不删除任何远端节点；待完成的删除或本地清理记录会保留。')) return;
+    if (!(await confirmAction('只清理当前订阅已解绑、已撤销和远端缺失的历史绑定？已计费用量保留，不删除任何远端节点；待完成的删除或本地清理记录会保留。'))) return;
     const profile = S.profile, button=$('trafficCleanup');button.disabled=true;
     try {
       const result=await api('/traffic/bindings/cleanup',jsonOpt('PUT',{confirmed:true}));
@@ -5035,16 +5044,12 @@ function traffic() {
         preserveUsage: upload === (t.upload || 0) && download === (t.download || 0) });
     } catch (error) { $('trafficError').textContent = error.message; }
   };
-  $('trafficDisable').onclick = () => { if (confirm('关闭该订阅的额度、有效期限制及流量信息展示？节点带宽限制仍保留，已删除节点不会恢复。')) void save({ enabled: false }); };
+  $('trafficDisable').onclick = async () => { if ((await confirmAction('关闭该订阅的额度、有效期限制及流量信息展示？节点带宽限制仍保留，已删除节点不会恢复。'))) void save({ enabled: false }); };
 }
 
 function cards() {
-  return `<div class="cards">
-    <div class="card"><span>节点</span><b>${S.data.nodes.length}</b></div>
-    <div class="card"><span>策略组</span><b>${S.data.groups.length}</b></div>
-    <div class="card"><span>路由规则</span><b>${S.data.rules.length}</b></div>
-    <div class="card"><span>DNS 分流</span><b>${S.data.dnsPolicies.length}</b></div>
-  </div>`;
+ const rows=[['nodes','节点',S.data.nodes.length],['groups','策略组',S.data.groups.length],['rules','路由规则',S.data.rules.length],['dns','DNS 分流',S.data.dnsPolicies.length]];
+ return `<nav class="ws-metrics" aria-label="当前订阅配置数量">${rows.map(([page,label,count])=>`<button type="button" class="ws-metric" onclick="go('${page}')" ${S.page===page?'aria-current="page"':''}><span>${label}</span><strong>${count}</strong><span class="ws-metric-link">查看 ${uiIcon('chevron-right')}</span></button>`).join('')}</nav>`;
 }
 
 function conversionRows(formats) {
@@ -5096,7 +5101,7 @@ async function overview() {
       <div class="craft-hero-copy"><span class="craft-eyebrow">MXIOC WORLD</span><h2>每一个方块，<br>连接你的世界。</h2><p>管理订阅、守望节点，搭建你的方块工作台。</p><a class="btn primary" href="#clientSubscriptions">探索订阅世界 ↓</a><div class="craft-inventory" aria-label="方块工作台装饰物品栏"><span class="craft-slot"><img src="/sub/ui-craft/block.svg" alt="草方块"></span><span class="craft-slot"><img src="/sub/ui-craft/pickaxe.svg" alt="钻石镐"></span><span class="craft-slot"><img src="/sub/ui-craft/chest.svg" alt="储物箱"></span><span>你的方块工作台</span></div><span class="craft-hero-note">从一个方块开始，连接每一处世界。</span></div>
       <div class="craft-landscape"><img src="/sub/ui-craft/overworld.png" alt="像素主世界：草地、树木、池塘与木屋" width="560" height="300"><span>OVERWORLD / 主世界</span></div>
     </section>
-` + cards() + trafficSummary() + `
+` + `<div class="ws-overview-head"><div><p class="hint">当前订阅</p><h3>当前订阅链接</h3><p class="muted">从配置节点到分发链接，在这里继续。</p></div><div class="ws-overview-actions"><button class="btn primary" onclick="go('nodes')">管理节点</button><button class="btn" onclick="go('servers')">查看服务器</button><button class="btn" onclick="profileClientLinks('${encodeURIComponent(p.id).replace(/'/g,'%27')}')">获取订阅链接</button></div></div>` + cards() + `<div class="ws-overview-grid">
   <section class="panel">
     <div class="panel-head">
       <h3>${esc(p.name)}</h3>
@@ -5106,12 +5111,13 @@ async function overview() {
     <div class="toolbar">
       <input value="${esc(url)}" readonly style="color:var(--blue-bright);">
       <button class="btn" onclick="copyText('${esc(url)}')">复制订阅链接</button>
-      <a class="btn primary" href="${esc(subscriptionURL(p.url))}" referrerpolicy="no-referrer">⬇ 下载配置文件</a>
+      <a class="btn primary" href="${esc(subscriptionURL(p.url))}" referrerpolicy="no-referrer">下载配置</a>
     </div>
-    <div class="note">当前配置的所有节点、策略组、路由规则及 DNS 分流设置均隔离保存于本订阅中。每次更新都会经过结构校验并自动生成历史快照备份。</div>
-    <button class="btn" onclick="go('raw')">查看/编辑完整 YAML 源代码</button>
+    <div class="note">节点、策略组、路由与 DNS 配置归属于当前订阅；保存配置时会自动创建历史快照。</div>
+    <button class="btn" onclick="go('raw')">编辑 YAML 配置</button>
   </section>
 
+  ${trafficSummary()}</div>
   <section class="panel" id="clientSubscriptions">
     <div class="panel-head">
       <h3>客户端订阅与扫码导入</h3>
@@ -5143,7 +5149,7 @@ function nodeSubscriptionBinding(node) {
 
 async function nodeSubscriptionImport(index) {
   const node=S.data?.nodes?.find(node=>node.index===index),binding=nodeSubscriptionBinding(node),profile=S.profile;
-  if(!binding)return alert('该节点没有有效的服务器用户绑定，请从“单个节点批量加入订阅”选择服务器入站。');
+  if(!binding)return showMessage('该节点没有有效的服务器用户绑定，请从“单个节点批量加入订阅”选择服务器入站。');
   openModal('批量加入订阅','<p id="nodeSubscriptionLoading" class="hint">正在核对来源服务器和节点身份…</p><div id="nodeSubscriptionError" class="error" role="alert"></div>');
   const target=$('nodeSubscriptionLoading');
   const active=()=>target.isConnected && !$('modal').classList.contains('hidden') && S.profile===profile;
@@ -5183,18 +5189,18 @@ function nodes() {
   $('content').innerHTML = cards() + `
   <section class="panel">
     <div class="panel-head"><div><h3>我的节点</h3><p class="hint">服务器绑定节点可直接“批量加入订阅”，为每份订阅生成独立凭据；点击“策略组”设置用途。</p></div></div>
-    <div class="toolbar node-source-actions"><span class="hint">服务器节点与订阅分配</span>
+    <details class="node-source-actions"><summary>从服务器获取节点与分配订阅</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="chooseNodeServer('create')">选择服务器添加订阅节点</button>
       <button type="button" class="btn small" onclick="batchServerImport()">从服务器批量导入节点</button>
       <button type="button" class="btn small" onclick="chooseNodeServer('subscriptions')">单个节点批量加入订阅</button><button type="button" class="btn small" onclick="chooseNodeServer('browse')">查看服务器节点</button>
       <button type="button" class="btn small" onclick="go('traffic')">订阅流量与有效期</button>
-    </div>
+    </div></details>
     <div class="toolbar"><input id="search" aria-label="搜索节点" placeholder="搜索名称、标签、协议或服务器地址…" value="${esc(q)}"><label for="nodeTagFilter">标签筛选</label><select id="nodeTagFilter" aria-label="按节点标签筛选"><option value="">全部标签</option><option value="none" ${tagFilter === 'none' ? 'selected' : ''}>未打标签 · ${S.data.nodes.filter(n=>!nodeTags(n).length).length}</option>${[...tagCounts].sort(([a],[b])=>a.localeCompare(b,'zh-CN')).map(([tag,count])=>`<option value="${esc('tag:'+tag)}" ${tagFilter === 'tag:'+tag ? 'selected' : ''}>${esc(tag)} · ${count}</option>`).join('')}${tagFilter.startsWith('tag:') && !tagCounts.has(tagFilter.slice(4)) ? `<option value="${esc(tagFilter)}" selected>${esc(tagFilter.slice(4))} · 0</option>` : ''}</select></div>
     <div class="node-protocol-filter" role="group" aria-label="按节点协议筛选">
       <button type="button" class="btn small" data-node-protocol="" aria-pressed="${!protocol}">全部 · ${S.data.nodes.length}</button>
       ${[...protocolCounts].sort(([a],[b]) => a.localeCompare(b)).map(([type,count]) => `<button type="button" class="btn small" data-node-protocol="${esc(type)}" aria-pressed="${type === protocol}">${esc(type.toUpperCase())} · ${count}</button>`).join('')}
     </div>
-    <details class="node-secondary"><summary>批量操作 · 标签、名称与证书验证</summary><div class="toolbar">
+    <details class="node-secondary" open><summary>批量操作 · 标签、名称与证书验证</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
       <button type="button" class="btn small" onclick="clearNodeSelection()">取消选择</button>
       <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button>
@@ -5224,7 +5230,7 @@ function nodes() {
                 <button class="btn small" onclick="nodeGroupsModal(${x.index})">策略组</button>
                 <button class="btn small" onclick="nodeTagsModal(${x.index})">标签</button>
                 ${nodeSubscriptionBinding(x) ? `<button class="btn small primary" onclick="nodeSubscriptionImport(${x.index})">批量加入订阅</button>` : ''}
-                <button class="btn small primary" onclick="shareNode(${x.index})" title="显示二维码并导出节点链接">分享</button>
+                <button class="btn small" onclick="shareNode(${x.index})" title="显示二维码并导出节点链接">分享</button>
                 <details><summary class="btn small" aria-label="更多节点操作">更多</summary><div>
                 <button class="btn small" onclick="moveNode(${x.index},-1)" ${x.index === 0 ? 'disabled' : ''} title="上移" aria-label="上移">${uiIcon('arrow-up-from-line')}</button>
                 <button class="btn small" onclick="moveNode(${x.index},1)" ${x.index === S.data.nodes.length - 1 ? 'disabled' : ''} title="下移" aria-label="下移">${uiIcon('arrow-down-to-line')}</button>
@@ -5513,7 +5519,7 @@ function chainNodeServer(node, servers) {
 
 async function failoverModal() {
   const normal = ordinaryNodes();
-  if (normal.length < 3) return alert('至少需要两个入口节点和一个独立出口节点，所有服务器都须已登记到总控');
+  if (normal.length < 3) return showMessage('至少需要两个入口节点和一个独立出口节点，所有服务器都须已登记到总控');
   const profile = S.profile;
   let servers;
   try { ({servers = []} = await api('/servers')); }
@@ -5588,7 +5594,7 @@ async function resumeFailover(encoded, button) {
 }
 
 async function deleteFailover(encoded, draft = false) {
-  if (!confirm(draft ? '取消这份主备草稿并清理已创建的专属转发？' : '删除此主备组及所有专属服务器转发？引用此组的规则将设为 REJECT。')) return;
+  if (!(await confirmAction(draft ? '取消这份主备草稿并清理已创建的专属转发？' : '删除此主备组及所有专属服务器转发？引用此组的规则将设为 REJECT。'))) return;
   try { await api('/failovers', jsonOpt('DELETE', {name: decodeURIComponent(encoded)})); await reload(); }
   catch (err) { notice(err.message); await reload(); }
 }
@@ -5625,7 +5631,7 @@ async function chainModal(index) {
   const openingProfile=S.profile;
   let x = index == null ? null : S.data.nodes.find(n => n.index === index);
   let normal = ordinaryNodes();
-  if (normal.length < 2) return alert('至少需要两个普通节点才能创建链式代理');
+  if (normal.length < 2) return showMessage('至少需要两个普通节点才能创建链式代理');
   const serverData = await api('/servers');
   if(S.profile!==openingProfile)return;
   const managedServers = serverData.servers || [];
@@ -5974,13 +5980,13 @@ async function raw() {
   </section>`;
   $('rawText').value = d.yaml;
   $('saveRaw').onclick = async () => {
-    if (!confirm('确认保存修改至底层完整配置文件？')) return;
+    if (!(await confirmAction('确认保存修改至底层完整配置文件？'))) return;
     try {
       await api('/raw', jsonOpt('PUT', { yaml: $('rawText').value }));
       await reload(false);
       notice('配置已校验并成功写回');
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message);
     }
   };
 }
@@ -6055,7 +6061,7 @@ async function system() {
 
   $('accountForm').onsubmit = async e => {
     e.preventDefault();
-    if ($('pwNew').value !== $('pwNew2').value) return alert('两次输入的新密码不一致');
+    if ($('pwNew').value !== $('pwNew2').value) return showMessage('两次输入的新密码不一致');
     try {
       await api('/account', jsonOpt('POST', {
         username: $('pwUser').value,
@@ -6063,10 +6069,10 @@ async function system() {
         newUsername: $('pwNewUser').value,
         newPassword: $('pwNew').value
       }));
-      alert('管理员登录凭证已修改，请使用新用户名和密码重新登录');
+      showMessage('管理员登录凭证已修改，请使用新用户名和密码重新登录');
       showLogin();
     } catch (x) {
-      alert(x.message);
+      showMessage(x.message);
     }
   };
 }
@@ -6121,8 +6127,8 @@ async function maintenance() {
     };
     check.onclick = () => run(check, '/updates/check', {});
     if (dismiss) dismiss.onclick = () => run(dismiss, '/updates/dismiss', {version:update.latestVersion});
-    if (apply) apply.onclick = () => {
-      if (confirm(`应用 ${update.latestVersion} 并重启 Go 管理后台？`)) run(apply, '/updates/apply', {version:update.latestVersion, confirmed:true});
+    if (apply) apply.onclick = async () => {
+      if ((await confirmAction(`应用 ${update.latestVersion} 并重启 Go 管理后台？`))) run(apply, '/updates/apply', {version:update.latestVersion, confirmed:true});
     };
     if ($('goUninstallPurge')) $('goUninstallPurge').onchange = event => {
       const enabled = event.target.checked, input = $('goUninstallPurgeConfirmation');
@@ -6137,7 +6143,7 @@ async function maintenance() {
       if($('goUninstallConfirmation').value!=='UNINSTALL'){status.textContent='请输入大写 UNINSTALL';return;}
       const purgeData=$('goUninstallPurge').checked,purgeConfirmation=$('goUninstallPurgeConfirmation').value;
       if(purgeData&&purgeConfirmation!=='DELETE ALL DATA'){status.textContent='清空数据需输入 DELETE ALL DATA';return;}
-      if(!confirm(purgeData?'卸载并永久清空本地订阅、账号和备份？远端节点会保留，但本地管理记录将丢失。':'停止并卸载 Go 后台服务？订阅、账号及远端节点数据将保留。'))return;
+      if(!(await confirmAction(purgeData?'卸载并永久清空本地订阅、账号和备份？远端节点会保留，但本地管理记录将丢失。':'停止并卸载 Go 后台服务？订阅、账号及远端节点数据将保留。')))return;
       button.disabled=true;
       try{
         const result=await api('/uninstall',jsonOpt('POST',{username:$('goUninstallUser').value,password:$('goUninstallPassword').value,confirmation:'UNINSTALL',purgeData,purgeConfirmation}));
@@ -6188,11 +6194,11 @@ async function maintenance() {
 async function uninstallManager(e) {
   e.preventDefault();
   let purgeData = $('uninstallMode').value === 'purge';
-  if ($('uninstallConfirmation').value !== 'UNINSTALL') return alert('请输入大写 UNINSTALL 确认卸载');
+  if ($('uninstallConfirmation').value !== 'UNINSTALL') return showMessage('请输入大写 UNINSTALL 确认卸载');
   let text = purgeData
     ? '这会移除管理后台并删除主 Clash 订阅文件。确认彻底卸载？'
     : '确认卸载管理后台？用户数据会先归档到 /var/backups。';
-  if (!confirm(text)) return;
+  if (!(await confirmAction(text))) return;
   try {
     let result = await api('/uninstall', jsonOpt('POST', {
       username: $('uninstallUser').value,
@@ -6207,7 +6213,7 @@ async function uninstallManager(e) {
         ${result.backupPath ? `<p>用户数据归档位置：<code>${esc(result.backupPath)}</code></p>` : '<p>已选择彻底清除用户数据。</p>'}
       </section>`;
   } catch (error) {
-    alert(error.message);
+    showMessage(error.message);
   }
 }
 
@@ -6222,7 +6228,7 @@ function openModal(title, html) {
   $('modal').querySelector('.modalbox').dataset.layout = $('modalBody').querySelector('table,textarea.raw,.theme-options') ? 'wide' : 'form';
   $('modal').classList.remove('hidden');
   document.body.classList.add('modal-open');
-  const box=$('modal').querySelector('.modalbox');box.scrollTop=0;box.focus({preventScroll:true});
+  const box=$('modal').querySelector('.modalbox');box.scrollTop=0;$('modalBody').scrollTop=0;window.WorkspaceUI?.prepareEditor();box.focus({preventScroll:true});
 }
 
 function closeModal() {
@@ -7007,7 +7013,7 @@ async function copyText(text) {
     await navigator.clipboard.writeText(text);
     notice('订阅链接已复制至剪贴板');
   } catch {
-    prompt('请手动复制以下订阅链接：', text);
+    (await promptAction('请手动复制以下订阅链接：', text));
   }
 }
 
@@ -7126,8 +7132,8 @@ function policyTemplateEditor(template) {
     }
   };
   back.onclick = policyTemplateManager;
-  if (remove) remove.onclick = () => {
-    if (confirm('删除此模板？已经创建的订阅会保留。')) void run('DELETE', () => ({id: template.id}));
+  if (remove) remove.onclick = async () => {
+    if ((await confirmAction('删除此模板？已经创建的订阅会保留。'))) void run('DELETE', () => ({id: template.id}));
   };
   form.onsubmit = event => {
     event.preventDefault();
@@ -7244,7 +7250,7 @@ function profileEdit(encoded) {
   $('editProfile').onsubmit = async e => {
     e.preventDefault();
     if (p.customSlug && !on('editProfileCustomSlug') &&
-        !confirm('关闭自定义模式后将生成新的 50 位随机地址，当前订阅链接会立即失效。确认继续？')) return;
+        !(await confirmAction('关闭自定义模式后将生成新的 50 位随机地址，当前订阅链接会立即失效。确认继续？'))) return;
     try {
       let d = await api('/profiles', jsonOpt('PUT', {
         oldId: p.id,
@@ -7268,7 +7274,7 @@ function profileEdit(encoded) {
 async function profileDelete(encoded) {
   let id = decodeURIComponent(encoded);
   let p = S.profiles.find(x => x.id === id);
-  if (!confirm(`确认永久删除订阅“${p.name}”？配置文件将被清除，但历史自动快照将完整保留。`)) return;
+  if (!(await confirmAction(`确认永久删除订阅“${p.name}”？配置文件将被清除，但历史自动快照将完整保留。`))) return;
   try {
     await api('/profiles', jsonOpt('DELETE', { id }));
     if (S.profile === id) {
@@ -7285,20 +7291,20 @@ async function profileDelete(encoded) {
     await reload();
     notice('订阅配置已安全删除');
   } catch (err) {
-    alert(err.message);
+    showMessage(err.message);
   }
 }
 
 async function deleteNode(i) {
   let x = S.data.nodes.find(n => n.index === i);
-  if (confirm(`确认删除节点“${x.name}”并自动清理全部策略组中的引用？`)) {
+  if ((await confirmAction(`确认删除节点“${x.name}”并自动清理全部策略组中的引用？`))) {
     try {
       await api('/nodes', jsonOpt('DELETE', { name: x.name }));
       S.nodeSelection.delete(x.name);
       await reload();
       notice('节点已成功删除');
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message);
     }
   }
 }
@@ -7307,21 +7313,21 @@ async function bulkDeleteNodes() {
   let names = [...S.nodeSelection];
   if (!names.length) return;
   let preview = names.slice(0, 8).join('、') + (names.length > 8 ? ` 等 ${names.length} 个节点` : '');
-  if (!confirm(`确认批量删除以下节点并清理全部策略组和路由引用？\n\n${preview}`)) return;
+  if (!(await confirmAction(`确认批量删除以下节点并清理全部策略组和路由引用？\n\n${preview}`))) return;
   try {
     let result = await api('/nodes/bulk', jsonOpt('DELETE', { names }));
     S.nodeSelection.clear();
     await reload();
     notice(`已安全删除 ${result.deleted} 个节点`);
   } catch (error) {
-    alert(error.message);
+    showMessage(error.message);
   }
 }
 
 async function autoAddCountryFlags() {
   let names = [...S.nodeSelection];
   let scope = names.length ? `已勾选的 ${names.length} 个节点` : `全部 ${S.data.nodes.length} 个节点`;
-  if (!S.data.nodes.length || !confirm(`将根据服务器公网 IP 为${scope}识别国家并规范化名称开头的国旗。\n\n重复执行不会重复添加国旗，是否继续？`)) return;
+  if (!S.data.nodes.length || !(await confirmAction(`将根据服务器公网 IP 为${scope}识别国家并规范化名称开头的国旗。\n\n重复执行不会重复添加国旗，是否继续？`))) return;
   try {
     notice('正在解析节点 IP 并识别国家，请稍候……');
     let result = await api('/nodes/flags', jsonOpt('POST', { names }));
@@ -7330,50 +7336,50 @@ async function autoAddCountryFlags() {
     let text = `已更新 ${result.updated} 个节点，${result.unchanged} 个无需修改`;
     if (result.skipped?.length) {
       text += `，跳过 ${result.skipped.length} 个`;
-      alert(text + '\n\n' + result.skipped.slice(0, 20).map(x => `${x.name}：${x.reason}`).join('\n'));
+      showMessage(text + '\n\n' + result.skipped.slice(0, 20).map(x => `${x.name}：${x.reason}`).join('\n'));
     } else {
       notice(text);
     }
   } catch (error) {
-    alert(error.message);
+    showMessage(error.message);
   }
 }
 
 async function deleteGroup(i) {
   let x = S.data.groups.find(n => n.index === i);
-  if (confirm(`确认删除策略组“${x.name}”以及所有流向该组的路由规则？`)) {
+  if ((await confirmAction(`确认删除策略组“${x.name}”以及所有流向该组的路由规则？`))) {
     try {
       await api('/groups', jsonOpt('DELETE', { name: x.name }));
       await reload();
       notice('策略组已成功删除');
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message);
     }
   }
 }
 
 async function deleteRule(i) {
   let x = S.data.rules.find(n => n.index === i);
-  if (confirm(`确认删除规则“${x.raw}”？`)) {
+  if ((await confirmAction(`确认删除规则“${x.raw}”？`))) {
     try {
       await api('/rules', jsonOpt('DELETE', { oldRaw: x.raw }));
       await reload();
       notice('规则已成功删除');
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message);
     }
   }
 }
 
 async function deleteDns(e) {
   let domain = decodeURIComponent(e);
-  if (confirm(`确认删除 DNS 分流规则“${domain}”？`)) {
+  if ((await confirmAction(`确认删除 DNS 分流规则“${domain}”？`))) {
     try {
       await api('/dns', jsonOpt('DELETE', { oldDomain: domain }));
       await reload();
       notice('DNS 分流策略已删除');
     } catch (x) {
-      alert(x.message);
+      showMessage(x.message);
     }
   }
 }
@@ -7384,7 +7390,7 @@ async function moveRule(i, d) {
     await api('/rules/move', jsonOpt('POST', { raw: x.raw, direction: d }));
     await reload();
   } catch (e) {
-    alert(e.message);
+    showMessage(e.message);
   }
 }
 
@@ -7429,13 +7435,13 @@ async function dragNode(name, targetName, position) {
 
 async function restoreBackup(e) {
   let name = decodeURIComponent(e);
-  if (confirm(`确认回滚恢复历史快照“${name}”？`)) {
+  if ((await confirmAction(`确认回滚恢复历史快照“${name}”？`))) {
     try {
       await api('/backups/restore', jsonOpt('POST', { name }));
       await reload();
       notice('快照备份已成功恢复');
     } catch (x) {
-      alert(x.message);
+      showMessage(x.message);
     }
   }
 }
@@ -7468,7 +7474,7 @@ document.querySelectorAll('.nav').forEach(n => n.onclick = () => { const wasOpen
 document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(localStorage.getItem('mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);localStorage.setItem('mx-nav-expanded',JSON.stringify(state))}catch{}})});
 $('navToggle').onclick = () => setNavigationOpen(!document.body.classList.contains('nav-open'));
 $('navClose').onclick = $('navBackdrop').onclick = () => setNavigationOpen(false);
-matchMedia('(max-width:768px)').addEventListener('change', () => setNavigationOpen(false));
+matchMedia('(max-width:1024px)').addEventListener('change', () => setNavigationOpen(document.body.classList.contains('nav-open'),false));
 setNavigationOpen(false, false);
 document.addEventListener('keydown', event => {
   if (!document.body.classList.contains('nav-open')) return;
@@ -7483,6 +7489,7 @@ document.addEventListener('keydown', event => {
 $('modalClose').onclick = closeModal;
 $('modal').onclick = e => { if (e.target === $('modal')) e.stopPropagation(); };
 document.addEventListener('keydown', e => {
+  if(document.querySelector('dialog[open]'))return;
   if(S.sniScan) { if(e.key==='Escape'){e.preventDefault();closeSniScanner();} return; }
   if ($('modal').classList.contains('hidden')) return;
   if (e.key === 'Escape') closeModal();
@@ -7498,7 +7505,7 @@ document.addEventListener('keydown', e => {
 });
 
 $('logout').onclick = () => logout(true);
-$('manageProfiles').onclick = profileManager;
+$('manageProfiles').onclick = () => window.WorkspaceUI ? WorkspaceUI.search('profiles') : profileManager();
 $('refresh').onclick = async () => {
   try {
     if (S.role === 'user') {
@@ -7519,7 +7526,7 @@ $('refresh').onclick = async () => {
     }
     notice('配置数据已同步刷新');
   } catch (e) {
-    alert(e.message);
+    showMessage(e.message);
   }
 };
 $('importNode').onclick = importNodeModal;
@@ -7537,5 +7544,6 @@ applySiteInfo({});
 const siteInfoReady=loadSiteInfo();
 void bootstrap();
 </script>
+<script src="/sub/workspace.js?v=0.3.0"></script>
 </body>
 </html>

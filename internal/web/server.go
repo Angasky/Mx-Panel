@@ -253,6 +253,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if craftAsset(w, r) {
 		return
 	}
+	if workspaceAsset(w, r) {
+		return
+	}
 	if uiFontAsset(w, r) {
 		return
 	}
