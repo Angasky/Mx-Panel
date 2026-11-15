@@ -109,6 +109,30 @@ func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record
 	if !strings.Contains(output, "MXIOC_CORE_APPLIED") {
 		return nil, errors.New("内核应用结果未确认，请重新读取")
 	}
+	// Single-file writers attest the actual bytes on disk while still holding
+	// the remote lock. Avoid another SSH channel and a full configuration download.
+	// Multi-file sing-box writers retain their layout-aware readback below.
+	const savedPrefix = "MXIOC_CORE_SAVED_SHA256="
+	if strings.Contains(output, savedPrefix) {
+		want, err := json.Marshal(next)
+		if err != nil {
+			return nil, errors.New("内核保存结果无法校验，请重新读取")
+		}
+		expected := coreConfigHash(want)
+		count := 0
+		for _, line := range strings.Split(output, "\n") {
+			if strings.HasPrefix(line, savedPrefix) {
+				count++
+				if strings.TrimPrefix(line, savedPrefix) != expected {
+					return nil, errors.New("内核保存结果与请求不同，请重新读取核对")
+				}
+			}
+		}
+		if count != 1 {
+			return nil, errors.New("内核保存校验结果无效，请重新读取核对")
+		}
+		return Record{"updated": true, "version": expected, "kind": kind}, nil
+	}
 	after, actual, err := readCore(ctx, kind, run)
 	if err != nil {
 		return nil, errors.New("内核请求已执行，保存结果读取待核对")

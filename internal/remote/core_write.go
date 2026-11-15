@@ -93,6 +93,8 @@ sync -f "$config"
 systemctl restart ` + kind + `
 systemctl is-active --quiet ` + kind + `
 ` + verify + `
+saved=$(sha256sum "$config")
+printf 'MXIOC_CORE_SAVED_SHA256=%s\n' "${saved%% *}"
 printf 'MXIOC_CORE_APPLIED\n'
 `
 	if len(cancelKey) > 0 {
