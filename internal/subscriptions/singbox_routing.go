@@ -322,6 +322,27 @@ func singBoxBasicCondition(kind, value string, noResolve bool) (Record, error) {
 			return nil, err
 		}
 		return condition, nil
+	case "PROCESS-PATH-WILDCARD":
+		absolute := strings.HasPrefix(value, "/") || len(value) > 2 && ((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= 'A' && value[0] <= 'Z')) && value[1] == ':' && (value[2] == '\\' || value[2] == '/')
+		if noResolve || !absolute || len(value) > 2048 {
+			return nil, errors.New("进程通配路径须为最多 2048 字节的 ASCII 绝对路径，不支持额外选项")
+		}
+		var pattern strings.Builder
+		pattern.WriteString("(?i)^")
+		for _, ch := range value {
+			switch {
+			case ch == '*':
+				pattern.WriteString(`[\x00-\x7f]*`)
+			case ch == '?':
+				pattern.WriteString(`[\x00-\x7f]`)
+			case ch >= 32 && ch <= 126 && !strings.ContainsRune(",()", ch):
+				pattern.WriteString(regexp.QuoteMeta(string(ch)))
+			default:
+				return nil, errors.New("进程通配路径仅支持 ASCII 可打印字符，不支持逗号或括号")
+			}
+		}
+		pattern.WriteString("$")
+		rule["process_path_regex"] = []string{pattern.String()}
 	case "PROCESS-PATH":
 		value := parts[1]
 		absolute := strings.HasPrefix(value, "/") || len(value) > 2 && ((value[0] >= 'A' && value[0] <= 'Z') || (value[0] >= 'a' && value[0] <= 'z')) && value[1] == ':' && (value[2] == '\\' || value[2] == '/')

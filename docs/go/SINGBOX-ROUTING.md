@@ -14,7 +14,7 @@
 
 ## 不支持时拒绝导出
 
-远程/文件规则集、代理提供者、GEOIP/GEOSITE、进程名/进程正则及通配规则、故障切换/负载均衡组、QUIC 落地链路、远端主备及策略组扩展选项（包括 lazy、timeout、expected-status 等）暂不转换。遇到不支持内容时整份导出不可用，管理页兼容报告显示原因；不会静默丢弃规则或退回全直连。
+远程/文件规则集、代理提供者、GEOIP/GEOSITE、进程名、进程正则及进程名通配规则、故障切换/负载均衡组、QUIC 落地链路、远端主备及策略组扩展选项（包括 lazy、timeout、expected-status 等）暂不转换。遇到不支持内容时整份导出不可用，管理页兼容报告显示原因；不会静默丢弃规则或退回全直连。
 
 此格式不转换原 DNS 设置。启用了面板 DNS/WebRTC 防护覆盖的订阅拒绝此导出，避免把未继承保护的配置当作等价替代。其他自定义 DNS/TUN/嗅探设置也未转换，需要在客户端自行配置；要求完整保持这些设置时使用原始 Mihomo 配置。原来的 sing-box 基础节点导出保持不变。
 
@@ -97,3 +97,12 @@ Mihomo 使用 regexp2 并默认忽略大小写，sing-box 使用 Go 正则；本
 原 inline domain 集合仍采用域名专用语法，正则请放到 classical 集合。Surge 分流不会因共用条件解析器而自动开放正则规则。
 
 验证：匹配/不匹配样例、大小写与锚定、非法输入、嵌套与内嵌集合、源配置不变、GET/HEAD 下载，以及 sing-box 1.14.4 内核 check；Go 全量与专项 race 通过。另以实际 regexp2 和 Go 正则比较 32192 组 ASCII 主机名结果。没有手机客户端实机联网验收；远程规则集、完整 DNS/TUN、跨客户端完全等价等仍未完成。
+
+
+## v0.2.39：桌面进程路径通配
+
+支持 `PROCESS-PATH-WILDCARD`，例如 `PROCESS-PATH-WILDCARD,/opt/*/bin/app?,选择`，以及 Windows 盘符绝对路径。`*` 匹配零个或多个 ASCII 字符，可跨目录分隔符；`?` 恰好匹配一个 ASCII 字符。完整路径匹配、忽略大小写，其他字符按字面量转义。支持顶层、AND/OR/NOT 和 inline classical 规则集，并自动启用 find_process。
+
+输入最多 2048 字节，要求以 / 或盘符路径开头；拒绝 Unicode、控制字符、逗号、括号、no-resolve。此处只承诺 ASCII 路径范围的转换，Mihomo 通配按字节处理，不能扩展为任意 Unicode 路径的等价匹配。不支持相对路径、Android 包名、PROCESS-NAME 或进程名通配；Surge 仍拒绝此条件。
+
+依赖桌面平台的进程查询权限与流量入口，本地 mixed 代理不能保证每个连接都能识别进程。完成匹配边界、Windows/Linux 路径、逻辑/规则集、源配置不变、下载接口、Go 全量与 race，以及真实 sing-box 1.14.4 check；未做各桌面平台实际进程流量识别验收。
