@@ -50,8 +50,19 @@ if ! $existing; then
  tar -xOf "$stage/$package" mxioc-agent > "$stage/mxioc-agent"
  chmod 700 "$stage/mxioc-agent"
 fi
+# Prefer IPv4 for the initial inventory address. Retry only transport failures;
+# authentication and application errors must not be hidden by an IPv6 retry.
 claim() {
- curl -fsS --connect-timeout 15 --max-time 30 --proto '=https' -H "@$stage/auth" -H 'Content-Type: application/json' --data-binary "@$stage/request" "$origin/sub/agent-enroll" -D "$stage/headers" -o "$stage/config"
+ local status
+ if curl -4 -fsS --connect-timeout 8 --max-time 30 --proto '=https' -H "@$stage/auth" -H 'Content-Type: application/json' --data-binary "@$stage/request" "$origin/sub/agent-enroll" -D "$stage/headers" -o "$stage/config"; then
+  return 0
+ else status=$?; fi
+ case "$status" in
+  5|6|7|28|35|52|55|56)
+   echo 'IPv4 登记连接不可用，尝试 IPv6…' >&2
+   curl -6 -fsS --connect-timeout 8 --max-time 30 --proto '=https' -H "@$stage/auth" -H 'Content-Type: application/json' --data-binary "@$stage/request" "$origin/sub/agent-enroll" -D "$stage/headers" -o "$stage/config";;
+  *) return "$status";;
+ esac
 }
 echo '正在登记服务器…'
 claim || { echo '登记失败：令牌可能已撤销或旧命令过期或面板被人机验证拦截。可重新运行命令，或在面板生成新命令。'; exit 1; }
