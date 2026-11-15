@@ -5784,7 +5784,7 @@ async function subscriptions() {
     </form>
   </section>`;
 
-  $('sourceSubUrl').oninput = () => { $('confirmSubImport').disabled = true; $('subImportForm').dataset.previewUrl = ''; };
+  $('sourceSubUrl').oninput = () => { $('confirmSubImport').disabled = true; $('subImportForm').dataset.previewUrl = ''; $('subImportForm').sourceSelection=null; $('subImportForm').previewGeneration=($('subImportForm').previewGeneration||0)+1; };
   $('previewSub').onclick = previewSubscription;
   $('subImportForm').onsubmit = confirmSubscriptionImport;
 }
@@ -5792,11 +5792,13 @@ async function subscriptions() {
 async function previewSubscription() {
   const form = $('subImportForm'), profile = form?.dataset.profile, url = val('sourceSubUrl');
   if (!form || profile !== S.profile) return;
-  const active = () => $('subImportForm') === form && S.profile === profile && S.page === 'subscriptions' && val('sourceSubUrl') === url;
+  const generation=(form.previewGeneration||0)+1;form.previewGeneration=generation;
+  const active = () => $('subImportForm') === form && form.previewGeneration===generation && S.profile === profile && S.page === 'subscriptions' && val('sourceSubUrl') === url;
   const box = $('subPreview'), button = $('previewSub');
   $('formError').textContent = '';
   $('confirmSubImport').disabled = true;
   form.dataset.previewUrl = '';
+  form.sourceSelection=null;
   if (!url) return $('formError').textContent = '请填写来源订阅链接';
   button.disabled = true;
   box.textContent = '>> 正在连接远端订阅服务器并解析数据包，请稍候...';
@@ -5807,7 +5809,20 @@ async function previewSubscription() {
     const protocols = Object.entries(d.protocols).map(([k, v]) => `${optionLabel(k)} ${v} 个`).join('、');
     box.innerHTML = `[SUCCESS] 成功解析 <b>${d.total}</b> 个有效节点：${esc(protocols)}。${d.skipped.length ? `（另有 ${d.skipped.length} 项格式不兼容已忽略）` : ''}`;
     form.dataset.previewUrl = url;
-    $('confirmSubImport').disabled = false;
+    const selected=new Set(d.nodes.map(n=>n.index));form.sourceSelection={selected,revision:d.revision};
+    box.innerHTML+=`<p class="hint">默认选择全部有效节点。可筛选后选择当前结果；隐藏的已选节点仍会导入。仅展示名称和协议，不展示凭据。</p><div class="toolbar"><input id="sourceNodeSearch" aria-label="搜索待导入节点" placeholder="搜索名称或协议"><button type="button" class="btn small" id="sourceSelectMatches">选择筛选结果</button><button type="button" class="btn small" id="sourceClearSelection">取消全部选择</button></div><p id="sourceSelectionCount" role="status"></p><div id="sourceNodeChoices" class="checks"></div><div class="toolbar"><button type="button" class="btn small" id="sourceNodesPrev">上一页</button><span id="sourceNodesPage"></span><button type="button" class="btn small" id="sourceNodesNext">下一页</button></div>`;
+    let page=1;
+    const matches=()=>{const q=$('sourceNodeSearch').value.trim().toLowerCase();return d.nodes.filter(n=>(n.name+' '+n.type).toLowerCase().includes(q));};
+    const render=()=>{
+      const rows=matches(),pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages);
+      $('sourceSelectionCount').textContent=`已选择 ${selected.size} / ${d.total} 个 · 匹配 ${rows.length} 个`;
+      $('sourceNodesPage').textContent=`${page} / ${pages}`;$('sourceNodesPrev').disabled=page===1;$('sourceNodesNext').disabled=page===pages;
+      $('sourceNodeChoices').innerHTML=rows.slice((page-1)*50,page*50).map(n=>`<label class="choice"><input type="checkbox" data-source-index="${n.index}" ${selected.has(n.index)?'checked':''}><span style="min-width:0;overflow-wrap:anywhere">${esc(n.name)} · ${esc(n.type)}</span></label>`).join('')||'<p>没有匹配的节点</p>';
+      $('sourceNodeChoices').querySelectorAll('input').forEach(input=>input.onchange=()=>{const i=Number(input.dataset.sourceIndex);if(input.checked)selected.add(i);else selected.delete(i);render()});
+      $('confirmSubImport').disabled=!selected.size;
+    };
+    let composing=false;const search=()=>{page=1;render()};$('sourceNodeSearch').oncompositionstart=()=>composing=true;$('sourceNodeSearch').oncompositionend=()=>{composing=false;search()};$('sourceNodeSearch').oninput=()=>{if(!composing)search()};
+    $('sourceSelectMatches').onclick=()=>{matches().forEach(n=>selected.add(n.index));render()};$('sourceClearSelection').onclick=()=>{selected.clear();render()};$('sourceNodesPrev').onclick=()=>{page--;render()};$('sourceNodesNext').onclick=()=>{page++;render()};render();
   } catch (error) {
     if (!active()) return;
     box.textContent = '[ERROR] 读取订阅失败';
@@ -5820,13 +5835,14 @@ async function previewSubscription() {
 async function confirmSubscriptionImport(e) {
   e.preventDefault();
   const form = $('subImportForm'), profile = form?.dataset.profile, url = val('sourceSubUrl');
-  if (!form || profile !== S.profile || $('confirmSubImport').disabled || form.dataset.previewUrl !== url) return;
+  if (!form || profile !== S.profile || $('confirmSubImport').disabled || form.dataset.previewUrl !== url || !form.sourceSelection?.selected.size) return;
   const active = () => $('subImportForm') === form && S.profile === profile && S.page === 'subscriptions' && val('sourceSubUrl') === url;
   const button = $('confirmSubImport'); button.disabled = true;
+  const controls=[...form.querySelectorAll('input,select,button')],previous=controls.map(e=>e.disabled);controls.forEach(e=>e.disabled=true);
   $('formError').textContent = '';
   try {
     const opt = jsonOpt('POST', {
-      url, conflict: val('subConflict'), groups: [...form.querySelectorAll('.importGroup:checked')].map(x => x.value)
+      url,selected:[...form.sourceSelection.selected],revision:form.sourceSelection.revision, conflict: val('subConflict'), groups: [...form.querySelectorAll('.importGroup:checked')].map(x => x.value)
     });
     opt.headers['X-Profile'] = profile;
     const d = await api('/import-subscription', opt);
@@ -5836,8 +5852,8 @@ async function confirmSubscriptionImport(e) {
     notice(`成功导入 ${d.added + d.replaced} 个节点`);
     await subscriptions();
   } catch (error) {
-    if (active()) { $('formError').textContent = error.message; button.disabled = false; }
-  }
+    if (active()) { $('formError').textContent = error.message; }
+  } finally { if(active()){controls.forEach((e,i)=>e.disabled=previous[i]);button.disabled=!form.sourceSelection?.selected.size;} }
 }
 
 async function raw() {

@@ -1,6 +1,9 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 
 	"github.com/Angasky/dingzhi-ban/internal/subsource"
@@ -11,6 +14,8 @@ func (s *Server) sourceImportRoutes(w http.ResponseWriter, r *http.Request) bool
 		return false
 	}
 	var input struct {
+		Selected []int  `json:"selected"`
+		Revision string `json:"revision"`
 		URL      string
 		Conflict string
 		Groups   any
@@ -49,6 +54,9 @@ func (s *Server) sourceImportRoutes(w http.ResponseWriter, r *http.Request) bool
 		problem(w, 400, err.Error())
 		return true
 	}
+	packed, _ := json.Marshal([]string{id, input.URL, text})
+	digest := sha256.Sum256(packed)
+	revision := hex.EncodeToString(digest[:])
 	if r.Context().Err() != nil {
 		problem(w, 408, "订阅读取已取消")
 		return true
@@ -59,15 +67,45 @@ func (s *Server) sourceImportRoutes(w http.ResponseWriter, r *http.Request) bool
 			problem(w, 400, err.Error())
 			return true
 		}
+		choices := []map[string]any{}
 		protocols := map[string]int{}
-		for _, node := range batch.Nodes {
+		for index, node := range batch.Nodes {
 			kind, _ := node["type"].(string)
 			if kind == "http" && node["tls"] == true {
 				kind = "https"
 			}
 			protocols[kind]++
+			choices = append(choices, map[string]any{"index": index, "name": node["name"], "type": kind})
 		}
-		respond(w, 200, map[string]any{"total": len(batch.Nodes), "protocols": protocols, "skipped": batch.Skipped, "groups": groups})
+		respond(w, 200, map[string]any{"nodes": choices, "revision": revision, "total": len(batch.Nodes), "protocols": protocols, "skipped": batch.Skipped, "groups": groups})
+		return true
+	}
+	if input.Selected != nil {
+		if input.Revision == "" || input.Revision != revision {
+			problem(w, 409, "上游订阅内容或来源已变化，请重新预览并选择节点")
+			return true
+		}
+		if len(input.Selected) == 0 || len(input.Selected) > subsource.MaxNodes {
+			problem(w, 400, "请选择至少一个节点，最多 20000 个")
+			return true
+		}
+		selected := map[int]bool{}
+		for _, index := range input.Selected {
+			if index < 0 || index >= len(batch.Nodes) || selected[index] {
+				problem(w, 400, "节点选择越界或重复，请重新预览")
+				return true
+			}
+			selected[index] = true
+		}
+		nodes := make([]map[string]any, 0, len(selected))
+		for index, node := range batch.Nodes {
+			if selected[index] {
+				nodes = append(nodes, node)
+			}
+		}
+		batch.Nodes = nodes
+	} else if input.Revision != "" {
+		problem(w, 400, "带预览版本的导入必须明确选择节点")
 		return true
 	}
 	result, err := s.repository.ImportSubscription(id, batch.Nodes, input.Conflict, input.Groups, batch.SkippedCount)
