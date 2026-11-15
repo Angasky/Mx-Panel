@@ -19,6 +19,7 @@ type BatchInstallItem struct {
 	Revision string `json:"revision,omitempty"`
 }
 type BatchInstall struct {
+	Concurrency   int                `json:"concurrency"`
 	ID            string             `json:"id"`
 	Status        string             `json:"status"`
 	StopOnFailure bool               `json:"stopOnFailure"`
@@ -62,7 +63,7 @@ func (m *Manager) writeInstallBatch(batch BatchInstall) error {
 
 // batchMu serializes queue transitions; the existing install worker owns each
 // actual job. Never replay an in-flight install after process restart.
-func (m *Manager) InstallBatch(ids []string, confirmed, stopOnFailure, cancel bool) (BatchInstall, error) {
+func (m *Manager) InstallBatch(ids []string, confirmed, stopOnFailure, cancel bool, limits ...int) (BatchInstall, error) {
 	m.batchMu.Lock()
 	defer m.batchMu.Unlock()
 	batch, e := m.readInstallBatch()
@@ -97,6 +98,13 @@ func (m *Manager) InstallBatch(ids []string, confirmed, stopOnFailure, cancel bo
 	if m.batchRunning {
 		return batch, errors.New("已有安装批次正在执行，请先等待完成或停止后续派发")
 	}
+	concurrency := 5
+	if len(limits) > 0 && limits[0] != 0 {
+		concurrency = limits[0]
+	}
+	if concurrency < 1 || concurrency > 20 {
+		return batch, errors.New("安装并发数须为 1–20")
+	}
 	seen := map[string]bool{}
 	items := []BatchInstallItem{}
 	for _, id := range ids {
@@ -121,7 +129,7 @@ func (m *Manager) InstallBatch(ids []string, confirmed, stopOnFailure, cancel bo
 	if _, e = rand.Read(raw); e != nil {
 		return batch, e
 	}
-	batch = BatchInstall{ID: hex.EncodeToString(raw), Status: "running", StopOnFailure: stopOnFailure, Items: items, Created: time.Now().Unix()}
+	batch = BatchInstall{Concurrency: concurrency, ID: hex.EncodeToString(raw), Status: "running", StopOnFailure: stopOnFailure, Items: items, Created: time.Now().Unix()}
 	if e = m.writeInstallBatch(batch); e != nil {
 		return batch, e
 	}
@@ -132,92 +140,121 @@ func (m *Manager) InstallBatch(ids []string, confirmed, stopOnFailure, cancel bo
 func (m *Manager) runInstallBatch(id string) {
 	defer func() { m.batchMu.Lock(); m.batchRunning = false; m.batchMu.Unlock() }()
 	for {
-		m.batchMu.Lock()
-		batch, e := m.readInstallBatch()
-		if e != nil || batch.ID != id {
-			m.batchMu.Unlock()
+		done, err := m.stepInstallBatch(id)
+		if err != nil || done {
 			return
 		}
-		index := -1
-		for i := range batch.Items {
-			if batch.Items[i].Status == "pending" {
-				index = i
-				break
-			}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+// Refresh every active job before dispatching more, so failure-stop prevents
+// new starts while allowing all already-running hosts to finish independently.
+func (m *Manager) stepInstallBatch(id string) (bool, error) {
+	m.batchMu.Lock()
+	defer m.batchMu.Unlock()
+	batch, err := m.readInstallBatch()
+	if err != nil {
+		return true, err
+	}
+	if batch.ID != id {
+		return true, nil
+	}
+	limit := batch.Concurrency
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 20 {
+		limit = 20
+	}
+	running := 0
+	for i := range batch.Items {
+		item := &batch.Items[i]
+		if item.Status != "running" {
+			continue
 		}
-		if batch.Status == "stopping" || index < 0 {
-			if batch.Status == "stopping" {
-				batch.Status = "stopped"
-				for i := range batch.Items {
-					if batch.Items[i].Status == "pending" {
-						batch.Items[i].Status = "skipped"
-					}
-				}
-			} else {
-				batch.Status = "completed"
-				for _, v := range batch.Items {
-					if v.Status == "failed" {
-						batch.Status = "completed_with_errors"
-					}
-				}
-			}
-			m.writeInstallBatch(batch)
-			m.batchMu.Unlock()
-			return
+		job, e := m.InstallJob(item.Job)
+		if e == nil && (job["status"] == "running" || job["status"] == "queued") {
+			running++
+			continue
 		}
-		item := &batch.Items[index]
-		// Persist dispatch intent before starting; a crash becomes interrupted.
-		item.Status = "running"
-		if m.writeInstallBatch(batch) != nil {
-			m.batchMu.Unlock()
-			return
-		}
-		job, e := m.startInstallExpected(item.ID, true, item.Revision)
 		if e != nil {
 			item.Status = "failed"
 			item.Error = e.Error()
-		} else {
-			item.Job = value(job["id"])
-		}
-		if m.writeInstallBatch(batch) != nil {
-			m.batchMu.Unlock()
-			return
-		}
-		m.batchMu.Unlock()
-		if e == nil {
-			for {
-				job, e = m.InstallJob(item.Job)
-				if e != nil || job["status"] != "running" {
-					break
-				}
-				time.Sleep(time.Second)
-			}
-		}
-		m.batchMu.Lock()
-		latest, readErr := m.readInstallBatch()
-		if readErr != nil || latest.ID != id {
-			m.batchMu.Unlock()
-			return
-		}
-		if e != nil {
-			latest.Items[index].Status = "failed"
-			latest.Items[index].Error = e.Error()
 		} else if job["status"] == "succeeded" {
-			latest.Items[index].Status = "succeeded"
+			item.Status = "succeeded"
 		} else {
-			latest.Items[index].Status = "failed"
-			latest.Items[index].Error = value(job["error"])
-			if latest.Items[index].Error == "" {
-				latest.Items[index].Error = "安装未成功，请查看任务日志"
+			item.Status = "failed"
+			item.Error = value(job["error"])
+			if item.Error == "" {
+				item.Error = "安装未成功，请查看任务日志"
 			}
 		}
-		if latest.Items[index].Status == "failed" && latest.StopOnFailure {
-			latest.Status = "stopping"
-		}
-		e = m.writeInstallBatch(latest)
-		m.batchMu.Unlock()
-		if e != nil {
-			return
+		if item.Status == "failed" && batch.StopOnFailure {
+			batch.Status = "stopping"
 		}
 	}
+	if batch.Status != "stopping" {
+		for i := range batch.Items {
+			item := &batch.Items[i]
+			if item.Status != "pending" {
+				continue
+			}
+			if running >= limit {
+				break
+			}
+			// Durable intent before start. Never replay this item after restart.
+			item.Status = "running"
+			if e := m.writeInstallBatch(batch); e != nil {
+				return true, e
+			}
+			job, e := m.startInstallExpected(item.ID, true, item.Revision)
+			if errors.Is(e, ErrInstallCapacity) {
+				item.Status = "pending"
+				break
+			}
+			if e != nil {
+				item.Status = "failed"
+				item.Error = e.Error()
+				if batch.StopOnFailure {
+					batch.Status = "stopping"
+					break
+				}
+			} else {
+				item.Job = value(job["id"])
+				running++
+			}
+			if e := m.writeInstallBatch(batch); e != nil {
+				return true, e
+			}
+		}
+	}
+	pending := 0
+	for i := range batch.Items {
+		if batch.Items[i].Status == "pending" {
+			if batch.Status == "stopping" {
+				batch.Items[i].Status = "skipped"
+			} else {
+				pending++
+			}
+		}
+	}
+	done := running == 0 && pending == 0
+	if done {
+		if batch.Status == "stopping" {
+			batch.Status = "stopped"
+		} else {
+			batch.Status = "completed"
+			for _, item := range batch.Items {
+				if item.Status == "failed" {
+					batch.Status = "completed_with_errors"
+					break
+				}
+			}
+		}
+	}
+	if e := m.writeInstallBatch(batch); e != nil {
+		return true, e
+	}
+	return done, nil
 }

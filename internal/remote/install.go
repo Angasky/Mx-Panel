@@ -96,6 +96,8 @@ func (m *Manager) RecoverInstallJobs() error {
 	return nil
 }
 
+var ErrInstallCapacity = errors.New("安装并发已达 20 台，请等待空位")
+
 func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
 	return m.startInstallExpected(id, confirmed, "")
 }
@@ -164,8 +166,8 @@ func (m *Manager) startInstallExpected(id string, confirmed bool, expected strin
 			keep = append(keep, job)
 		}
 	}
-	if count >= 2 {
-		return nil, errors.New("已有两个安装任务，请稍后再试")
+	if count >= 20 {
+		return nil, ErrInstallCapacity
 	}
 	if m.operations == nil {
 		m.operations = map[string]chan struct{}{}

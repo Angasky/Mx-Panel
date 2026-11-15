@@ -17,6 +17,7 @@ func (s *Server) serverBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 	}
 	if r.URL.Path == "/admin/api/servers/batch-install" {
 		var in struct {
+			Concurrency   int      `json:"concurrency"`
 			IDs           []string `json:"ids"`
 			Confirmed     bool     `json:"confirmed"`
 			StopOnFailure bool     `json:"stopOnFailure"`
@@ -31,7 +32,7 @@ func (s *Server) serverBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 				return true
 			}
 		}
-		batch, e := m.InstallBatch(in.IDs, in.Confirmed, in.StopOnFailure, r.Method == "DELETE")
+		batch, e := m.InstallBatch(in.IDs, in.Confirmed, in.StopOnFailure, r.Method == "DELETE", in.Concurrency)
 		if e != nil {
 			problem(w, 409, e.Error())
 		} else {
