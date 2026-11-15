@@ -1836,6 +1836,7 @@ html[data-theme="craft"] .btn.primary:not(:disabled):active{box-shadow:inset 2px
 @media(max-width:640px){#serverStatusFilter,#serverKindFilter,#serverRefresh{flex:1 1 100%;width:100%;min-width:0}}
 [data-site-name],[data-site-description]{overflow-wrap:anywhere;min-width:0}.login-identity b{font-weight:inherit}.side-brand>div:nth-child(2){min-width:0;flex:1}.site-announcement{white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto;flex-shrink:0}#siteInfoPreview{overflow-wrap:anywhere}#siteInfoForm textarea{width:100%;box-sizing:border-box;resize:vertical}
 [data-site-logo].site-custom-logo{background:none!important;font-size:0!important;padding:0;overflow:hidden;flex-shrink:0}[data-site-logo] img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}.site-login-logo{width:64px;height:64px;margin-bottom:16px}#siteLogoPreview{width:64px;height:64px;object-fit:contain}#siteLogo{max-width:100%}
+#panelUserProfile{max-width:100%;min-width:0}#panelUserSearch{min-width:0}
 </style>
 </head>
 <body>
@@ -2584,15 +2585,19 @@ function setTheme(theme) {
 
 
 const accessNotice = '授权控制面板内的订阅访问。禁用用户或撤销授权不会使已复制的订阅链接失效；如需彻底撤销，请同时轮换订阅地址。普通用户不能修改节点、服务器或系统设置。';
-async function userManager(view = {query:'',status:'',page:1}) {
+async function userManager(view = {query:'',status:'',profile:'',page:1}) {
   const epoch=S.modalEpoch,role=S.role;
   const [data, profiles] = await Promise.all([api('/users'), api('/profiles')]);
   if(S.role!==role||role!=='admin'||S.modalEpoch!==epoch)return;
-  openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button><button id="panelUsersRefresh" class="btn">刷新列表</button></div><div class="toolbar"><input id="panelUserSearch" aria-label="搜索用户名" placeholder="搜索用户名…" value="${esc(view.query)}"><select id="panelUserFilter" aria-label="用户状态"><option value="">全部状态</option><option value="enabled">已启用</option><option value="disabled">已禁用</option></select><button class="btn" id="panelUsersClear">清除筛选</button></div><p id="panelUserCount" class="hint" role="status"></p><div id="panelUserList"></div><div class="pagination"><button class="btn small" id="panelUsersPrev">上一页</button><span id="panelUsersPage"></span><button class="btn small" id="panelUsersNext">下一页</button></div>`);
+  openModal('用户与权限', `<p class="note">${esc(accessNotice)}</p><div class="toolbar"><button id="newPanelUser" class="btn primary">新建用户</button><button id="panelUsersRefresh" class="btn">刷新列表</button></div><div class="toolbar"><input id="panelUserSearch" aria-label="搜索用户名" placeholder="搜索用户名…" value="${esc(view.query)}"><select id="panelUserFilter" aria-label="用户状态"><option value="">全部状态</option><option value="enabled">已启用</option><option value="disabled">已禁用</option></select><select id="panelUserProfile" aria-label="授权订阅筛选"><option value="">全部授权情况</option><option value="none">无有效订阅授权</option>${profiles.profiles.map(p=>`<option value="${esc('profile:'+p.id)}">${esc(p.name)}</option>`).join('')}</select><button class="btn" id="panelUsersClear">清除筛选</button></div><p id="panelUserCount" class="hint" role="status"></p><div id="panelUserList"></div><div class="pagination"><button class="btn small" id="panelUsersPrev">上一页</button><span id="panelUsersPage"></span><button class="btn small" id="panelUsersNext">下一页</button></div>`);
   const list=$('panelUserList'),search=$('panelUserSearch'),filter=$('panelUserFilter');filter.value=view.status;
+  const profileFilter=$('panelUserProfile'),existingProfiles=new Set(profiles.profiles.map(p=>p.id));
+  view.profile=view.profile||'';
+  if(view.profile.startsWith('profile:')&&!existingProfiles.has(view.profile.slice(8))){const option=document.createElement('option');option.value=view.profile;option.textContent='原筛选订阅已删除';profileFilter.append(option)}
+  profileFilter.value=view.profile;
   const render=()=>{
     const query=view.query.trim().toLocaleLowerCase();
-    const matched=data.users.filter(u=>u.username.toLocaleLowerCase().includes(query)&&(!view.status||u.enabled===(view.status==='enabled')));
+    const matched=data.users.filter(u=>u.username.toLocaleLowerCase().includes(query)&&(!view.status||u.enabled===(view.status==='enabled'))&&(!view.profile||(view.profile==='none'?!(u.profiles||[]).some(id=>existingProfiles.has(id)):(u.profiles||[]).includes(view.profile.slice(8))&&existingProfiles.has(view.profile.slice(8)))));
     const pages=Math.max(1,Math.ceil(matched.length/20));view.page=Math.max(1,Math.min(view.page,pages));
     const rows=matched.slice((view.page-1)*20,view.page*20);
     $('panelUserCount').textContent=`共 ${data.users.length} 位用户，匹配 ${matched.length} 位 · 每页 20 位`;
@@ -2611,7 +2616,8 @@ async function userManager(view = {query:'',status:'',page:1}) {
   const applySearch=()=>{view.query=search.value;view.page=1;render()};
   search.addEventListener('compositionstart',()=>composing=true);search.addEventListener('compositionend',()=>{composing=false;applySearch()});search.oninput=()=>{if(!composing)applySearch()};
   filter.onchange=()=>{view.status=filter.value;view.page=1;render()};
-  $('panelUsersClear').onclick=()=>{view.query='';view.status='';view.page=1;search.value='';filter.value='';render();search.focus()};
+  profileFilter.onchange=()=>{view.profile=profileFilter.value;view.page=1;render()};
+  $('panelUsersClear').onclick=()=>{view.query='';view.status='';view.profile='';view.page=1;search.value='';filter.value='';profileFilter.value='';render();search.focus()};
   $('panelUsersPrev').onclick=()=>{view.page--;render()};$('panelUsersNext').onclick=()=>{view.page++;render()};
   $('panelUsersRefresh').onclick=async e=>{e.currentTarget.disabled=true;try{await userManager(view)}catch(error){notice(error.message);if(list.isConnected)$('panelUsersRefresh').disabled=false}};
   $('newPanelUser').onclick=()=>editPanelUser(null,profiles.profiles);render();
