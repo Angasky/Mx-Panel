@@ -20,14 +20,15 @@ import (
 )
 
 type panelUser struct {
-	ID         string             `json:"id"`
-	Username   string             `json:"username"`
-	Salt       string             `json:"salt"`
-	Hash       string             `json:"hash"`
-	Iterations int                `json:"iterations"`
-	Enabled    bool               `json:"enabled"`
-	Profiles   []string           `json:"profiles"`
-	Sessions   map[string]session `json:"sessions"`
+	PreferredClient string             `json:"preferredClient,omitempty"`
+	ID              string             `json:"id"`
+	Username        string             `json:"username"`
+	Salt            string             `json:"salt"`
+	Hash            string             `json:"hash"`
+	Iterations      int                `json:"iterations"`
+	Enabled         bool               `json:"enabled"`
+	Profiles        []string           `json:"profiles"`
+	Sessions        map[string]session `json:"sessions"`
 }
 
 func (s *Server) userStore() *storage.Store {
@@ -353,6 +354,8 @@ func (s *Server) memberRoutes(w http.ResponseWriter, r *http.Request, u panelUse
 		return
 	}
 	switch {
+	case r.URL.Path == "/admin/api/portal/preferences":
+		s.memberPreferences(w, r, u)
 	case r.URL.Path == "/admin/api/account" && r.Method == "GET":
 		respond(w, 200, userView(u))
 	case r.URL.Path == "/admin/api/logout" && r.Method == "POST":
@@ -401,7 +404,7 @@ func (s *Server) memberRoutes(w http.ResponseWriter, r *http.Request, u panelUse
 			}
 			result = append(result, map[string]any{"id": id, "name": source.Name, "url": "/sub/" + source.Slug, "traffic": traffic, "formats": subscriptions.ConversionReport(source, s.now())})
 		}
-		respond(w, 200, map[string]any{"profiles": result})
+		respond(w, 200, map[string]any{"profiles": result, "preferredClient": preferredClient(u.PreferredClient), "clients": subscriptions.ClientChoices()})
 	default:
 		problem(w, 403, "普通用户无权执行此操作")
 	}

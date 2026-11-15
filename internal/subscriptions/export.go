@@ -232,3 +232,19 @@ func ConversionReport(source config.Subscription, now time.Time) []Record {
 	}
 	return reports
 }
+
+// ClientChoices contains public format labels, never subscription URLs.
+func ClientChoices() []Record {
+	choices := []Record{{"id": "clash", "name": "Clash / Mihomo"}}
+	for _, f := range formats {
+		choices = append(choices, Record{"id": f.ID, "name": f.Name})
+	}
+	return choices
+}
+func ValidClientChoice(id string) bool {
+	if id == "clash" {
+		return true
+	}
+	_, err := formatByID(id)
+	return err == nil
+}
