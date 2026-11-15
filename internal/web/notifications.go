@@ -19,25 +19,27 @@ import (
 )
 
 type notificationConfig struct {
-	TextTemplate string `json:"textTemplate"`
-	Renewal      bool   `json:"renewal"`
-	RenewalUsers string `json:"renewalUsers"`
-	Enabled      bool   `json:"enabled"`
-	ChatID       string `json:"chatId"`
-	SealedToken  string `json:"sealedToken,omitempty"`
-	Monitor      bool   `json:"monitor"`
-	Traffic      bool   `json:"traffic"`
-	Expiry       bool   `json:"expiry"`
-	Days         int    `json:"days"`
-	Percent      int    `json:"percent"`
-	Failures     int    `json:"failures"`
-	Daily        bool   `json:"daily"`
-	DailyHour    int    `json:"dailyHour"`
-	Probes       bool   `json:"probes"`
-	LatencyMS    int    `json:"latencyMs"`
-	LossPercent  int    `json:"lossPercent"`
+	EventTemplates notificationTemplates `json:"eventTemplates"`
+	TextTemplate   string                `json:"textTemplate"`
+	Renewal        bool                  `json:"renewal"`
+	RenewalUsers   string                `json:"renewalUsers"`
+	Enabled        bool                  `json:"enabled"`
+	ChatID         string                `json:"chatId"`
+	SealedToken    string                `json:"sealedToken,omitempty"`
+	Monitor        bool                  `json:"monitor"`
+	Traffic        bool                  `json:"traffic"`
+	Expiry         bool                  `json:"expiry"`
+	Days           int                   `json:"days"`
+	Percent        int                   `json:"percent"`
+	Failures       int                   `json:"failures"`
+	Daily          bool                  `json:"daily"`
+	DailyHour      int                   `json:"dailyHour"`
+	Probes         bool                  `json:"probes"`
+	LatencyMS      int                   `json:"latencyMs"`
+	LossPercent    int                   `json:"lossPercent"`
 }
 type notificationEvent struct {
+	Category      string           `json:"category,omitempty"`
 	DeliveryText  string           `json:"deliveryText,omitempty"`
 	RenewalResult string           `json:"renewalResult,omitempty"`
 	Renewal       *telegramRenewal `json:"renewal,omitempty"`
@@ -75,6 +77,9 @@ func (s *Server) readNotifications() (notificationState, error) {
 	}
 	if e == nil {
 		e = validateNotificationTemplate(n.Config.TextTemplate)
+	}
+	if e == nil {
+		e = n.Config.EventTemplates.validate()
 	}
 	return n, e
 }
@@ -136,26 +141,28 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 	case "GET":
 	case "PUT":
 		var input struct {
-			TextTemplate *string `json:"textTemplate"`
-			Renewal      *bool   `json:"renewal"`
-			RenewalUsers *string `json:"renewalUsers"`
-			Enabled      bool    `json:"enabled"`
-			ChatID       string  `json:"chatId"`
-			Token        string  `json:"token"`
-			ClearToken   bool    `json:"clearToken"`
-			Monitor      bool    `json:"monitor"`
-			Traffic      bool    `json:"traffic"`
-			Expiry       bool    `json:"expiry"`
-			Days         int     `json:"days"`
-			Percent      int     `json:"percent"`
-			Failures     int     `json:"failures"`
-			Daily        *bool   `json:"daily"`
-			DailyHour    *int    `json:"dailyHour"`
-			Probes       *bool   `json:"probes"`
-			LatencyMS    *int    `json:"latencyMs"`
-			LossPercent  *int    `json:"lossPercent"`
+			TextTemplate   *string                `json:"textTemplate"`
+			EventTemplates *notificationTemplates `json:"eventTemplates"`
+			Renewal        *bool                  `json:"renewal"`
+			RenewalUsers   *string                `json:"renewalUsers"`
+			Enabled        bool                   `json:"enabled"`
+			ChatID         string                 `json:"chatId"`
+			Token          string                 `json:"token"`
+			ClearToken     bool                   `json:"clearToken"`
+			Monitor        bool                   `json:"monitor"`
+			Traffic        bool                   `json:"traffic"`
+			Expiry         bool                   `json:"expiry"`
+			Days           int                    `json:"days"`
+			Percent        int                    `json:"percent"`
+			Failures       int                    `json:"failures"`
+			Daily          *bool                  `json:"daily"`
+			DailyHour      *int                   `json:"dailyHour"`
+			Probes         *bool                  `json:"probes"`
+			LatencyMS      *int                   `json:"latencyMs"`
+			LossPercent    *int                   `json:"lossPercent"`
 		}
-		if readJSON(w, r, &input) != nil {
+		if err := readJSON(w, r, &input); err != nil {
+			problem(w, 400, err.Error())
 			return true
 		}
 		input.Token = strings.TrimSpace(input.Token)
@@ -185,6 +192,14 @@ func (s *Server) notificationRoute(w http.ResponseWriter, r *http.Request) bool 
 			return true
 		}
 		next := notificationConfig{Enabled: input.Enabled, ChatID: input.ChatID, SealedToken: sealed, Monitor: input.Monitor, Traffic: input.Traffic, Expiry: input.Expiry, Days: input.Days, Percent: input.Percent, Failures: input.Failures, Daily: n.Config.Daily, DailyHour: n.Config.DailyHour, Probes: n.Config.Probes, LatencyMS: n.Config.LatencyMS, LossPercent: n.Config.LossPercent}
+		next.EventTemplates = n.Config.EventTemplates
+		if input.EventTemplates != nil {
+			next.EventTemplates = *input.EventTemplates
+		}
+		if err := next.EventTemplates.validate(); err != nil {
+			problem(w, 400, err.Error())
+			return true
+		}
 		next.TextTemplate = n.Config.TextTemplate
 		if input.TextTemplate != nil {
 			next.TextTemplate = *input.TextTemplate
@@ -404,15 +419,15 @@ func notificationReconcile(n *notificationState, current map[string]string, now 
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	add := func(key, message string) {
-		n.Events = append(n.Events, notificationEvent{Key: key, Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
+	add := func(key, category, message string) {
+		n.Events = append(n.Events, notificationEvent{Key: key, Category: category, Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
 	}
 	for _, key := range keys {
 		if strings.HasPrefix(key, "unknown:") || strings.HasPrefix(key, "healthy:") {
 			continue
 		}
 		if n.Active[key] != current[key] {
-			add(key, current[key])
+			add(key, notificationCategory(key), current[key])
 		}
 	}
 	oldKeys := make([]string, 0, len(n.Active))
@@ -425,14 +440,14 @@ func notificationReconcile(n *notificationState, current map[string]string, now 
 			if current["unknown:"+key] != "" {
 				current[key] = n.Active[key]
 			} else if current["healthy:"+key] != "" {
-				add("", "探测恢复通知（以下原告警已解除）："+n.Active[key])
+				add("", "recovery", "探测恢复通知（以下原告警已解除）："+n.Active[key])
 			}
 		}
 		if strings.HasPrefix(key, "monitor:") && current[key] == "" {
 			if current["unknown:"+strings.TrimPrefix(key, "monitor:")] != "" {
 				current[key] = n.Active[key]
 			} else if n.Config.Monitor && current["healthy:"+strings.TrimPrefix(key, "monitor:")] != "" {
-				add("", "监控采样恢复："+strings.TrimSuffix(n.Active[key], "连续监控采样失败，请检查连接；不代表代理服务一定离线。"))
+				add("", "recovery", "监控采样恢复："+strings.TrimSuffix(n.Active[key], "连续监控采样失败，请检查连接；不代表代理服务一定离线。"))
 			}
 		}
 	}
@@ -502,7 +517,7 @@ func (s *Server) pollNotifications(ctx context.Context) {
 		date := now.UTC().AddDate(0, 0, -1).Format("2006-01-02")
 		if n.LastDaily < date {
 			if message, e := s.notificationDailyReport(now); e == nil {
-				n.Events = append(n.Events, notificationEvent{Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
+				n.Events = append(n.Events, notificationEvent{Category: "daily", Time: now.Unix(), Text: message, Status: "pending", Next: now.Unix()})
 				n.LastDaily = date
 			}
 		}
@@ -530,7 +545,7 @@ func (s *Server) pollNotifications(ctx context.Context) {
 		}
 		token, _ := secret["token"].(string)
 		if event.DeliveryText == "" {
-			event.DeliveryText, _ = renderNotificationText(n.Config.TextTemplate, event.Text, event.Time)
+			event.DeliveryText, _ = renderNotificationText(n.Config.templateFor(event.Category), event.Text, event.Time)
 			if s.saveNotifications(n) != nil {
 				return
 			}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,6 +9,68 @@ import (
 	"unicode"
 	"unicode/utf8"
 )
+
+// A fixed, comparable schema keeps configuration change detection atomic.
+type notificationTemplates struct {
+	Monitor            string `json:"monitor"`
+	Probe              string `json:"probe"`
+	Traffic            string `json:"traffic"`
+	SubscriptionExpiry string `json:"subscription-expiry"`
+	ServerExpiry       string `json:"server-expiry"`
+	Recovery           string `json:"recovery"`
+	Daily              string `json:"daily"`
+}
+
+func (t *notificationTemplates) UnmarshalJSON(data []byte) error {
+	type plain notificationTemplates
+	var values map[string]json.RawMessage
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+	allowed := notificationTemplates{}.values()
+	for key, value := range values {
+		if _, ok := allowed[key]; !ok {
+			return errors.New("未知通知模板分类")
+		}
+		if string(value) == "null" {
+			return errors.New("分类模板必须为字符串")
+		}
+	}
+	var parsed plain
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return err
+	}
+	*t = notificationTemplates(parsed)
+	return nil
+}
+func (t notificationTemplates) values() map[string]string {
+	return map[string]string{"monitor": t.Monitor, "probe": t.Probe, "traffic": t.Traffic, "subscription-expiry": t.SubscriptionExpiry, "server-expiry": t.ServerExpiry, "recovery": t.Recovery, "daily": t.Daily}
+}
+func (t notificationTemplates) validate() error {
+	for _, value := range t.values() {
+		if err := validateNotificationTemplate(value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (c notificationConfig) templateFor(category string) string {
+	if value := c.EventTemplates.values()[category]; value != "" {
+		return value
+	}
+	return c.TextTemplate
+}
+func notificationCategory(key string) string {
+	prefix, _, _ := strings.Cut(key, ":")
+	switch prefix {
+	case "monitor", "traffic", "subscription-expiry", "server-expiry":
+		return prefix
+	case "probe-loss", "probe-latency":
+		return "probe"
+	default:
+		return ""
+	}
+}
 
 func validateNotificationTemplate(value string) error {
 	if value == "" {
@@ -78,7 +141,8 @@ func (s *Server) notificationTemplateRoute(w http.ResponseWriter, r *http.Reques
 		Template string `json:"template"`
 		Sample   string `json:"sample"`
 	}
-	if readJSON(w, r, &input) != nil {
+	if err := readJSON(w, r, &input); err != nil {
+		problem(w, 400, err.Error())
 		return true
 	}
 	if err := validateNotificationTemplate(input.Template); err != nil {
@@ -86,11 +150,14 @@ func (s *Server) notificationTemplateRoute(w http.ResponseWriter, r *http.Reques
 		return true
 	}
 	samples := map[string]string{
-		"monitor":  "服务器「示例香港」连续监控采样失败，请检查连接；不代表代理服务一定离线。",
-		"traffic":  "订阅「示例套餐」已使用 92% 流量（示例数据）。",
-		"expiry":   "服务器「示例服务器」将在 7 天后到期，请核对续费（示例数据）。",
-		"recovery": "监控采样恢复：服务器「示例香港」（示例数据）。",
-		"daily":    "网卡观测流量日报（示例数据）\n示例服务器：上传 2 GiB，下载 8 GiB。\n观测流量不等同于订阅账单。",
+		"monitor":             "服务器「示例香港」连续监控采样失败，请检查连接；不代表代理服务一定离线。",
+		"probe":               "服务器「示例香港」探测平均延迟超过 300 毫秒（示例数据）。",
+		"subscription-expiry": "订阅「示例套餐」将在 7 天后到期（示例数据）。",
+		"server-expiry":       "服务器「示例服务器」将在 7 天后到期，请核对续费（示例数据）。",
+		"traffic":             "订阅「示例套餐」已使用 92% 流量（示例数据）。",
+		"expiry":              "服务器「示例服务器」将在 7 天后到期，请核对续费（示例数据）。",
+		"recovery":            "监控采样恢复：服务器「示例香港」（示例数据）。",
+		"daily":               "网卡观测流量日报（示例数据）\n示例服务器：上传 2 GiB，下载 8 GiB。\n观测流量不等同于订阅账单。",
 	}
 	message, ok := samples[input.Sample]
 	if !ok {
