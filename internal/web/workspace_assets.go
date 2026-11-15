@@ -1,14 +1,14 @@
 package web
 
 import (
-	"bytes"
 	"embed"
 	"net/http"
-	"time"
+	"sync"
 )
 
 //go:embed assets/workspace/*
 var workspaceAssets embed.FS
+var workspaceDelivery sync.Map
 
 func workspaceAsset(w http.ResponseWriter, r *http.Request) bool {
 	var name, kind string
@@ -32,13 +32,15 @@ func workspaceAsset(w http.ResponseWriter, r *http.Request) bool {
 		problem(w, 405, "请求方法不支持")
 		return true
 	}
-	data, e := workspaceAssets.ReadFile("assets/workspace/" + name)
-	if e != nil {
-		problem(w, 404, "界面资源不存在")
-		return true
+	cached, ok := workspaceDelivery.Load(name)
+	if !ok {
+		data, e := workspaceAssets.ReadFile("assets/workspace/" + name)
+		if e != nil {
+			problem(w, 404, "界面资源不存在")
+			return true
+		}
+		cached, _ = workspaceDelivery.LoadOrStore(name, makeUIRepresentation(data))
 	}
-	w.Header().Set("Content-Type", kind)
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(data))
+	cached.(*uiRepresentation).serve(w, r, name, kind)
 	return true
 }

@@ -247,7 +247,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if path == "" {
 			path = filepath.Join(s.options.Root, "index.html")
 		}
-		http.ServeFile(w, r, path)
+		serveUIHTML(w, r, path)
 		return
 	}
 	if craftAsset(w, r) {

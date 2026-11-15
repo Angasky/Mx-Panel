@@ -2157,7 +2157,7 @@ SOFTWARE.
 <!-- TOAST ALERT -->
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script src="/sub/status-globe.js" defer></script>
+
 <script>
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -4141,8 +4141,17 @@ function serverGlobePosition(server){
  const places={HK:[22.3,114.2],MO:[22.2,113.5],TW:[23.7,121],CN:[35,105],JP:[36,138],KR:[36,128],SG:[1.35,103.82],US:[39,-98],DE:[51,10],VN:[16,108],GB:[54,-2],FR:[46,2],CA:[56,-106],AU:[-25,134],NZ:[-41,174],IN:[22,79],ID:[-2,118],MY:[4,102],TH:[15,101],PH:[13,122],NL:[52,5],BE:[50.8,4.5],CH:[47,8],AT:[47.5,14.5],IT:[43,12],ES:[40,-4],PT:[40,-8],IE:[53,-8],SE:[62,15],NO:[62,10],FI:[64,26],DK:[56,10],PL:[52,19],CZ:[50,15],RU:[60,100],UA:[49,32],TR:[39,35],AE:[24,54],IL:[31.5,35],SA:[24,45],ZA:[-29,24],BR:[-10,-52],AR:[-34,-64],CL:[-30,-71],MX:[23,-102],IS:[65,-19],RO:[46,25],HU:[47,19],BG:[43,25],GR:[39,22],LU:[49.8,6.1],EE:[59,26],LT:[55,24],LV:[57,25],BD:[24,90],PK:[30,69],NP:[28,84],KH:[13,105],LA:[18,103],MM:[21,96],KZ:[48,68],GE:[42,44],AM:[40,45],EG:[27,30],KE:[0,38],NG:[9,8],CO:[4,-73],PE:[-10,-76],EC:[-2,-78],UY:[-33,-56],CR:[10,-84],PA:[9,-80]};
  const coordinates=places[code];return coordinates?{label:server.name,latitude:coordinates[0],longitude:coordinates[1],source:'探针地域 '+region+' · 国家/地区近似位置'}:null;
 }
+let globeLoading;
+function loadGlobe(){
+ if(window.MxGlobe)return Promise.resolve();
+ if(!globeLoading)globeLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/sub/status-globe.js';script.onload=resolve;script.onerror=()=>{script.remove();globeLoading=null;reject(Error('地球组件加载失败，请重试'))};document.head.append(script)});
+ return globeLoading;
+}
 async function serverGlobe(){
- const epoch=S.modalEpoch||0,data=await api('/servers');
+ const epoch=S.modalEpoch||0;
+ await loadGlobe();
+ if(S.role!=='admin'||epoch!==(S.modalEpoch||0))return;
+ const data=await api('/servers');
  if(S.role!=='admin'||epoch!==(S.modalEpoch||0))return;
  const servers=data.servers||[],points=servers.map(serverGlobePosition).filter(Boolean),missing=servers.filter(s=>!serverGlobePosition(s));
  openModal('服务器位置 · 3D 地球',`<p class="note">已定位 ${points.length} / ${servers.length} 台。优先使用手动经纬度，其余复用探针国家/地区的近似坐标，不代表真实机房或城市。同地域服务器可能重叠，可从下方列表逐台选择。支持拖动和方向键旋转。</p>${missing.length?`<p class="hint">缺少可用位置：${missing.map(s=>esc(s.name)).join('、')}。请刷新探针连接，或在“地域与续费”补充经纬度。</p>`:''}<div id="serverGlobe"></div>`);
