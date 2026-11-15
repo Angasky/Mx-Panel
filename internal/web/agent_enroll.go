@@ -40,6 +40,7 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 	switch r.Method {
 	case "POST":
 		var input struct {
+			Reusable         bool   `json:"reusable"`
 			Name             string `json:"name"`
 			SettingsRevision string `json:"settingsRevision"`
 			Origin           string `json:"origin"`
@@ -58,7 +59,7 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		name := strings.TrimSpace(input.Name)
-		if settings.AutoHostname {
+		if settings.AutoHostname || input.Reusable {
 			name = "等待服务器上报 hostname"
 		}
 		if name == "" || utf8.RuneCountInString(name) > 60 || !utf8.ValidString(name) || strings.ContainsFunc(name, unicode.IsControl) {
@@ -73,7 +74,7 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 		}
 		// Expired unclaimed entries can be removed safely: they never created servers.
 		for id, entry := range entries {
-			if entry.EnrollDigest != "" && !entry.EnrollDone && entry.EnrollClient == "" && entry.EnrollExpires <= s.now().Unix() {
+			if entry.EnrollDigest != "" && !entry.EnrollDone && entry.EnrollClient == "" && !entry.EnrollReusable && entry.EnrollExpires <= s.now().Unix() {
 				delete(entries, id)
 			}
 		}
@@ -95,6 +96,12 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 		id := hex.EncodeToString(random[:12])
 		token := base64.RawURLEncoding.EncodeToString(random[12:])
 		entry := agentRegistration{EnrollAutoHostname: settings.AutoHostname, EnrollDigest: enrollHash(token), EnrollExpires: s.now().Add(30 * time.Minute).Unix(), EnrollName: name, EnrollOrigin: origin}
+		if input.Reusable {
+			entry.EnrollReusable = true
+			entry.EnrollAutoHostname = true
+			entry.EnrollExpires = 0
+			entry.EnrollName = "多服务器接入令牌"
+		}
 		entries[id] = entry
 		if s.writeAgents(entries) != nil {
 			problem(w, 500, "登记凭据保存失败")
@@ -102,7 +109,7 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 		}
 		// Token goes through stdin, not a URL, curl argv or service command line.
 		command := "bash -c " + shellLiteral("set -e; umask 077; t=$(mktemp); trap 'rm -f \"$t\"' EXIT; curl -fsS --proto '=https' --connect-timeout 15 --max-time 60 "+shellLiteral(origin+"/sub/agent-install.sh")+" -o \"$t\"; printf '%s\\n' "+shellLiteral(token)+" | bash \"$t\" "+shellLiteral(origin)+" "+shellLiteral(id))
-		respond(w, 201, map[string]any{"id": id, "name": name, "expires": entry.EnrollExpires, "command": command})
+		respond(w, 201, map[string]any{"id": id, "name": name, "expires": entry.EnrollExpires, "reusable": entry.EnrollReusable, "command": command})
 		return true
 	case "GET":
 		m, err := s.remoteManager()
@@ -127,7 +134,9 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 			status := "waiting"
 			if entry.EnrollDone {
 				status = "registered"
-			} else if entry.EnrollExpires <= s.now().Unix() {
+			} else if entry.EnrollReusable {
+				status = "reusable"
+			} else if entry.EnrollExpires > 0 && entry.EnrollExpires <= s.now().Unix() {
 				status = "expired"
 			}
 			v := s.agentViews[id]
@@ -136,7 +145,13 @@ func (s *Server) agentEnrollAdmin(w http.ResponseWriter, r *http.Request) bool {
 				status = "removed"
 				connected = false
 			}
-			rows = append(rows, map[string]any{"id": id, "name": entry.EnrollName, "expires": entry.EnrollExpires, "status": status, "connected": connected})
+			count := 0
+			for _, child := range entries {
+				if child.EnrollParent == id && child.EnrollDone {
+					count++
+				}
+			}
+			rows = append(rows, map[string]any{"reusable": entry.EnrollReusable, "registeredCount": count, "parent": entry.EnrollParent, "id": id, "name": entry.EnrollName, "expires": entry.EnrollExpires, "status": status, "connected": connected})
 		}
 		respond(w, 200, map[string]any{"entries": rows})
 		return true
@@ -216,9 +231,29 @@ func (s *Server) agentEnrollPublic(w http.ResponseWriter, r *http.Request) bool 
 	defer s.agentMu.Unlock()
 	entries, e := s.readAgents()
 	entry, ok := entries[input.ID]
-	if e != nil || !ok || entry.EnrollDigest == "" || entry.EnrollExpires <= s.now().Unix() || subtle.ConstantTimeCompare([]byte(entry.EnrollDigest), []byte(enrollHash(token))) != 1 {
+	if e != nil || !ok || entry.EnrollDigest == "" || (!entry.EnrollReusable && entry.EnrollExpires <= s.now().Unix()) || subtle.ConstantTimeCompare([]byte(entry.EnrollDigest), []byte(enrollHash(token))) != 1 {
 		problem(w, 401, "命令已过期、已撤销或凭据无效")
 		return true
+	}
+
+	if entry.EnrollReusable {
+		parentID := input.ID
+		childID := enrollHash("mx-enroll-child-v1:" + parentID + ":" + input.Client)[:24]
+		child, exists := entries[childID]
+		if exists {
+			if child.EnrollParent != parentID {
+				problem(w, 409, "安装实例身份冲突")
+				return true
+			}
+		} else {
+			if len(entries) >= 1000 {
+				problem(w, 409, "Agent 数量已达上限")
+				return true
+			}
+			child = agentRegistration{EnrollParent: parentID, EnrollAutoHostname: true, EnrollDigest: entry.EnrollDigest, EnrollOrigin: entry.EnrollOrigin}
+		}
+		input.ID = childID
+		entry = child
 	}
 	clientHash := enrollHash(input.Client)
 	if entry.EnrollClient != "" && entry.EnrollClient != clientHash {

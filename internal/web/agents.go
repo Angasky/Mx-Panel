@@ -25,6 +25,8 @@ import (
 )
 
 type agentRegistration struct {
+	EnrollReusable     bool   `json:"enrollReusable,omitempty"`
+	EnrollParent       string `json:"enrollParent,omitempty"`
 	EnrollAutoHostname bool   `json:"enrollAutoHostname,omitempty"`
 	EnrollDigest       string `json:"enrollDigest,omitempty"`
 	EnrollExpires      int64  `json:"enrollExpires,omitempty"`

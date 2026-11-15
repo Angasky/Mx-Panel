@@ -46,7 +46,7 @@ if ! $existing; then
  echo '正在下载并校验 Agent…'
  curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.1.35/$package" -o "$stage/$package"
  (cd "$stage" && printf '%s  %s\n' "$digest" "$package" | sha256sum -c -)
- [[ $(tar -tzf "$stage/$package" | sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || { echo '发布包文件清单异常'; exit 1; }
+ [[ $(tar -tzf "$stage/$package" | LC_ALL=C sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || { echo '发布包文件清单异常'; exit 1; }
  tar -xOf "$stage/$package" mxioc-agent > "$stage/mxioc-agent"
  chmod 700 "$stage/mxioc-agent"
 fi
@@ -54,7 +54,7 @@ claim() {
  curl -fsS --connect-timeout 15 --max-time 30 --proto '=https' -H "@$stage/auth" -H 'Content-Type: application/json' --data-binary "@$stage/request" "$origin/sub/agent-enroll" -D "$stage/headers" -o "$stage/config"
 }
 echo '正在登记服务器…'
-claim || { echo '登记失败：命令可能过期、已撤销或面板被人机验证拦截。可重新运行命令，或在面板生成新命令。'; exit 1; }
+claim || { echo '登记失败：令牌可能已撤销或旧命令过期或面板被人机验证拦截。可重新运行命令，或在面板生成新命令。'; exit 1; }
 validator="$stage/mxioc-agent"; $existing && validator=/usr/local/bin/mxioc-agent
 "$validator" --config "$stage/config" --check
 if $existing; then
@@ -67,7 +67,7 @@ else
   systemctl disable --now mxioc-agent.service 9>&- >/dev/null 2>&1 || true
   rm -f /etc/mxioc-agent.json /usr/local/bin/mxioc-agent /etc/systemd/system/mxioc-agent.service
   systemctl daemon-reload 9>&- || true
-  echo '安装失败，已移除本次新建的服务文件；登记记录保留，可在命令有效期内重试。'
+  echo '安装失败，已移除本次新建的服务文件；登记记录保留，可使用原命令重试。'
   exit 1
  }
  trap rollback ERR HUP INT TERM
@@ -97,7 +97,8 @@ systemctl is-active --quiet mxioc-agent.service || { echo 'Agent 未运行，请
 echo '等待面板确认收到 Agent 心跳…'
 for attempt in {1..12}; do
  if claim && grep -qi '^X-Mxioc-Agent-Connected: true' "$stage/headers"; then
-  rm -rf -- "$state"
+  # Keep the installation identity and config for idempotent reruns.
+  chmod 600 "$state/client" "$state/config"
   echo '接入成功：面板已收到心跳，服务器已自动加入列表。无需开放入站端口或提供 SSH 密码。'
   exit 0
  fi
