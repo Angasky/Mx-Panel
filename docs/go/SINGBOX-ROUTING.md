@@ -106,3 +106,11 @@ Mihomo 使用 regexp2 并默认忽略大小写，sing-box 使用 Go 正则；本
 输入最多 2048 字节，要求以 / 或盘符路径开头；拒绝 Unicode、控制字符、逗号、括号、no-resolve。此处只承诺 ASCII 路径范围的转换，Mihomo 通配按字节处理，不能扩展为任意 Unicode 路径的等价匹配。不支持相对路径、Android 包名、PROCESS-NAME 或进程名通配；Surge 仍拒绝此条件。
 
 依赖桌面平台的进程查询权限与流量入口，本地 mixed 代理不能保证每个连接都能识别进程。完成匹配边界、Windows/Linux 路径、逻辑/规则集、源配置不变、下载接口、Go 全量与 race，以及真实 sing-box 1.14.4 check；未做各桌面平台实际进程流量识别验收。
+
+## v0.3.21：域名正则有界重复次数
+
+DOMAIN-REGEX 新增 `{n}` 和 `{n,m}`，上下界为 0–1000 且递增；例如 `DOMAIN-REGEX,^cdn[0-9]{1,3}\.example\.com$,选择`。适用于顶层、AND/OR/NOT 与 inline classical 集合，重复次数内的逗号不再被误认成策略分隔符。保持大小写不敏感及原有锚点语义。
+
+仍拒绝 `{n,}`、反向范围、负数、过大次数、花括号字面字符和高级正则语法；嵌套重复还受 Go 正则引擎复杂度限制。此扩展只用于 ASCII 域名子集，Surge 不会因共享解析器而自动接受 DOMAIN-REGEX。
+
+验证覆盖匹配边界、非法输入、逻辑与内嵌规则集、源配置不变、真实 sing-box 1.14.4 check，并对 regexp2 IgnoreCase 与 Go regexp 进行 16096 组 ASCII 主机名比较。全量 Go 与专项竞态测试通过；未进行手机客户端实机联网验收。

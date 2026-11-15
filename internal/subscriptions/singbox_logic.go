@@ -2,8 +2,11 @@ package subscriptions
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 )
+
+var routingRepeat = regexp.MustCompile(`^\{[0-9]{1,4},[0-9]{1,4}\}`)
 
 // Split commas at the current nesting level only. Bounds apply before recursion.
 func splitRoutingParts(raw string) ([]string, error) {
@@ -11,8 +14,18 @@ func splitRoutingParts(raw string) ([]string, error) {
 		return nil, errors.New("规则长度无效")
 	}
 	depth, start := 0, 0
+	skipUntil := 0
 	parts := []string{}
 	for i, ch := range raw {
+		if i < skipUntil {
+			continue
+		}
+		if ch == '{' {
+			if match := routingRepeat.FindString(raw[i:]); match != "" {
+				skipUntil = i + len(match)
+				continue
+			}
+		}
 		switch ch {
 		case '(':
 			depth++
