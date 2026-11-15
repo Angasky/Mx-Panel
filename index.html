@@ -1849,6 +1849,7 @@ html[data-theme] .server-group-picker {display:flex;align-items:center;gap:8px;m
 html[data-theme] .server-group-picker > span {white-space:nowrap;flex:none}
 html[data-theme] .server-group-picker > select {width:100%;min-width:0;max-width:100%;flex:1}
 #serverGroupsEditor .panel {min-width:0;max-width:100%;overflow-wrap:anywhere}
+.node-probe-panel{padding:16px;border:1px solid var(--border);border-radius:12px;margin:16px 0;min-width:0}.node-probe-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.node-probe-result{display:grid;gap:6px;padding:12px;border:1px solid var(--border);border-radius:8px;overflow-wrap:anywhere;min-width:0}.node-probe-result small{color:var(--text-dim)}
 </style>
 <link rel="stylesheet" href="/sub/workspace.css?v=0.3.2">
 </head>
@@ -5368,6 +5369,7 @@ function nodes() {
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
       <button type="button" class="btn small" onclick="clearNodeSelection()">取消选择</button>
       <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button>
+      <button id="bulkNodeProbeButton" type="button" class="btn small" onclick="nodeConnectivity()">检查入口连通性</button>
       <button id="bulkTagsButton" type="button" class="btn small" onclick="nodeTagsModal()">批量管理标签</button>
       <button id="bulkCertificateButton" type="button" class="btn small" onclick="bulkNodeCertificates()">启用证书验证</button>
       <button id="bulkDeleteButton" type="button" class="btn small danger" onclick="bulkDeleteNodes()">批量删除</button>
@@ -5377,6 +5379,7 @@ function nodes() {
     </details>
     <div class="node-selection-bar"><label><input id="nodeSelectAll" type="checkbox" aria-label="全选当前筛选节点" onchange="toggleAllVisibleNodes(this.checked)"> 选择当前结果</label><span class="node-selection-count">显示 ${rows.length} / ${S.data.nodes.length} 个节点</span></div>
     <div id="nodeSortStatus" class="node-sort-status" role="status" aria-live="polite">拖动卡片右侧手柄排序，靠近屏幕上下边缘可连续滚动；按 Esc 取消。筛选时按可见节点插入，其他节点保持相对顺序。</div>
+    <section id="nodeProbePanel" class="node-probe-panel hidden" aria-label="节点入口连通性检查"></section>
     <div id="nodeRows" class="node-grid" role="list" aria-label="节点顺序">
           ${rows.map(x => `
             <article class="node-card" role="listitem" data-node-name="${esc(x.name)}">
@@ -5393,6 +5396,7 @@ function nodes() {
                 <button class="btn small" onclick="nodeModal(${x.index})">编辑</button>
                 <button class="btn small" onclick="nodeGroupsModal(${x.index})">策略组</button>
                 <button class="btn small" onclick="nodeTagsModal(${x.index})">标签</button>
+                <button class="btn small" onclick="nodeConnectivity(${x.index})">检查入口</button>
                 ${nodeSubscriptionBinding(x) ? `<button class="btn small primary" onclick="nodeSubscriptionImport(${x.index})">批量加入订阅</button>` : ''}
                 <button class="btn small" onclick="shareNode(${x.index})" title="显示二维码并导出节点链接">分享</button>
                 <details><summary class="btn small" aria-label="更多节点操作">更多</summary><div>
@@ -5427,8 +5431,35 @@ function updateNodeSelectionUi() {
   }
   if ($('nodeSelectedCount')) $('nodeSelectedCount').textContent = `已选择 ${S.nodeSelection.size} 个`;
   if ($('bulkDeleteButton')) $('bulkDeleteButton').disabled = S.nodeSelection.size === 0;
+  if ($('bulkNodeProbeButton')) $('bulkNodeProbeButton').disabled = S.nodeSelection.size === 0;
   if ($('bulkTagsButton')) $('bulkTagsButton').disabled = S.nodeSelection.size === 0;
   if ($('bulkCertificateButton')) $('bulkCertificateButton').disabled = S.nodeSelection.size === 0;
+}
+
+async function nodeConnectivity(index) {
+  const single=Number.isInteger(index)?S.data.nodes.find(n=>n.index===index):null;
+  const names=single?[single.name]:[...S.nodeSelection],profile=S.profile;
+  if(!names.length||names.length>30)return notice('每次请选择 1–30 个节点');
+  S.nodeProbeController?.abort();
+  const panel=$('nodeProbePanel');if(!panel)return;
+  panel.classList.remove('hidden');
+  panel.innerHTML=`<div class="toolbar"><h3>节点入口检查</h3><button type="button" class="btn small" id="nodeProbeStop">停止检查</button><button type="button" class="btn small" id="nodeProbeClose">收起</button></div><p class="hint">探测来源：面板服务器 → 节点入口。检查 DNS 与 TCP 建连，不验证代理认证、落地出口、UDP 或下载带宽；结果不能代表手机或 TG 测速端的网络。客户端链式代理仅检查节点地址，不经过前置代理。</p><p id="nodeProbeStatus" role="status" aria-live="polite">正在检查 ${names.length} 个节点，每批最多 6 个并发…</p><div id="nodeProbeResults" class="node-probe-results"></div>`;
+  const controller=new AbortController();S.nodeProbeController=controller;
+  const status=$('nodeProbeStatus'),results=$('nodeProbeResults'),stop=$('nodeProbeStop');
+  let stopped=false;
+  const cancel=()=>{stopped=true;controller.abort()};stop.onclick=cancel;$('nodeProbeClose').onclick=()=>{cancel();panel.classList.add('hidden')};
+  const active=()=>panel.isConnected&&S.profile===profile&&S.nodeProbeController===controller;
+  const observer=new MutationObserver(()=>{if(!active())controller.abort()});observer.observe($('content'),{childList:true,subtree:true});
+  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+  try {
+    const data=await api('/nodes/probe',{...jsonOpt('POST',{names}),headers:{'X-Profile':profile},signal:controller.signal});
+    if(!active()||stopped)return;
+    const labels={'dns-failed':'DNS 解析失败','blocked-address':'解析包含非公网地址，未连接','invalid-target':'地址或端口无效，或不是公网地址','connect-failed':'TCP 连接失败或超时','unsupported':'此协议或传输不适用 TCP 检查','cancelled':'未完成检查'};
+    const passed=data.results.filter(r=>r.ok).length,skipped=data.results.filter(r=>r.error==='unsupported').length;
+    status.textContent=`检查完成：TCP 可达 ${passed} / ${data.results.length}，不适用 ${skipped}。失败不显示为 0 ms。`;
+    results.innerHTML=data.results.map(r=>`<article class="node-probe-result"><strong>${esc(r.name)}</strong><span>${r.ok?'TCP 可达 · '+esc(Number(r.milliseconds).toFixed(1))+' ms':esc(labels[r.error]||'检查未完成')}</span><small>${esc(r.host)}:${esc(r.port)}${r.chain?' · 客户端链式节点':''} · ${esc(new Date(r.time*1000).toLocaleTimeString())}</small></article>`).join('');
+  }catch(err){if(active())status.textContent=stopped?'已停止检查；没有结果的节点不视为故障。':err.message}
+  finally{observer.disconnect();if(active()){stop.disabled=true;S.nodeProbeController=null}}
 }
 
 function nodeTags(node) {

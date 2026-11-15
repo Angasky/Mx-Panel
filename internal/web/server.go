@@ -25,6 +25,7 @@ import (
 	"github.com/Angasky/dingzhi-ban/internal/legacycrypto"
 	"github.com/Angasky/dingzhi-ban/internal/links"
 	"github.com/Angasky/dingzhi-ban/internal/monitorhistory"
+	"github.com/Angasky/dingzhi-ban/internal/netprobe"
 	"github.com/Angasky/dingzhi-ban/internal/releaseupdate"
 	"github.com/Angasky/dingzhi-ban/internal/subsource"
 )
@@ -47,6 +48,8 @@ type failure struct {
 	Since time.Time
 }
 type Server struct {
+	nodeProbeMu          sync.Mutex
+	measureNodeTCP       func(context.Context, []netprobe.Target) []netprobe.Result
 	siteInfoMu           sync.Mutex
 	portableBackupMu     sync.Mutex
 	aiMu                 sync.Mutex
@@ -329,6 +332,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.subscriptionRotationRoute(w, r) {
+		return
+	}
+	if s.nodeProbeRoute(w, r) {
 		return
 	}
 	if s.nodeTagsRoute(w, r) {
