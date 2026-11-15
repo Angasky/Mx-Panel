@@ -1850,7 +1850,7 @@ html[data-theme] .server-group-picker > span {white-space:nowrap;flex:none}
 html[data-theme] .server-group-picker > select {width:100%;min-width:0;max-width:100%;flex:1}
 #serverGroupsEditor .panel {min-width:0;max-width:100%;overflow-wrap:anywhere}
 </style>
-<link rel="stylesheet" href="/sub/workspace.css?v=0.3.0">
+<link rel="stylesheet" href="/sub/workspace.css?v=0.3.2">
 </head>
 <body>
 <!-- Lucide Icons / ISC License
@@ -2161,12 +2161,13 @@ SOFTWARE.
 <script>
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const browserStore=(kind,method,...args)=>{try{return window[kind][method](...args)}catch{return null}};
 const S = {
-  token: sessionStorage.getItem('mxioc_token') || localStorage.getItem('mxioc_token'),
+  token: browserStore('sessionStorage','getItem','mxioc_token') || browserStore('localStorage','getItem','mxioc_token'),
   page: 'overview',
   data: null,
   profiles: [],
-  profile: localStorage.getItem('mxioc_profile') || 'clash',
+  profile: browserStore('localStorage','getItem','mxioc_profile') || 'clash',
   nodeSelection: new Set(),
   filters: {},
   tablePages: {},
@@ -2219,8 +2220,8 @@ function showLogin() {
   stopMonitoring();
   S.monitorHistory = new Map(); S.monitorData = null; S.monitorId = '';
   S.monitorCards = new Map(); closeSniScanner();
-  sessionStorage.removeItem('mxioc_token');
-  localStorage.removeItem('mxioc_token');
+  browserStore('sessionStorage','removeItem','mxioc_token');
+  browserStore('localStorage','removeItem','mxioc_token');
   S.token = null;
   S.role = null;
   document.querySelector("#app .nav-group").classList.remove("hidden");
@@ -2262,7 +2263,9 @@ async function showAuthenticatedApp() {
     return;
   }
   $('sectionTabs').classList.remove('hidden');
+  $('bootStatus').textContent = '正在读取订阅列表…';
   await loadProfiles();
+  $('bootStatus').textContent = '正在读取当前订阅配置…';
   if (S.profiles.length) await reload(false);
   const requested=location.hash.slice(1);await go(S.profiles.length && Object.hasOwn(pageInfo,requested)?requested:S.profiles.length?'overview':'profiles');
   $('boot').classList.add('hidden');
@@ -2296,9 +2299,20 @@ async function api(path, opt = {}) {
   opt.headers = { 'X-Profile': S.profile, ...(opt.headers || {}) };
   if (S.token) opt.headers.Authorization = 'Bearer ' + S.token;
   opt.credentials = 'same-origin';
-  let r = await fetch('/admin/api' + path, opt);
-  S.idempotentCreate=r.headers.get('X-Mxioc-Create-Idempotency')==='1';
-  let d = await r.json().catch(() => ({}));
+  let r,d;
+  const controller=new AbortController(),readOnly=!opt.method||opt.method.toUpperCase()==='GET';
+  const upstream=opt.signal,abort=()=>controller.abort();
+  if(upstream?.aborted)controller.abort();else upstream?.addEventListener('abort',abort,{once:true});
+  const timer=readOnly?setTimeout(()=>controller.abort(),15000):null;
+  try {
+    r=await fetch('/admin/api'+path,{...opt,signal:controller.signal});
+    S.idempotentCreate=r.headers.get('X-Mxioc-Create-Idempotency')==='1';
+    const body=await r.text();
+    try{d=JSON.parse(body)}catch{throw Error(r.headers.get('cf-mitigated')==='challenge'?'Cloudflare 验证拦截了接口，请刷新页面完成验证':'接口未返回 JSON 数据（HTTP '+r.status+'），请检查网络或反向代理')}
+  } catch(error) {
+    if(controller.signal.aborted)throw Error('请求超时或已取消：'+path+'，请重试');
+    throw error;
+  } finally {clearTimeout(timer);upstream?.removeEventListener('abort',abort)}
   if (r.status === 401) {
     showLogin();
     throw Error(d.error || '登录已失效');
@@ -2416,7 +2430,6 @@ async function confirmSoftwareUpdate(force = false) {
 }
 
 async function loadProfiles() {
-  await siteInfoReady;
   let d = await api('/profiles');
   S.profiles = d.profiles;
   if (!S.profiles.some(x => x.id === S.profile)) {
@@ -2427,7 +2440,7 @@ async function loadProfiles() {
     S.tablePages = {profiles:S.tablePages.profiles || 1};
     S.ruleAction = '';
   }
-  localStorage.setItem('mxioc_profile', S.profile);
+  browserStore('localStorage','setItem','mxioc_profile', S.profile);
   $('currentProfileName').textContent = S.profiles.find(x => x.id === S.profile)?.name || '未选择订阅';
 }
 
@@ -2628,7 +2641,7 @@ function setTheme(theme) {
   void root.offsetWidth;
   requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
   let persisted = true;
-  try { localStorage.setItem('mxioc_theme', theme); } catch (_) { persisted = false; }
+  try { browserStore('localStorage','setItem','mxioc_theme', theme); } catch (_) { persisted = false; }
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
   notice(persisted ? `已切换为${({craft:'我的世界',slate:'云白',high:'科技', low:'简洁', pink:'猛男', amber:'暖橙'})[theme]}主题` : '主题已切换，当前浏览器未允许保存偏好');
 }
@@ -2759,7 +2772,7 @@ function aiPlace(el,x,y){
 }
 function aiFit(){
  const v=aiViewport();$('aiFloatWindow').style.maxHeight=Math.max(160,v.h-16)+'px';
- let launcherPosition=null;try{launcherPosition=JSON.parse(localStorage.getItem('mx-ai-launcher-position'))}catch{}
+ let launcherPosition=null;try{launcherPosition=JSON.parse(browserStore('localStorage','getItem','mx-ai-launcher-position'))}catch{}
  const customLauncher=Number.isFinite(launcherPosition?.x)&&Number.isFinite(launcherPosition?.y);
  if(!customLauncher)for(const prop of ['left','top','right','bottom'])$('aiLauncher').style.removeProperty(prop);
  for(const id of ['aiLauncher','aiFloatWindow']){const el=$(id);if((id!=='aiLauncher'||customLauncher)&&!el.classList.contains('hidden')&&el.getClientRects().length&&!el.closest('#wsAIHost')){const r=el.getBoundingClientRect();aiPlace(el,r.left,r.top);}}
@@ -2776,11 +2789,11 @@ function aiDrag(handle,el,key){
   if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>6)drag.moved=true;
   if(drag.moved){e.preventDefault();aiPlace(el,drag.left+e.clientX-drag.x,drag.top+e.clientY-drag.y);}
  });
- const end=e=>{if(!drag||drag.id!==e.pointerId)return;suppress=drag.moved;if(drag.moved){const r=el.getBoundingClientRect();try{localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top}));}catch{}}drag=null;if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
+ const end=e=>{if(!drag||drag.id!==e.pointerId)return;suppress=drag.moved;if(drag.moved){const r=el.getBoundingClientRect();try{browserStore('localStorage','setItem',key,JSON.stringify({x:r.left,y:r.top}));}catch{}}drag=null;if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
  handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);handle.addEventListener('lostpointercapture',()=>{drag=null;});
  handle.addEventListener('click',e=>{if(suppress){e.preventDefault();e.stopImmediatePropagation();suppress=false;}},true);
 }
-function aiRestorePosition(el,key){try{const p=JSON.parse(localStorage.getItem(key));if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))aiPlace(el,p.x,p.y);}catch{}aiFit();}
+function aiRestorePosition(el,key){try{const p=JSON.parse(browserStore('localStorage','getItem',key));if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))aiPlace(el,p.x,p.y);}catch{}aiFit();}
 function aiShowLauncher(){if(!S.role)return;$('aiLauncher').classList.remove('hidden');aiRestorePosition($('aiLauncher'),'mx-ai-launcher-position');}
 function aiMinimize(){
  if(S.page==='assistant'){void go('overview');return;}
@@ -2808,7 +2821,7 @@ function aiInitWidget(){
  $('aiFloatMaximize').onclick=()=>{const box=$('aiFloatWindow'),large=box.classList.toggle('ai-maximized');$('aiFloatMaximize').textContent=large?'还原':'放大';$('aiFloatMaximize').setAttribute('aria-label',large?'还原 AI 窗口':'最大化 AI 工作区');aiFit();};
  $('aiFloatWindow').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').classList.contains('hidden')){e.stopPropagation();aiMinimize();}});
  // Keyboard users can reposition the launcher without a pointer.
- $('aiLauncher').addEventListener('keydown',e=>{const d={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[e.key];if(!d)return;e.preventDefault();const r=$('aiLauncher').getBoundingClientRect();aiPlace($('aiLauncher'),r.left+d[0],r.top+d[1]);try{const moved=$('aiLauncher').getBoundingClientRect();localStorage.setItem('mx-ai-launcher-position',JSON.stringify({x:moved.left,y:moved.top}));}catch{}});
+ $('aiLauncher').addEventListener('keydown',e=>{const d={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[e.key];if(!d)return;e.preventDefault();const r=$('aiLauncher').getBoundingClientRect();aiPlace($('aiLauncher'),r.left+d[0],r.top+d[1]);try{const moved=$('aiLauncher').getBoundingClientRect();browserStore('localStorage','setItem','mx-ai-launcher-position',JSON.stringify({x:moved.left,y:moved.top}));}catch{}});
  window.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('resize',aiFit);window.visualViewport?.addEventListener('scroll',aiFit);
 }
 async function aiAssistant(){return S.page==='assistant'&&window.WorkspaceUI?WorkspaceUI.dockAI():aiOpenWindow();}
@@ -3224,7 +3237,7 @@ async function useProfile(encoded, page = 'nodes') {
   try {
     if (S.profile !== id) {
       S.profile = id;
-      localStorage.setItem('mxioc_profile', id);
+      browserStore('localStorage','setItem','mxioc_profile', id);
       S.nodeSelection.clear();
       S.data = null;
       S.filters = {profiles:S.filters.profiles || ''};
@@ -7210,7 +7223,7 @@ async function profileCreate(templateId = 'blank') {
         templateId: val('profileTemplate')
       }));
       S.profile = d.profile.id;
-      localStorage.setItem('mxioc_profile', S.profile);
+      browserStore('localStorage','setItem','mxioc_profile', S.profile);
       S.filters = {};
       S.tablePages = {};
       S.profileFilter = 'all';
@@ -7268,7 +7281,7 @@ function profileEdit(encoded) {
         slug: val('editProfileSlug')
       }));
       if (S.profile === p.id) S.profile = d.profile.id;
-      localStorage.setItem('mxioc_profile', S.profile);
+      browserStore('localStorage','setItem','mxioc_profile', S.profile);
       S.data = null;
       closeModal();
       await loadProfiles();
@@ -7293,7 +7306,7 @@ async function profileDelete(encoded) {
       S.tablePages = {profiles:S.tablePages.profiles || 1};
       S.ruleAction = '';
     }
-    localStorage.setItem('mxioc_profile', S.profile);
+    browserStore('localStorage','setItem','mxioc_profile', S.profile);
     S.data = null;
     closeModal();
     await loadProfiles();
@@ -7469,8 +7482,8 @@ $('loginForm').onsubmit = async e => {
     let d = await r.json();
     if (!r.ok) throw Error(d.error);
     S.token = null;
-    sessionStorage.removeItem('mxioc_token');
-    localStorage.removeItem('mxioc_token');
+    browserStore('sessionStorage','removeItem','mxioc_token');
+    browserStore('localStorage','removeItem','mxioc_token');
     await showAuthenticatedApp();
   } catch (x) {
     $('loginError').textContent = x.message;
@@ -7480,7 +7493,7 @@ $('loginForm').onsubmit = async e => {
 };
 
 document.querySelectorAll('.nav').forEach(n => n.onclick = () => { const wasOpen=document.body.classList.contains('nav-open');setNavigationOpen(false,false);if(wasOpen)$('content').focus({preventScroll:true}); if(n.dataset.navAction){return go(n.dataset.navAction).catch(e=>notice(e.message))} if(n.dataset.page==='monitoring')S.monitorId=''; return go(n.dataset.page).catch(error => notice('加载失败：' + error.message)); });
-document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(localStorage.getItem('mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);localStorage.setItem('mx-nav-expanded',JSON.stringify(state))}catch{}})});
+document.querySelectorAll('[data-nav-section]').forEach(d=>{try{const saved=JSON.parse(browserStore('localStorage','getItem','mx-nav-expanded')||'{}');d.open=saved[d.dataset.navSection]??!matchMedia('(max-width:600px)').matches}catch{}d.addEventListener('toggle',()=>{try{const state={};document.querySelectorAll('[data-nav-section]').forEach(x=>state[x.dataset.navSection]=x.open);browserStore('localStorage','setItem','mx-nav-expanded',JSON.stringify(state))}catch{}})});
 $('navToggle').onclick = () => setNavigationOpen(!document.body.classList.contains('nav-open'));
 $('navClose').onclick = $('navBackdrop').onclick = () => setNavigationOpen(false);
 matchMedia('(max-width:1024px)').addEventListener('change', () => setNavigationOpen(document.body.classList.contains('nav-open'),false));
@@ -7553,6 +7566,6 @@ applySiteInfo({});
 const siteInfoReady=loadSiteInfo();
 void bootstrap();
 </script>
-<script src="/sub/workspace.js?v=0.3.0"></script>
+<script src="/sub/workspace.js?v=0.3.2"></script>
 </body>
 </html>
