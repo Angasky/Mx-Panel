@@ -53,7 +53,10 @@ func formatByID(id string) (Format, error) {
 	}
 	return Format{}, errors.New("转换格式尚未适配")
 }
-func usageNodes(info Record, now time.Time) []Record {
+func UsageNodeNames(info Record, now time.Time, options *config.UsageDisplay) []string {
+	if options != nil && !options.Enabled {
+		return nil
+	}
 	if info["configured"] != true {
 		return nil
 	}
@@ -76,8 +79,23 @@ func usageNodes(info Record, now time.Time) []Record {
 		duration += " · 到期 " + time.Unix(expire, 0).UTC().Format("2006-01-02 15:04 UTC")
 	}
 	labels := []string{"订阅信息 · 已用 " + gib(info["used"]) + " / 总量 " + total, "订阅信息 · 剩余流量 " + remaining, "订阅信息 · " + duration}
+	if options != nil {
+		replacements := strings.NewReplacer("{used}", gib(info["used"]), "{total}", total, "{remaining}", remaining, "{expiry}", duration)
+		for i, template := range []string{options.Used, options.Remaining, options.Expiry} {
+			if template != "" {
+				labels[i] = replacements.Replace(template)
+			}
+		}
+	}
+	return labels
+}
+func usageNodes(info Record, now time.Time, options ...*config.UsageDisplay) []Record {
+	var display *config.UsageDisplay
+	if len(options) > 0 {
+		display = options[0]
+	}
 	out := []Record{}
-	for _, name := range labels {
+	for _, name := range UsageNodeNames(info, now, display) {
 		out = append(out, Record{"name": name, "type": "vmess", "server": "127.0.0.1", "port": 9, "uuid": "00000000-0000-4000-8000-000000000000", "alterId": 0, "cipher": "auto", "network": "tcp"})
 	}
 	return out
@@ -151,6 +169,7 @@ func Convert(source config.Subscription, format string, now time.Time) (Export, 
 	}
 	result := Export{Skipped: []Record{}}
 	uris := []string{}
+	names := map[string]bool{}
 	for _, node := range objects(source.Document["proxies"]) {
 		reason := ""
 		kind := text(node["type"])
@@ -173,13 +192,21 @@ func Convert(source config.Subscription, format string, now time.Time) (Export, 
 			continue
 		}
 		uris = append(uris, uri)
+		names[text(node["name"])] = true
 	}
 	result.Count = len(uris)
 	if result.Count == 0 {
 		return result, errors.New("没有可转换的兼容节点")
 	}
 	info := []string{}
-	for _, node := range usageNodes(source.Traffic, now) {
+	for _, node := range usageNodes(source.Traffic, now, source.UsageDisplay) {
+		base := text(node["name"])
+		name := base
+		for n := 1; names[name]; n++ {
+			name = fmt.Sprintf("%s · 信息 %d", base, n)
+		}
+		node["name"] = name
+		names[name] = true
 		uri, e := links.Export(node)
 		if e != nil {
 			return result, e

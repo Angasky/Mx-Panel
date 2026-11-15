@@ -13,6 +13,7 @@ var ErrSubscriptionMissing = errors.New("订阅不存在")
 var ErrSubscriptionBlocked = errors.New("订阅已过期或流量已用尽")
 
 type Subscription struct {
+	UsageDisplay          *UsageDisplay  `json:"-"`
 	BlockBrowserDownloads bool           `json:"-"`
 	ClientOptions         *ClientOptions `json:"-"`
 	Name, Slug            string
@@ -73,6 +74,10 @@ func (r *Repository) subscriptionRecord(record Document, now time.Time) (Subscri
 }
 
 func (r *Repository) subscriptionRecordView(record Document, now time.Time, includeDocument bool) (Subscription, error) {
+	display, err := readUsageDisplay(record)
+	if err != nil {
+		return Subscription{}, err
+	}
 	blockBrowser, err := readSubscriptionBrowser(record)
 	if err != nil {
 		return Subscription{}, err
@@ -146,7 +151,7 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 	if includeDocument {
 		document = cloneConfig(doc).(Document)
 	}
-	return Subscription{BlockBrowserDownloads: blockBrowser, ClientOptions: options, Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
+	return Subscription{UsageDisplay: &display, BlockBrowserDownloads: blockBrowser, ClientOptions: options, Name: p.Name, Slug: p.Slug, Document: document, Raw: raw, Traffic: info, Userinfo: header, Managed: managed}, nil
 }
 
 // ConversionSource is an authenticated management read. It remains available
