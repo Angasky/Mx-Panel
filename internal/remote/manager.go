@@ -219,7 +219,7 @@ func (m *Manager) Secret(record Record, key string) (string, error) {
 }
 func publicServer(record Record) Record {
 	result := Record{}
-	for _, key := range []string{"agentOnly", "agentManaged", "probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType"} {
+	for _, key := range []string{"agentOnly", "agentManaged", "probeSource", "probeUUID", "id", "name", "host", "sshPort", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "panelAddress", "panelUrl", "panelPort", "panelPath", "panelTLS", "createdAt", "lastError", "connectionMode", "existingVerifiedAt", "certificateDomains", "installType", "xrayVersion"} {
 		if v, ok := record[key]; ok {
 			result[key] = v
 		}
@@ -294,6 +294,11 @@ func serverHostKey(host string) string {
 }
 
 func (m *Manager) sameRegistration(existing, submitted Record, panel bool) bool {
+	oldVersion, _ := normalizeXrayVersion(value(existing["xrayVersion"]))
+	newVersion, _ := normalizeXrayVersion(value(submitted["xrayVersion"]))
+	if oldVersion != newVersion {
+		return false
+	}
 	for _, key := range []string{"name", "sshUser", "fingerprint", "installType", "connectionMode", "domain", "nodeAddress", "panelAddress"} {
 		if value(existing[key]) != value(submitted[key]) {
 			return false
@@ -358,7 +363,7 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if previousKind == "" {
 		previousKind = "3x-ui"
 	}
-	for _, key := range []string{"probeSource", "probeUUID", "name", "host", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "installType", "connectionMode"} {
+	for _, key := range []string{"probeSource", "probeUUID", "name", "host", "sshUser", "fingerprint", "domain", "nodeAddress", "panelUser", "installType", "xrayVersion", "connectionMode"} {
 		if v, ok := payload[key]; ok {
 			if _, ok := v.(string); !ok {
 				return nil, errors.New("服务器字段必须为字符串")
@@ -396,6 +401,11 @@ func (m *Manager) Save(payload Record) (Record, error) {
 	if !strings.HasPrefix(value(record["fingerprint"]), "SHA256:") || err != nil || len(decoded) != 32 {
 		return nil, errors.New("请先检测并核对 SSH 主机指纹")
 	}
+	version, versionErr := normalizeXrayVersion(value(record["xrayVersion"]))
+	if versionErr != nil {
+		return nil, versionErr
+	}
+	record["xrayVersion"] = version
 	kind := value(record["installType"])
 	panel := kind == "3x-ui" || kind == "x-ui" || kind == "x-panel"
 	if !panel && kind != "xray" && kind != "sing-box" {

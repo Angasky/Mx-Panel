@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -18,11 +19,33 @@ var installXray string
 //go:embed scripts/install-sing-box.sh
 var installSingBox string
 
-func coreInstallScript(kind, config string) (string, error) {
+const DefaultXrayVersion = "26.6.27"
+
+var xrayVersionPattern = regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`)
+
+func normalizeXrayVersion(version string) (string, error) {
+	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if version == "" {
+		version = DefaultXrayVersion
+	}
+	if !xrayVersionPattern.MatchString(version) {
+		return "", errors.New("Xray 版本格式应为 26.6.27，仅支持官方发布版本号")
+	}
+	return version, nil
+}
+func coreInstallScript(kind, config string, versions ...string) (string, error) {
 	script := ""
 	switch kind {
 	case "xray":
-		script = installXray
+		version := ""
+		if len(versions) > 0 {
+			version = versions[0]
+		}
+		version, err := normalizeXrayVersion(version)
+		if err != nil {
+			return "", err
+		}
+		script = strings.ReplaceAll(installXray, "__MXIOC_XRAY_VERSION__", version)
 	case "sing-box":
 		script = installSingBox
 	default:
@@ -98,10 +121,10 @@ func (m *Manager) RecoverInstallJobs() error {
 
 var ErrInstallCapacity = errors.New("安装并发已达 20 台，请等待空位")
 
-func (m *Manager) StartInstall(id string, confirmed bool) (Record, error) {
-	return m.startInstallExpected(id, confirmed, "")
+func (m *Manager) StartInstall(id string, confirmed bool, versions ...string) (Record, error) {
+	return m.startInstallExpected(id, confirmed, "", versions...)
 }
-func (m *Manager) startInstallExpected(id string, confirmed bool, expected string) (Record, error) {
+func (m *Manager) startInstallExpected(id string, confirmed bool, expected string, versions ...string) (Record, error) {
 	if !confirmed {
 		return nil, errors.New("请确认安装或更新服务器软件")
 	}
@@ -135,7 +158,17 @@ func (m *Manager) startInstallExpected(id string, confirmed bool, expected strin
 			return nil, err
 		}
 	}
-	script, err := coreInstallScript(value(record["installType"]), config)
+	version := value(record["xrayVersion"])
+	if len(versions) > 0 && versions[0] != "" {
+		version = versions[0]
+	}
+	if record["installType"] == "xray" {
+		version, err = normalizeXrayVersion(version)
+		if err != nil {
+			return nil, err
+		}
+	}
+	script, err := coreInstallScript(value(record["installType"]), config, version)
 	if record["installType"] == "3x-ui" {
 		password, e := m.Secret(record, "panelPassword")
 		if e != nil {
@@ -188,7 +221,10 @@ func (m *Manager) startInstallExpected(id string, confirmed bool, expected strin
 		return nil, err
 	}
 	jobID := hex.EncodeToString(random)
-	job := Record{"id": jobID, "serverId": id, "installType": record["installType"], "status": "running", "startedAt": time.Now().Unix(), "log": "正在连接远端，详细日志将在任务结束后显示。", "error": ""}
+	if record["installType"] == "xray" {
+		record["xrayVersion"] = version
+	}
+	job := Record{"id": jobID, "serverId": id, "installType": record["installType"], "xrayVersion": version, "status": "running", "startedAt": time.Now().Unix(), "log": "正在连接远端，详细日志将在任务结束后显示。", "error": ""}
 	appendInstallStage(job, "connecting")
 	if len(keep) > 47-len(active) {
 		keep = keep[len(keep)-(47-len(active)):]

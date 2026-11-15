@@ -73,13 +73,19 @@ if [ "$had_unit" = 0 ] && { [ -e /etc/systemd/system/xray.service ] || [ -L /etc
 if [ -f /usr/local/etc/xray/config.json ]; then cp -p /usr/local/etc/xray/config.json "$backup"; had_config=1; fi
 stage=download
 printf 'MXIOC_STAGE=download\n'
-# Fixed, checksum-verified release; never execute a downloaded installer.
+# Official, checksum-verified release; never execute a downloaded installer.
+version='__MXIOC_XRAY_VERSION__'
 case "$(uname -m)" in
-  x86_64|amd64) asset=Xray-linux-64.zip; archive_sum=e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214 ;;
-  aarch64|arm64) asset=Xray-linux-arm64-v8a.zip; archive_sum=1811c8f1da0c3b6dc707ebaf1c8390e987ba39859a8f0a7aadd8526157f2ec8d ;;
+  x86_64|amd64) asset=Xray-linux-64.zip; archive_sum=b3e5902d06d6282fe53cfa2fc426058b9aeaa429b2c812e20887cd47f26d08bf ;;
+  aarch64|arm64) asset=Xray-linux-arm64-v8a.zip; archive_sum=13a251379bea366c2cf10363ad71e75734193d401f26f518bf0c25e5c8f8c931 ;;
   *) echo 'Managed Xray supports linux amd64/arm64 only'; exit 12 ;;
 esac
-curl -fLsS --proto '=https' --tlsv1.2 --retry 2 --connect-timeout 20 --max-time 300 "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/$asset" -o "$workdir/xray.zip"
+curl -fLsS --proto '=https' --tlsv1.2 --retry 2 --connect-timeout 20 --max-time 300 "https://github.com/XTLS/Xray-core/releases/download/v$version/$asset" -o "$workdir/xray.zip"
+if [ "$version" != 26.6.27 ]; then
+ curl -fLsS --proto '=https' --tlsv1.2 --retry 2 --connect-timeout 20 --max-time 60 "https://github.com/XTLS/Xray-core/releases/download/v$version/$asset.dgst" -o "$workdir/xray.dgst"
+ archive_sum=$(awk '$1 == "SHA2-256=" || $1 == "SHA256=" {print $2}' "$workdir/xray.dgst")
+ [[ "$archive_sum" =~ ^[a-fA-F0-9]{64}$ ]] || { echo 'Official SHA256 digest missing or invalid'; exit 12; }
+fi
 printf '%s  %s\n' "$archive_sum" "$workdir/xray.zip" | sha256sum -c -
 stage=verify
 printf 'MXIOC_STAGE=verify\n'
@@ -87,7 +93,7 @@ mkdir -p "$workdir/bin"
 unzip -p "$workdir/xray.zip" xray > "$workdir/bin/xray"
 chmod 755 "$workdir/bin/xray"
 "$workdir/bin/xray" version > "$workdir/version.txt"
-grep -q '^Xray 26.10.31 ' "$workdir/version.txt"
+grep -Fq "Xray $version " "$workdir/version.txt"
 if [ -n '__MXIOC_CONFIG64__' ]; then
   printf '%s' '__MXIOC_CONFIG64__' | base64 -d > "$workdir/check.json"
 elif [ "$had_config" = 1 ]; then

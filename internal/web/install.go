@@ -22,14 +22,15 @@ func (s *Server) installRoutes(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	var input struct {
-		ID        string `json:"id"`
-		Confirmed bool   `json:"confirmed"`
+		ID          string `json:"id"`
+		Confirmed   bool   `json:"confirmed"`
+		XrayVersion string `json:"xrayVersion"`
 	}
 	if readJSON(w, r, &input) != nil || input.ID == "" {
 		problem(w, 400, "请选择服务器并确认安装")
 		return true
 	}
-	job, err := manager.StartInstall(input.ID, input.Confirmed)
+	job, err := manager.StartInstall(input.ID, input.Confirmed, input.XrayVersion)
 	if err != nil {
 		problem(w, 400, err.Error())
 	} else {

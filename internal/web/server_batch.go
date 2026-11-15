@@ -64,7 +64,7 @@ func (s *Server) serverBatchRoute(w http.ResponseWriter, r *http.Request) bool {
 		}
 		seen[id] = true
 		for k := range row {
-			if k != "id" && k != "name" && k != "nodeAddress" && k != "installType" {
+			if k != "id" && k != "name" && k != "nodeAddress" && k != "installType" && k != "xrayVersion" {
 				problem(w, 400, "批量编辑包含不支持字段")
 				return true
 			}
