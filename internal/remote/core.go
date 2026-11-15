@@ -123,8 +123,11 @@ func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record
 }
 
 // CoreConfig uses the same per-server exclusion gate as panel writes, server
-// removal and credential edits. Each call owns its SSH connection.
+// removal and credential edits. Each call exclusively leases its SSH transport.
 func (m *Manager) CoreConfig(ctx context.Context, id, expected string, next Record) (Record, error) {
+	if next == nil {
+		ctx = context.WithValue(ctx, inventoryWaitKey{}, true)
+	}
 	return m.withCore(ctx, id, func(ctx context.Context, kind string, record Record, run coreRunner) (Record, error) {
 		if next != nil && value(record["coreUserPending"]) != "" {
 			return nil, errors.New("独立内核用户变更待核对，暂不能修改配置")
@@ -153,6 +156,14 @@ type coreRunner func(context.Context, string, int) (string, error)
 func (m *Manager) withCore(ctx context.Context, id string, action func(context.Context, string, Record, coreRunner) (Record, error), detectSing ...bool) (Record, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
+	gate, err := m.coreGate(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { <-gate }()
+	if ctx.Value(inventoryWaitKey{}) != true {
+		defer m.invalidateInventoryView(id)
+	}
 	m.mu.Lock()
 	data, err := m.load()
 	if err != nil {
@@ -187,37 +198,33 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 			return nil, errors.New("请等待服务器任务完成")
 		}
 	}
-	if m.operations == nil {
-		m.operations = map[string]chan struct{}{}
-	}
-	gate := m.operations[id]
-	if gate == nil {
-		gate = make(chan struct{}, 1)
-		m.operations[id] = gate
-	}
-	select {
-	case gate <- struct{}{}:
-	default:
-		m.mu.Unlock()
-		return nil, errors.New("服务器正在处理其他操作")
-	}
 	m.mu.Unlock()
-	defer func() { <-gate }()
 	connection, err := m.connectionRecord(record)
 	if err != nil {
 		return nil, err
 	}
-	client, err := Connect(ctx, connection)
+	client, err := m.takeCoreSession(ctx, id, connection)
 	if err != nil {
 		return nil, err
 	}
-	defer client.Close()
 	ctx = context.WithValue(ctx, coreStatsQueryKey{}, coreStatsQuery(func(ctx context.Context, address string) (string, error) {
 		return querySingStats(ctx, address, client.DialContext)
 	}))
 	done := make(chan struct{})
-	defer close(done)
+	watchDone := make(chan struct{})
+	healthy := false
+	transportHealthy := true
+	defer func() {
+		close(done)
+		<-watchDone
+		if healthy && transportHealthy && ctx.Err() == nil {
+			m.keepCoreSession(id, connection, client)
+		} else {
+			client.Close()
+		}
+	}()
 	go func() {
+		defer close(watchDone)
 		select {
 		case <-ctx.Done():
 			client.Close()
@@ -225,7 +232,11 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		}
 	}()
 	run := coreRunner(func(ctx context.Context, script string, limit int) (string, error) {
-		return executeClient(ctx, client, connection, script, limit)
+		output, err := executeClient(ctx, client, connection, script, limit)
+		if err != nil {
+			transportHealthy = false
+		}
+		return output, err
 	})
 	if kind == "sing-box" {
 		config, e := newSingConfig(ctx, run)
@@ -234,5 +245,7 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		}
 		ctx = context.WithValue(ctx, singConfigKey{}, config)
 	}
-	return action(ctx, kind, record, run)
+	result, err := action(ctx, kind, record, run)
+	healthy = err == nil
+	return result, err
 }

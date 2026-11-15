@@ -258,6 +258,9 @@ func (m *Manager) templatePayload(server string, record, payload Record) (Record
 		return prepared, "", nil
 	}
 	domain, err := certificateDomain(value(prepared["serverName"]))
+	if excludedSNIDomain(domain) {
+		return nil, "", errors.New("CF / AWS SNI 已移除，请重新选择并测试其他站点")
+	}
 	if err != nil {
 		return nil, "", err
 	}

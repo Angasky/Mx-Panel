@@ -39,6 +39,10 @@ func (m *Manager) loadSNICatalog() (map[string]sniBaseline, error) {
 		return nil, errors.New("固定 SNI 站点库损坏，请恢复备份")
 	}
 	for domain, entry := range entries {
+		if excludedSNIDomain(domain) {
+			delete(entries, domain)
+			continue
+		}
 		d, e := certificateDomain(domain)
 		ip, ie := netip.ParseAddr(entry.Address)
 		if e != nil || d != domain || entry.Domain != domain || ie != nil || !netguard.PublicAddress(ip) || entry.VerifiedAt <= 0 {

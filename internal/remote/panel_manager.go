@@ -79,6 +79,17 @@ func (m *Manager) updateDerived(id string, updates Record) error {
 	return m.flush(data)
 }
 func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, Record) (any, error)) (any, error) {
+	gate, err := m.coreGate(ctx, id)
+	if err != nil {
+		if errors.Is(err, ErrServerBusy) {
+			return nil, errors.New("该服务器正在处理其他操作，请稍后重试")
+		}
+		return nil, err
+	}
+	defer func() { <-gate }()
+	if ctx.Value(inventoryWaitKey{}) != true {
+		defer m.invalidateInventoryView(id)
+	}
 	m.mu.Lock()
 	data, err := m.load()
 	if err != nil {
@@ -105,22 +116,7 @@ func (m *Manager) WithPanel(ctx context.Context, id string, action func(*Panel, 
 			return nil, errors.New("请等待服务器安装任务完成")
 		}
 	}
-	if m.operations == nil {
-		m.operations = map[string]chan struct{}{}
-	}
-	operation := m.operations[id]
-	if operation == nil {
-		operation = make(chan struct{}, 1)
-		m.operations[id] = operation
-	}
-	select {
-	case operation <- struct{}{}:
-	default:
-		m.mu.Unlock()
-		return nil, errors.New("该服务器正在处理其他操作，请稍后重试")
-	}
 	m.mu.Unlock()
-	defer func() { <-operation }()
 	connection, err := m.Connection(id)
 	if err != nil {
 		return nil, err

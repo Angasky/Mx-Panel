@@ -106,42 +106,19 @@ func (s *Server) remoteRoutes(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		if path == "/admin/api/servers/inbounds" {
+			w.Header().Set("Cache-Control", "no-store")
 			ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 			defer cancel()
 			serverID := r.URL.Query().Get("id")
-			observed, err := s.repository.BindingSnapshot(serverID)
-			if err != nil {
-				problem(w, 400, err.Error())
-				return true
-			}
-			var result remote.Record
-			if r.URL.Query().Get("refresh") == "1" {
-				result, err = manager.RefreshInboundsWithStats(ctx, serverID)
-			} else {
-				result, err = manager.InboundsWithStats(ctx, serverID)
-			}
+			result, err := manager.InboundsView(ctx, serverID, r.URL.Query().Get("refresh") == "1")
 			if err != nil {
 				problem(w, 400, err.Error())
 			} else {
-				if result["inventoryOnly"] == true {
-					respond(w, 200, result)
-					return true
-				}
-				controller, e := s.subscriptionController()
-				if e == nil {
-					var cleanup map[string]any
-					cleanup, e = controller.ReconcileServer(ctx, serverID, result, observed)
-					if e == nil {
-						result["subscriptionCleanup"] = cleanup
-					}
-				}
-				if e != nil {
-					result["subscriptionCleanup"] = map[string]any{"errors": []string{"订阅同步未完成，稍后自动重试"}}
-				}
 				respond(w, 200, result)
 			}
 			return true
 		}
+
 		servers, err := manager.List()
 		if err != nil {
 			problem(w, 400, err.Error())

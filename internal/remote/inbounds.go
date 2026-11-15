@@ -291,6 +291,9 @@ func (m *Manager) inbounds(ctx context.Context, id string, withStats bool) (Reco
 		}
 		cleanupErrors := []string{}
 		for _, relay := range anyRecords(record["relays"]) {
+			if ctx.Value(inventoryWaitKey{}) == true {
+				continue
+			}
 			if relay["deletePending"] != true || live[value(relay["inboundId"])] {
 				continue
 			}

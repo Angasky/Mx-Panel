@@ -29,6 +29,8 @@ type Manager struct {
 	key              []byte
 	mu               sync.Mutex
 	operations       map[string]chan struct{}
+	coreSessions     map[string]*cachedCoreSession
+	inventoryViews   map[string]*inventoryViewEntry
 	panels           map[string]*cachedPanel
 	monitor          *hostMonitor
 	sni              *sniScanner

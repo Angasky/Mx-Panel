@@ -148,6 +148,16 @@ func (s *sniScanner) invalidate(server, revision string, domains []string) {
 	}
 }
 
+// Exclude provider-owned candidates from both new scans and saved catalogs.
+func excludedSNIDomain(domain string) bool {
+	for _, suffix := range []string{"cloudflare.com", "cloudflare.net", "cloudflare-dns.com", "cloudflareinsights.com", "workers.dev", "pages.dev", "amazonaws.com", "cloudfront.net", "amazon.com", "amazon.co.jp", "amazon.co.uk", "aws.amazon.com", "aws.dev", "awsstatic.com", "awsglobalaccelerator.com", "twitch.tv", "twitchcdn.net"} {
+		if domain == suffix || strings.HasSuffix(domain, "."+suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 func sniDomains(candidates []string) ([]string, error) {
 	if len(candidates) < 1 || len(candidates) > 20 {
 		return nil, errors.New("每次测试 1–20 个 SNI 域名")
@@ -158,6 +168,9 @@ func sniDomains(candidates []string) ([]string, error) {
 		domain, err := certificateDomain(input)
 		if err != nil {
 			return nil, errors.New("SNI 域名格式无效，请使用完整域名或 Punycode")
+		}
+		if excludedSNIDomain(domain) {
+			return nil, errors.New("CF / AWS 相关域名已从 SNI 候选中移除，请选择其他站点")
 		}
 		if !seen[domain] {
 			domains = append(domains, domain)
