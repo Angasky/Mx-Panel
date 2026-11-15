@@ -120,21 +120,31 @@ func resetCycle(p Record, now time.Time) error {
 	if anchor == 0 || next == 0 || now.Unix() < next || u.Expire != nil && *u.Expire <= now.Unix() {
 		return nil
 	}
-	start := time.Unix(anchor, 0).UTC()
-	months := (now.Year()-start.Year())*12 + int(now.Month()) - int(start.Month())
-	if months < 1 {
-		months = 1
+	day, err := number(t["resetDay"], 0)
+	if err != nil || day < 0 || day > 31 {
+		return errors.New("套餐重置日无效")
 	}
-	if months > 120000 {
-		return errors.New("月度重置日期超出范围")
-	}
-	for billing.Month(start, months).Unix() <= now.Unix() {
-		months++
+	var nextBoundary int64
+	if day > 0 {
+		nextBoundary = billing.NextResetDay(now, int(day)).Unix()
+	} else {
+		start := time.Unix(anchor, 0).UTC()
+		months := (now.Year()-start.Year())*12 + int(now.Month()) - int(start.Month())
+		if months < 1 {
+			months = 1
+		}
+		if months > 120000 {
+			return errors.New("月度重置日期超出范围")
+		}
+		for billing.Month(start, months).Unix() <= now.Unix() {
+			months++
+		}
+		nextBoundary = billing.Month(start, months).Unix()
 	}
 	for _, k := range []string{"upload", "download", "rawUpload", "rawDownload"} {
 		t[k] = int64(0)
 	}
-	t["nextResetAt"] = billing.Month(start, months).Unix()
+	t["nextResetAt"] = nextBoundary
 	t["updatedAt"] = now.Unix()
 	for _, b := range objects(p["remoteNodes"]) {
 		b["monthlyBaselinePending"] = true

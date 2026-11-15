@@ -286,7 +286,12 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 		}
 		anchor := now.Unix()
 		nextReset := any(nil)
-		if previous["resetPeriod"] == plan["resetPeriod"] {
+		resetDay, dayErr := number(plan["resetDay"], 0)
+		oldDay, oldDayErr := number(previous["resetDay"], 0)
+		if dayErr != nil || oldDayErr != nil || resetDay < 0 || resetDay > 31 {
+			return errors.New("套餐重置日无效")
+		}
+		if previous["resetPeriod"] == plan["resetPeriod"] && oldDay == resetDay {
 			var e error
 			anchor, e = number(previous["cycleAnchor"], now.Unix())
 			if e != nil || anchor < 1 || anchor > 253402300799 {
@@ -301,7 +306,11 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 			}
 		}
 		if plan["resetPeriod"] == "monthly" && nextReset == nil {
-			nextReset = billing.Month(time.Unix(anchor, 0).UTC(), 1).Unix()
+			if resetDay > 0 {
+				nextReset = billing.NextResetDay(now, int(resetDay)).Unix()
+			} else {
+				nextReset = billing.Month(time.Unix(anchor, 0).UTC(), 1).Unix()
+			}
 		}
 		if plan["resetPeriod"] != "monthly" {
 			nextReset = nil
@@ -316,6 +325,7 @@ func (c *Controller) ApplyPlan(ctx context.Context, profile, planID string) (Rec
 		}
 		t["planId"] = plan["id"]
 		t["planName"] = plan["name"]
+		t["resetDay"] = resetDay
 		t["cycleAnchor"] = anchor
 		t["nextResetAt"] = nextReset
 		for _, b := range objects(record["remoteNodes"]) {

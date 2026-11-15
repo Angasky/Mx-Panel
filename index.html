@@ -4711,7 +4711,7 @@ function nodeMultiplierModal(encoded, inboundId) {
 }
 
 function planDescription(p) {
-  return `${p.durationMonths ?? 12} 个月 · ${p.resetPeriod === 'none' ? '一次性流量' : '每月重置'} · ${p.speedMbps ? p.speedMbps + ' Mbps' : '无限速'} · ${p.multiplier ?? 1} 倍`;
+  return `${p.durationMonths ?? 12} 个月 · ${p.resetPeriod === 'none' ? '一次性流量' : p.resetDay ? '每月 '+p.resetDay+' 日重置（UTC）' : '按套用日期每月重置'} · ${p.speedMbps ? p.speedMbps + ' Mbps' : '无限速'} · ${p.multiplier ?? 1} 倍`;
 }
 
 function subscriptionPlanModal(encoded = '') {
@@ -4725,16 +4725,18 @@ function subscriptionPlanModal(encoded = '') {
     <div><label for="planPrice">价格（元 / 整个有效期）</label><input id="planPrice" type="number" min="0" max="100000000" step="any" value="${p.price == null ? '' : esc(p.price)}" placeholder="留空表示未设置"></div>
     <div><label for="planQuota">流量额度（GiB）</label><input id="planQuota" type="number" min="0.001" max="1000000" step="any" required value="${esc(p.monthlyGiB)}"></div>
     <div><label for="planPeriod">流量周期</label><select id="planPeriod"><option value="monthly">每月重置</option><option value="none">一次性总流量</option></select></div>
-    <div><label for="planMonths">有效期（月）</label><input id="planMonths" type="number" min="1" max="120" step="1" required value="${p.durationMonths ?? 12}"></div>
+    <div><label for="planResetDay">默认流量重置日</label><select id="planResetDay"><option value="0">沿用套用日期</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}">每月 ${i+1} 日（UTC）</option>`).join('')}</select><p class="hint">固定日期于 UTC 00:00 重置；月份没有该日时取月末，下月仍按原日期。重新套用不清空用量或延长有效期。</p></div><div><label for="planMonths">有效期（月）</label><input id="planMonths" type="number" min="1" max="120" step="1" required value="${p.durationMonths ?? 12}"></div>
     <div><label for="planSpeed">节点上传 / 下载限速（Mbps）</label><input id="planSpeed" type="number" min="0" max="10000" step="0.001" value="${p.speedMbps || 0}"><p class="hint">0 或留空表示无限速；非零至少 0.1 Mbps。</p></div>
     <div><label for="planMultiplier">节点流量倍率</label><input id="planMultiplier" type="number" min="0" max="100" step="0.001" required value="${p.multiplier ?? 1}"></div>
     </div><p class="hint">模板由所有订阅共用。保存或删除模板不会修改已套用的订阅；只有点击套用才下发配置。价格仅作备注，不自动收款。</p><div id="planError" class="error" role="alert"></div><button id="planSave" class="btn primary" type="submit">保存模板</button></form>`);
   $('planPeriod').value = p.resetPeriod || 'monthly';
+  $('planResetDay').value=String(p.resetDay || 0);
+  const updateResetDay=()=>{ $('planResetDay').disabled=$('planPeriod').value==='none'; };updateResetDay();$('planPeriod').onchange=updateResetDay;
   $('planForm').onsubmit = async e => {
     e.preventDefault(); const button = $('planSave'); button.disabled = true;
     try {
       const body = {id: id || undefined, name:$('planName').value, price:$('planPrice').value === '' ? null : Number($('planPrice').value),
-        monthlyGiB:Number($('planQuota').value),durationMonths:Number($('planMonths').value),resetPeriod:$('planPeriod').value,
+        monthlyGiB:Number($('planQuota').value),durationMonths:Number($('planMonths').value),resetPeriod:$('planPeriod').value,resetDay:$('planPeriod').value==='none'?0:Number($('planResetDay').value),
         speedMbps:Number($('planSpeed').value || 0),multiplier:Number($('planMultiplier').value)};
       const result = await api('/traffic/plans', jsonOpt('PUT', body));
       if (S.profile !== profile) return;

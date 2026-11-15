@@ -118,7 +118,7 @@ func TrafficInfo(record Document, now time.Time) (Document, error) {
 		expired = n <= now.Unix()
 	}
 	info := Document{"configured": t["enabled"] == true, "enforce": t["enforce"] == true, "upload": upload, "download": download, "used": used, "total": total, "expire": expire, "remaining": remaining, "percent": percent, "exhausted": exhausted, "expired": expired, "rawUpload": rawUp, "rawDownload": rawDown, "rawUsed": rawUsed, "multiplier": float64(units) / 1000, "resetPeriod": t["resetPeriod"], "nextResetAt": t["nextResetAt"], "updatedAt": t["updatedAt"], "bindings": bindings, "enforcementError": record["enforcementError"], "lastCheckedAt": record["lastEnforcedAt"], "revoked": record["accessRevoked"] == true}
-	for _, key := range []string{"planId", "planName", "price", "durationMonths", "speedMbps", "cycleAnchor"} {
+	for _, key := range []string{"planId", "planName", "price", "durationMonths", "speedMbps", "cycleAnchor", "resetDay"} {
 		info[key] = t[key]
 	}
 	return info, nil

@@ -104,6 +104,10 @@ func normalizedPlan(payload Document) (Document, error) {
 	if period != "monthly" && period != "none" {
 		return nil, errors.New("流量重置周期无效")
 	}
+	resetDay, err := trafficNumber(payload["resetDay"], 0)
+	if err != nil || resetDay < 0 || resetDay > 31 || period == "none" && resetDay != 0 {
+		return nil, errors.New("重置日须为 0–31；一次性流量不支持固定重置日")
+	}
 	kbps, err := billing.BandwidthKbps(payload["speedMbps"])
 	if err != nil {
 		return nil, err
@@ -117,7 +121,7 @@ func normalizedPlan(payload Document) (Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Document{"id": payload["id"], "name": name, "price": price, "monthlyGiB": payload["monthlyGiB"], "durationMonths": months, "resetPeriod": period, "speedMbps": speed, "multiplier": json.Number(strconv.FormatFloat(float64(units)/1000, 'f', -1, 64))}, nil
+	return Document{"id": payload["id"], "name": name, "price": price, "monthlyGiB": payload["monthlyGiB"], "durationMonths": months, "resetPeriod": period, "resetDay": resetDay, "speedMbps": speed, "multiplier": json.Number(strconv.FormatFloat(float64(units)/1000, 'f', -1, 64))}, nil
 }
 func plansFrom(index Document) ([]Document, error) {
 	if raw, present := index["subscriptionPlans"]; present {
