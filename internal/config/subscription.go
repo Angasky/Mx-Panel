@@ -125,7 +125,7 @@ func (r *Repository) subscriptionRecordView(record Document, now time.Time, incl
 		return Subscription{}, err
 	}
 	managed := Document{}
-	for key, fields := range map[string][]string{"failovers": {"name", "status", "interval", "paths", "exit"}, "serverChains": {"name", "serverId", "inboundId", "exit"}, "remoteNodes": {"serverId", "inboundId", "status"}} {
+	for key, fields := range map[string][]string{"failovers": {"name", "status", "interval", "paths", "exit"}, "serverChains": {"name", "serverId", "inboundId", "exit"}, "remoteNodes": {"serverId", "inboundId", "status", "importedNodes"}} {
 		list := []any{}
 		for _, v := range rows(record, key) {
 			source, ok := v.(map[string]any)

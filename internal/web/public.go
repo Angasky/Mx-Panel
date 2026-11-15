@@ -19,7 +19,29 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 		if err != nil {
 			problem(w, 400, err.Error())
 		} else {
-			respond(w, 200, map[string]any{"formats": subscriptions.ConversionReport(source, s.now())})
+			if values, exists := r.URL.Query()["server"]; exists {
+				if len(values) != 1 || values[0] == "" {
+					problem(w, 400, "请选择唯一服务器")
+					return true
+				}
+				server := values[0]
+				filtered, e := subscriptions.FilterServerURI(source, server, "v2ray")
+				if e != nil {
+					problem(w, 400, e.Error())
+					return true
+				}
+				reports := []subscriptions.Record{}
+				for _, report := range subscriptions.ConversionReport(filtered, s.now()) {
+					id, _ := report["id"].(string)
+					if subscriptions.ServerURIFormat(id) {
+						report["url"] = report["url"].(string) + "?server=" + url.QueryEscape(server)
+						reports = append(reports, report)
+					}
+				}
+				respond(w, 200, map[string]any{"formats": reports})
+				return true
+			}
+			respond(w, 200, map[string]any{"formats": subscriptions.ConversionReport(source, s.now()), "servers": subscriptions.ServerURIChoices(source)})
 		}
 		return true
 	}
@@ -63,6 +85,18 @@ func (s *Server) publicRoutes(w http.ResponseWriter, r *http.Request) bool {
 			problem(w, 403, "该订阅已关闭浏览器直接下载，请在代理客户端中更新订阅，或联系管理员调整设置")
 		}
 		return true
+	}
+	if values, exists := r.URL.Query()["server"]; exists {
+		if !convert || len(values) != 1 || values[0] == "" {
+			problem(w, 400, "服务器筛选仅支持节点 URI 订阅且需要唯一服务器")
+			return true
+		}
+		filtered, e := subscriptions.FilterServerURI(source, values[0], parts[2])
+		if e != nil {
+			problem(w, 404, "没有可用的服务器筛选导出")
+			return true
+		}
+		source = filtered
 	}
 	body := source.Raw
 	extension := ".yaml"

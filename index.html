@@ -3143,14 +3143,22 @@ function profileCopyLink(encoded) {
 async function profileClientLinks(encoded) {
   const p = S.profiles.find(x => x.id === decodeURIComponent(encoded));
   if (!p) return;
-  openModal('客户端订阅 · ' + p.name, `<p class="muted">电脑选 v2rayN，安卓选 v2rayNG，iPhone 选 Shadowrocket。普通节点订阅不携带主备策略；自动切换请选择专用配置。用量与有效期按整个订阅统计，更新订阅后刷新。</p>
-    ${subscriptionRow('Clash / Mihomo', '完整节点、策略组、规则与 DNS', location.origin + p.url, p.url)}
-    <div id="clientConversionRows" class="empty">正在检查客户端兼容性...</div>`);
-  const target = $('clientConversionRows');
-  try {
-    const result = await api('/conversions', {headers: {'X-Profile': p.id}});
-    if (target?.isConnected) { target.classList.remove('empty'); target.innerHTML = conversionRows(result.formats || []); }
-  } catch (err) { if (target?.isConnected) target.textContent = err.message; }
+  openModal('客户端订阅 · ' + p.name, `<p class="muted">用量与有效期按整个订阅统计。服务器筛选只提供节点 URI，不包含完整分流或主备配置；只包含归属明确且仍在托管的节点，外部节点和归属不明节点不纳入。筛选不是权限隔离，持有地址者删除筛选参数仍可获取原订阅。</p><label for="clientServerFilter">导出范围</label><select id="clientServerFilter" disabled><option value="">全部服务器与节点</option></select><div id="clientRawLink">${subscriptionRow('Clash / Mihomo','完整节点、策略组、规则与 DNS',location.origin+p.url,p.url)}</div><div id="clientConversionRows" class="empty">正在检查客户端兼容性...</div>`);
+  const target=$('clientConversionRows'),select=$('clientServerFilter'),raw=$('clientRawLink');let generation=0;
+  const load=async()=>{
+    const ticket=++generation,server=select.value;target.replaceChildren();target.textContent='正在检查客户端兼容性…';raw.classList.toggle('hidden',!!server);
+    try {
+      const result=await api('/conversions'+(server?'?server='+encodeURIComponent(server):''),{headers:{'X-Profile':p.id}});
+      if(!target.isConnected||ticket!==generation)return;
+      if(!server){
+        select.replaceChildren(new Option('全部服务器与节点',''));
+        const names=new Map(S.servers.map(s=>[s.id,s.name]));
+        for(const row of result.servers||[])select.add(new Option((names.get(row.id)||'服务器 '+row.id)+' · '+row.count+' 个归属节点',row.id));
+      }
+      select.disabled=false;target.classList.remove('empty');target.innerHTML=conversionRows(result.formats||[]);
+    }catch(e){if(target.isConnected&&ticket===generation){target.textContent=e.message;select.disabled=false}}
+  };
+  select.onchange=load;await load();
 }
 
 function profileDuplicate(encoded) { profileCreate(decodeURIComponent(encoded)); }
