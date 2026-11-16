@@ -38,13 +38,13 @@ printf '{"id":"%s","client":"%s","hostnameBase64":"%s"}' "$enrollment" "$client"
 if ! $existing; then
  [[ -z $(systemctl show mxioc-agent.service -p FragmentPath --value 2>/dev/null) ]] || { echo '发现非标准位置的已有 Agent 服务，不会覆盖'; exit 1; }
  case "$(uname -m)" in
-  x86_64) arch=amd64; digest=a14c108a292848b7e819bb4e8f5a65c238bbe8ad0eca72af197a9cbf865125d2;;
-  aarch64|arm64) arch=arm64; digest=e4ac5ca8880b17b273e28294f80cc19822c734e381c4cd66590024bc8f6f09cf;;
+  x86_64) arch=amd64; digest=e7d3d7415ed8ecf3a1f74b9e2e76547ef1c103eb8585c0e3508ea4cc26d6db18;;
+  aarch64|arm64) arch=arm64; digest=852276ce9f98f9ed59ad2780cd75f766ec5bdbd7fcf782c5b77a965f85773f49;;
   *) echo '仅支持 amd64 / arm64'; exit 1;;
  esac
- package="mxioc-agent-v0.1.35-linux-$arch.tar.gz"
+ package="mxioc-agent-v0.3.24-linux-$arch.tar.gz"
  echo '正在下载并校验 Agent…'
- curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.1.35/$package" -o "$stage/$package"
+ curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.24/$package" -o "$stage/$package"
  (cd "$stage" && printf '%s  %s\n' "$digest" "$package" | sha256sum -c -)
  [[ $(tar -tzf "$stage/$package" | LC_ALL=C sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || { echo '发布包文件清单异常'; exit 1; }
  tar -xOf "$stage/$package" mxioc-agent > "$stage/mxioc-agent"
@@ -84,6 +84,8 @@ else
  trap rollback ERR HUP INT TERM
  install -m 0600 "$state/config" /etc/mxioc-agent.json
  install -m 0755 "$stage/mxioc-agent" /usr/local/bin/mxioc-agent
+ mkdir -p /var/lib/mxioc-agent /usr/local/etc/xray
+ chmod 700 /var/lib/mxioc-agent
  cat > /etc/systemd/system/mxioc-agent.service <<'UNIT'
 [Unit]
 Description=Mx-Panel monitoring agent
@@ -97,6 +99,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+ReadWritePaths=/run /var/lib/mxioc-agent /usr/local/etc/xray
 [Install]
 WantedBy=multi-user.target
 UNIT

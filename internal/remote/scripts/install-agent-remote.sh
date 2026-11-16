@@ -5,15 +5,15 @@ for dependency in curl tar sha256sum base64 flock systemctl; do command -v "$dep
 exec 9>/run/mxioc-agent-install.lock
 flock -n 9 || { echo '已有 Agent 安装正在执行'; exit 1; }
 case "$(uname -m)" in
- x86_64) arch=amd64; digest=a9817eb723bffe743972f309977f84c7c33ddbd3c36b0845f8d2b6f10459fd6a;;
- aarch64|arm64) arch=arm64; digest=c9836609d9d73b537695b3d9c2786d26106a0fb0ee5067537c6da34521f3a8d3;;
+ x86_64) arch=amd64; digest=e7d3d7415ed8ecf3a1f74b9e2e76547ef1c103eb8585c0e3508ea4cc26d6db18;;
+ aarch64|arm64) arch=arm64; digest=852276ce9f98f9ed59ad2780cd75f766ec5bdbd7fcf782c5b77a965f85773f49;;
  *) echo '不支持的架构'; exit 1;;
 esac
 stage=$(mktemp -d /var/tmp/mxioc-agent-install.XXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
 printf 'MXIOC_STAGE=downloading\n'
-package="mxioc-agent-v0.1.15-linux-$arch.tar.gz"
-curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.1.15/$package" -o "$stage/$package"
+package="mxioc-agent-v0.3.24-linux-$arch.tar.gz"
+curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.24/$package" -o "$stage/$package"
 (cd "$stage" && printf '%s  %s\n' "$digest" "$package" | sha256sum -c -)
 [[ $(tar -tzf "$stage/$package" | sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || { echo '发布包文件列表异常'; exit 1; }
 mkdir "$stage/bundle"

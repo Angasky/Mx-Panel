@@ -27,6 +27,7 @@ func (s *Server) remoteManager() (*remote.Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	manager.SetCoreRPCResolver(s.resolveCoreAgent)
 	managers.Store(s.options.Root, manager)
 	return manager, nil
 }

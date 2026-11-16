@@ -203,7 +203,7 @@ func queryCoreCounters(ctx context.Context, kind string, doc, stats Record, run 
 		}
 		return parseCoreCounters(raw)
 	}
-	raw, err := run(ctx, "/usr/local/bin/xray api statsquery --server="+quote(address)+" --pattern='user>>>'", 2<<20)
+	raw, err := coreRPCExec(ctx, run, CoreRPCPlan{Action: "stats"}, "/usr/local/bin/xray api statsquery --server="+quote(address)+" --pattern='user>>>'", 2<<20)
 	if err != nil {
 		return nil, errCoreStats
 	}

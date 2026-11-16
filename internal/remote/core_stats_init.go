@@ -158,9 +158,7 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 	} else if journal["after"] != after {
 		return nil, errors.New("计量配置与已保存的写入计划不一致")
 	}
-	verify := "ready=0\nfor attempt in 1 2 3 4 5; do\n" +
-		" if timeout 2 /usr/local/bin/xray api statsquery --server=127.0.0.1:10085 --pattern='user>>>' >/dev/null 2>&1; then ready=1; break; fi\n" +
-		" sleep 1\ndone\ntest \"$ready\" = 1"
+	verify := xrayStatsReady
 	if kind == "sing-box" {
 		// The remote shell verifies listener readiness. The following pinned-SSH
 		// gRPC query must also succeed before committing state or granting users.
@@ -192,7 +190,7 @@ func checkCoreStatsTools(ctx context.Context, kind string, run coreRunner) error
 		}
 		check = "test -x " + quote(binary) + " && " + quote(binary) + " version"
 	}
-	output, err := run(ctx, check, 64<<10)
+	output, err := coreRPCExec(ctx, run, CoreRPCPlan{Action: "tools"}, check, 64<<10)
 	if err != nil || (kind == "sing-box" && !strings.Contains(output, "with_v2ray_api")) {
 		if kind == "sing-box" {
 			return errors.New("sing-box 不可执行或构建缺少 with_v2ray_api")

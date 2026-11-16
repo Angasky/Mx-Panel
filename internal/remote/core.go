@@ -31,7 +31,7 @@ func readCore(ctx context.Context, kind string, run func(context.Context, string
 	if err != nil {
 		return nil, nil, err
 	}
-	output, err := run(ctx, "base64 < "+quote(path), 3<<20)
+	output, err := coreRPCExec(ctx, run, CoreRPCPlan{Action: "read"}, "base64 < "+quote(path), 3<<20)
 	if err != nil {
 		return nil, nil, errors.New("独立内核配置读取失败，请检查安装路径和权限")
 	}
@@ -93,7 +93,10 @@ func applyCoreVerified(ctx context.Context, kind string, raw []byte, next Record
 	if err != nil {
 		return nil, err
 	}
-	output, err := run(ctx, script, 64<<10)
+	if _, ok := ctx.Value(coreRPCKey{}).(CoreRPC); ok && verify != "" && verify != xrayStatsReady {
+		return nil, errors.New("此验证流程暂不支持 Agent API")
+	}
+	output, err := coreRPCExec(ctx, run, CoreRPCPlan{Action: "apply", Previous: raw, Next: next, Tag: managedTag, StatsReady: verify == xrayStatsReady, CancelKeys: cancelKey}, script, 64<<10)
 	if err != nil {
 		if strings.Contains(output, "MXIOC_CORE_VALIDATION_FAILED") {
 			return nil, errCoreValidation
@@ -223,6 +226,22 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		}
 	}
 	m.mu.Unlock()
+	m.mu.Lock()
+	resolver := m.coreRPCResolver
+	m.mu.Unlock()
+	if kind == "xray" && resolver != nil {
+		if rpc := chosenCoreRPC(ctx, id, record, resolver); rpc != nil {
+			ctx = context.WithValue(ctx, coreRPCKey{}, rpc)
+			blocked := coreRunner(func(context.Context, string, int) (string, error) {
+				return "", errors.New("此操作尚未适配 Agent 节点 API，未自动回退或重放")
+			})
+			result, err := action(ctx, kind, record, blocked)
+			if result != nil {
+				result["managementTransport"] = "agent-api"
+			}
+			return result, err
+		}
+	}
 	connection, err := m.connectionRecord(record)
 	if err != nil {
 		return nil, err

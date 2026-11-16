@@ -23,6 +23,7 @@ import (
 )
 
 type Manager struct {
+	coreRPCResolver  CoreRPCResolver
 	batchMu          sync.Mutex
 	batchRunning     bool
 	root, path       string

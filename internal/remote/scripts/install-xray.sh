@@ -158,4 +158,9 @@ systemctl restart xray
 sleep 2
 systemctl is-active --quiet xray
 /usr/local/bin/xray version
+# Authorize fixed-path Xray operations for the authenticated local Agent.
+# This creates no listener and does not change the Xray public API configuration.
+test ! -L /etc/mxioc-agent-xray-api
+(umask 077; printf 'mx-panel-xray-core-api-v1\n' > /etc/mxioc-agent-xray-api)
+chmod 600 /etc/mxioc-agent-xray-api
 printf 'MXIOC_STAGE=installed\n'

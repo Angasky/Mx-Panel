@@ -68,6 +68,7 @@ type Server struct {
 	notificationMu       sync.Mutex
 	metadataMu           sync.Mutex
 	probeMu              sync.Mutex
+	coreAgents           coreAgentHub
 	agentMu              sync.Mutex
 	agentViews           map[string]agentObservation
 	agentSlots           chan struct{}
@@ -271,6 +272,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if s.agentEnrollPublic(w, r) {
+			return
+		}
+		if s.agentCorePublic(w, r) {
 			return
 		}
 		if s.agentPublic(w, r) {

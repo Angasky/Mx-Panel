@@ -199,6 +199,7 @@ func (s *Server) agentAdmin(w http.ResponseWriter, r *http.Request) bool {
 	result := map[string]any{"version": observation.Version, "deployJob": entries[id].DeployJob, "configuredMode": entries[id].Mode, "pullURL": entries[id].URL, "enabled": entries[id].Enabled, "connected": !observation.At.IsZero() && s.now().Sub(observation.At) < 90*time.Second, "mode": observation.Mode, "lastSeen": int64(0)}
 	if record, err := m.Record(id); err == nil {
 		result["agentOnly"] = record["agentOnly"] == true
+		result["coreAPIConnected"] = s.resolveCoreAgent(id, record) != nil
 	}
 	if !observation.At.IsZero() {
 		result["lastSeen"] = observation.At.Unix()

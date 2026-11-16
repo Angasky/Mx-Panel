@@ -53,6 +53,13 @@ UNIT
  printf '%s ' "${writable_dirs[@]}"
  printf '\n'
 } >> /etc/systemd/system/mxioc-agent.service
+# Installing the management Agent on an existing standard Xray server enables
+# typed local core operations. No public listener is created.
+if [[ -f /usr/local/etc/xray/config.json && ! -L /usr/local/etc/xray/config.json && -x /usr/local/bin/xray ]]; then
+ [[ ! -L /etc/mxioc-agent-xray-api ]]
+ (umask 077; printf 'mx-panel-xray-core-api-v1\n' > /etc/mxioc-agent-xray-api)
+ chmod 600 /etc/mxioc-agent-xray-api
+fi
 systemctl daemon-reload
 systemctl restart mxioc-agent.service
 sleep 2

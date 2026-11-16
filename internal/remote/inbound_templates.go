@@ -306,6 +306,10 @@ func validateTemplateCertificate(ctx context.Context, panel *Panel, payload Reco
 }
 
 func verifyTemplateCertificate(ctx context.Context, run coreRunner, payload Record) error {
+	if rpc, ok := ctx.Value(coreRPCKey{}).(CoreRPC); ok {
+		_, err := rpc(ctx, CoreRPCPlan{Action: "certificate", Certificate: payload})
+		return err
+	}
 	if run == nil {
 		return errors.New("证书验证通道未就绪，尚未创建节点")
 	}

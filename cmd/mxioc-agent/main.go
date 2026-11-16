@@ -64,7 +64,7 @@ func main() {
 		if cfg.StateDir == "" {
 			cfg.StateDir = "/var/lib/mxioc-agent"
 		}
-		dirs := map[string]bool{cfg.StateDir: true}
+		dirs := map[string]bool{cfg.StateDir: true, "/usr/local/etc/xray": true, "/var/lock": true}
 		for _, target := range cfg.Targets {
 			dirs[filepath.Dir(target.Config)] = true
 			if target.Kind == "nginx" {
@@ -146,6 +146,7 @@ func run(path string, local, check bool) error {
 	if check {
 		return nil
 	}
+	go serveCoreAPI(ctx, c)
 	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("Agent 不跟随重定向") }}
 	var ws *websocket.Conn
 	defer func() {

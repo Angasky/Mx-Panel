@@ -26,6 +26,7 @@ func (c *Controller) CreateRelay(ctx context.Context, profile, server string, pa
 	return c.createInbound(ctx, profile, server, payload, true, nil, nil)
 }
 func (c *Controller) createInbound(ctx context.Context, profile, server string, payload Record, relay bool, chain *config.ServerChainImport, prepare func() error) (Record, error) {
+	ctx = remote.PreferCoreAPI(ctx)
 	if !c.started.Load() {
 		return nil, errors.New("独立用户后台计量尚未启动")
 	}
@@ -93,6 +94,7 @@ func (c *Controller) createInbound(ctx context.Context, profile, server string, 
 	result["inbound"] = row
 	result["enforcementEnabled"] = true
 	result["reusedInbound"] = created["reused"]
+	result["managementTransport"] = created["managementTransport"]
 	return result, nil
 }
 
