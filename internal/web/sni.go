@@ -29,6 +29,8 @@ func (s *Server) sniRoutes(w http.ResponseWriter, r *http.Request) bool {
 	switch input.Mode {
 	case "catalog":
 		result, err = manager.SNICatalog()
+	case "verify":
+		result, err = manager.ScanSNI(r.Context(), input.ServerID, input.Candidates, input.Force)
 	case "baseline":
 		result, err = manager.BuildSNICatalog(r.Context(), input.ServerID, input.Candidates)
 	case "tcp", "":

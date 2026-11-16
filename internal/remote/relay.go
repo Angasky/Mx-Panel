@@ -255,8 +255,8 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	}
 	kind := value(record["installType"])
 	if kind == "sing-box" {
-		if templateName(payload) != "vmess-tcp" && templateName(payload) != "vless-reality" {
-			return nil, errors.New("独立 sing-box 中转入口需要 Reality 或 VMess TCP 模板")
+		if standaloneTemplateProtocol(kind, templateName(payload)) == "" {
+			return nil, errors.New("此内核不支持所选中转入口协议")
 		}
 		outbound, err := singRelayOutbound(landing, tag)
 		if err != nil {
@@ -268,11 +268,14 @@ func (m *Manager) CreateRelay(ctx context.Context, server, scope string, payload
 	if err != nil {
 		return nil, err
 	}
-	if templateName(payload) != "vless-reality" {
-		return nil, errors.New("中转入口仅支持 Reality 模板")
-	}
 	if kind == "xray" {
+		if standaloneTemplateProtocol(kind, templateName(payload)) == "" {
+			return nil, errors.New("此内核不支持所选中转入口协议")
+		}
 		return m.createStandaloneInbound(ctx, server, key, hash, payload, outbound)
+	}
+	if templateName(payload) != "vless-reality" && templateName(payload) != "vmess-tcp" {
+		return nil, errors.New("Web 面板中转入口支持 Reality 或 VMess TCP")
 	}
 	created, err := m.CreateInbound(ctx, server, scope, payload)
 	if err != nil {

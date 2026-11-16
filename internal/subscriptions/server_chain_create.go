@@ -164,9 +164,21 @@ func (c *Controller) CreateServerChain(ctx context.Context, profile string, inpu
 	default:
 		return nil, errors.New("服务器中转入口需要已接入的 Web 面板或独立内核")
 	}
+	if chosen, exists := input["entryTemplate"]; exists {
+		v, ok := chosen.(string)
+		if !ok || v == "" {
+			return nil, errors.New("请选择入口协议")
+		}
+		template = v
+	}
 	payload := Record{"operationId": chain.Request, "remark": chain.Name, "template": template,
 		"port": input["port"], "serverName": input["serverName"], "sniVerified": input["sniVerified"],
 		"sniAddress": input["sniAddress"], "chainEntry": chain.Entry, "chainExit": chain.Exit, "chainGroups": chain.Groups}
+	for _, key := range []string{"certFile", "keyFile", "certificateMode", "certificateJobId", "path", "grpcService", "alpn", "xhttpMode"} {
+		if v, ok := input[key]; ok {
+			payload[key] = v
+		}
+	}
 	if chain.EntryServerID != "" {
 		payload["chainEntryServerId"] = chain.EntryServerID
 	}

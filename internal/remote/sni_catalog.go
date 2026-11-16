@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Angasky/dingzhi-ban/internal/netguard"
@@ -176,46 +175,36 @@ func (m *Manager) ScanSNITCP(ctx context.Context, id string, candidates []string
 	}
 	defer session.Close()
 	rows := make([]Record, len(domains))
-	jobs := make(chan int)
-	var workers sync.WaitGroup
-	for n := 0; n < 8; n++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for i := range jobs {
-				domain := domains[i]
-				row := Record{"domain": domain, "ok": false, "realityVerified": false, "method": "tcp"}
-				rows[i] = row
-				entry, ok := entries[domain]
-				if !ok {
-					row["error"] = "不在固定站点库，请先用参考服务器完整验证"
-					continue
-				}
-				row["baselineVerified"] = true
-				row["baselineServer"] = entry.ServerName
-				row["baselineAt"] = entry.VerifiedAt
-				script, e := sniTCPScript(entry.Address)
-				if e != nil {
-					row["error"] = e.Error()
-					continue
-				}
-				raw, e := session.Run(ctx, script, 4096)
-				latency, ok := sniTCPLatency(raw)
-				if e != nil || !ok {
-					row["error"] = "TCP 443 连接失败或超时"
-					continue
-				}
-				row["ok"] = true
-				row["latencyMs"] = latency
-				row["verifiedAddress"] = entry.Address
+	targets := []string{}
+	indexes := []int{}
+	for i, domain := range domains {
+		row := Record{"domain": domain, "ok": false, "realityVerified": false, "method": "tcp"}
+		rows[i] = row
+		entry, ok := entries[domain]
+		if !ok {
+			row["error"] = "不在固定站点库，请先用参考服务器完整验证"
+			continue
+		}
+		row["baselineVerified"], row["baselineServer"], row["baselineAt"] = true, entry.ServerName, entry.VerifiedAt
+		targets = append(targets, entry.Address)
+		indexes = append(indexes, i)
+	}
+	if len(targets) > 0 {
+		script, e := sniTCPBatchScript(targets)
+		if e != nil {
+			return nil, e
+		}
+		raw, e := session.Run(ctx, script, 16384)
+		readings, parseErr := sniTCPBatchResults(raw, len(targets))
+		for n, i := range indexes {
+			latency, ok := readings[n]
+			if e != nil || parseErr != nil || !ok {
+				rows[i]["error"] = "TCP 443 连接失败或超时"
+				continue
 			}
-		}()
+			rows[i]["ok"], rows[i]["latencyMs"], rows[i]["verifiedAddress"] = true, latency, targets[n]
+		}
 	}
-	for i := range domains {
-		jobs <- i
-	}
-	close(jobs)
-	workers.Wait()
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -257,4 +246,54 @@ func (m *Manager) ScanSNITCP(ctx context.Context, id string, candidates []string
 		return aok && (!bok || a < b)
 	})
 	return Record{"results": rows, "method": "tcp"}, nil
+}
+
+// Run up to eight TCP probes per wave within one SSH command. Avoid opening a
+// new SSH exec channel (and paying its RTT) for every candidate.
+func sniTCPBatchScript(addresses []string) (string, error) {
+	if len(addresses) < 1 || len(addresses) > 20 {
+		return "", errors.New("TCP 批次大小无效")
+	}
+	script := "set -eu\n"
+	for i, address := range addresses {
+		ip, err := netip.ParseAddr(address)
+		if err != nil || !netguard.PublicAddress(ip) {
+			return "", errors.New("TCP 目标必须为固定库公网 IP")
+		}
+		script += "( start=$(date +%s%N); if timeout 2 bash -c " + quote("exec 3<>/dev/tcp/"+ip.String()+"/443") + " 2>/dev/null; then end=$(date +%s%N); printf 'MXIOC_TCP " + strconv.Itoa(i) + " %s\\n' \"$((end-start))\"; else printf 'MXIOC_TCP_FAIL " + strconv.Itoa(i) + "\\n'; fi ) &\n"
+		if i%8 == 7 || i == len(addresses)-1 {
+			script += "wait\n"
+		}
+	}
+	return script, nil
+}
+func sniTCPBatchResults(raw string, count int) (map[int]float64, error) {
+	result := map[int]float64{}
+	seen := map[int]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 2 {
+			return nil, errors.New("TCP 测试结果不完整")
+		}
+		i, e := strconv.Atoi(f[1])
+		if e != nil || i < 0 || i >= count || seen[i] {
+			return nil, errors.New("TCP 测试编号无效")
+		}
+		seen[i] = true
+		if f[0] == "MXIOC_TCP_FAIL" && len(f) == 2 {
+			continue
+		}
+		if f[0] != "MXIOC_TCP" || len(f) != 3 {
+			return nil, errors.New("TCP 测试结果无效")
+		}
+		latency, ok := sniTCPLatency("MXIOC_TCP " + f[2])
+		if !ok {
+			return nil, errors.New("TCP 测试耗时无效")
+		}
+		result[i] = latency
+	}
+	if len(seen) != count {
+		return nil, errors.New("TCP 测试结果缺失")
+	}
+	return result, nil
 }
