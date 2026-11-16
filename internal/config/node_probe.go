@@ -47,3 +47,35 @@ func (r *Repository) NodeProbeTargets(id string, names []string) ([]Document, er
 	}
 	return result, nil
 }
+
+// ProbeNodeConfig is a private snapshot used only by authenticated administrator
+// diagnostics. It is never included in a diagnostic response.
+func (r *Repository) ProbeNodeConfig(id, name string) (Document, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, e := r.profile(id)
+	if e != nil {
+		return nil, e
+	}
+	doc, _, e := r.cachedRead(p)
+	if e != nil {
+		return nil, e
+	}
+	var found Document
+	for _, raw := range rows(doc, "proxies") {
+		n := raw.(Document)
+		if n["name"] == name {
+			if found != nil {
+				return nil, errors.New("节点名称重复")
+			}
+			if stringValue(n["dialer-proxy"]) != "" {
+				return nil, errors.New("请选择普通落地节点，暂不测试客户端链式代理")
+			}
+			found = cloneConfig(n).(Document)
+		}
+	}
+	if found == nil {
+		return nil, errors.New("节点已变化，请刷新后重试")
+	}
+	return found, nil
+}

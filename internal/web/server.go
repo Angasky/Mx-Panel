@@ -341,6 +341,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.subscriptionRotationRoute(w, r) {
 		return
 	}
+	if s.outboundProbeRoute(w, r) {
+		return
+	}
 	if s.nodeProbeRoute(w, r) {
 		return
 	}
