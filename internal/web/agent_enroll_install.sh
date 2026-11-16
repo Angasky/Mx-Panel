@@ -38,13 +38,13 @@ printf '{"id":"%s","client":"%s","hostnameBase64":"%s"}' "$enrollment" "$client"
 if ! $existing; then
  [[ -z $(systemctl show mxioc-agent.service -p FragmentPath --value 2>/dev/null) ]] || { echo '发现非标准位置的已有 Agent 服务，不会覆盖'; exit 1; }
  case "$(uname -m)" in
-  x86_64) arch=amd64; digest=e7d3d7415ed8ecf3a1f74b9e2e76547ef1c103eb8585c0e3508ea4cc26d6db18;;
-  aarch64|arm64) arch=arm64; digest=852276ce9f98f9ed59ad2780cd75f766ec5bdbd7fcf782c5b77a965f85773f49;;
+  x86_64) arch=amd64; digest=6a8fa50fb2717c0a88220dd0247f42246afe0ae0b9d0c499b1ec0c10b694f1c2;;
+  aarch64|arm64) arch=arm64; digest=dc9052bca53af377f6adc69f33702b7f2933715861258a851c053b774bc89b8c;;
   *) echo '仅支持 amd64 / arm64'; exit 1;;
  esac
- package="mxioc-agent-v0.3.24-linux-$arch.tar.gz"
+ package="mxioc-agent-v0.3.25-linux-$arch.tar.gz"
  echo '正在下载并校验 Agent…'
- curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.24/$package" -o "$stage/$package"
+ curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.25/$package" -o "$stage/$package"
  (cd "$stage" && printf '%s  %s\n' "$digest" "$package" | sha256sum -c -)
  [[ $(tar -tzf "$stage/$package" | LC_ALL=C sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || { echo '发布包文件清单异常'; exit 1; }
  tar -xOf "$stage/$package" mxioc-agent > "$stage/mxioc-agent"

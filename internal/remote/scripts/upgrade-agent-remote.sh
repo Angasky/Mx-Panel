@@ -13,17 +13,17 @@ systemctl is-active --quiet mxioc-agent.service || { echo 'Agent 未运行，拒
 [[ $(systemctl show mxioc-agent.service -p ExecStart --value) == *'/usr/local/bin/mxioc-agent --config /etc/mxioc-agent.json'* ]] || exit 1
 config_hash=$(sha256sum /etc/mxioc-agent.json | cut -d' ' -f1)
 case "$(uname -m)" in
- x86_64) arch=amd64; digest=e7d3d7415ed8ecf3a1f74b9e2e76547ef1c103eb8585c0e3508ea4cc26d6db18;;
- aarch64|arm64) arch=arm64; digest=852276ce9f98f9ed59ad2780cd75f766ec5bdbd7fcf782c5b77a965f85773f49;;
+ x86_64) arch=amd64; digest=6a8fa50fb2717c0a88220dd0247f42246afe0ae0b9d0c499b1ec0c10b694f1c2;;
+ aarch64|arm64) arch=arm64; digest=dc9052bca53af377f6adc69f33702b7f2933715861258a851c053b774bc89b8c;;
  *) exit 1;;
 esac
 stage=$(mktemp -d /var/tmp/mxioc-agent-upgrade.XXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
-package="mxioc-agent-v0.3.24-linux-$arch.tar.gz"
+package="mxioc-agent-v0.3.25-linux-$arch.tar.gz"
 printf 'MXIOC_STAGE=downloading\n'
-curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.24/$package" -o "$stage/$package"
+curl -fLsS --retry 2 --connect-timeout 15 --max-time 180 --proto '=https' --proto-redir '=https' "https://github.com/Angasky/Mx-Panel/releases/download/go-v0.3.25/$package" -o "$stage/$package"
 (cd "$stage" && printf '%s  %s\n' "$digest" "$package" | sha256sum -c -)
-[[ $(tar -tzf "$stage/$package" | sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || exit 1
+[[ $(tar -tzf "$stage/$package" | LC_ALL=C sort) == $'SHA256SUMS\ninstall-agent.sh\nmxioc-agent' ]] || exit 1
 # Read only the binary from a digest-pinned release; keep local config and unit.
 tar -xOf "$stage/$package" mxioc-agent > "$stage/mxioc-agent"
 chmod 700 "$stage/mxioc-agent"
