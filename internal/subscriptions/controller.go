@@ -266,6 +266,9 @@ func (c *Controller) Batch(ctx context.Context, profile, server string, ids []in
 	return Record{"results": results, "succeeded": succeeded, "failed": len(ids) - succeeded, "added": added, "existing": existing, "traffic": info}, nil
 }
 func (c *Controller) preflight(record Record, server string) error {
+	if p := exitPolicy(record); p != nil && p["status"] != "active" {
+		return errors.New("套餐出口变更未完成，请先恢复原操作")
+	}
 	u, err := usage(record)
 	if err != nil {
 		return err
@@ -290,6 +293,9 @@ func (c *Controller) preflight(record Record, server string) error {
 		return err
 	}
 	kind := text(s["installType"])
+	if exitPolicy(record) != nil && kind != "xray" {
+		return errors.New("该套餐的专属出口要求独立 Xray 服务器")
+	}
 	if kind == "" {
 		kind = "3x-ui"
 	}
@@ -426,6 +432,9 @@ func (c *Controller) provision(ctx context.Context, profile, server string, row 
 	}
 	if client != nil {
 		op = "add"
+	}
+	if err := c.ensureUserExit(ctx, profile, server); err != nil {
+		return nil, err
 	}
 	response, err := c.Backend.SubscriptionUser(ctx, server, binding, op, client)
 	if err != nil {

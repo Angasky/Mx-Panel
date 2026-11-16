@@ -41,6 +41,9 @@ func verifyCoreRelay(doc, row Record) error {
 		return errors.New("中转出站不能作为内核默认出站")
 	}
 	for _, item := range anyRecords(routing["rules"]) {
+		if profileExitRule(item) {
+			continue
+		}
 		tags := anyStrings(item[input])
 		rawTags, _ := item[input].([]any)
 		out := value(item[output])

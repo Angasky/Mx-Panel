@@ -400,6 +400,9 @@ func (r *Repository) DeleteProfile(id string) error {
 	if record["protected"] == true {
 		return errors.New("主订阅不能删除")
 	}
+	if record["userExit"] != nil {
+		return errors.New("请先清除套餐专属出口，不能丢弃远端路由归属")
+	}
 	if hasActiveBindings(record) {
 		return errors.New("订阅仍拥有服务器节点，不能丢弃计费关联")
 	}

@@ -112,6 +112,14 @@ func (r *Repository) DetachServer(server string, confirmed bool, commit func() e
 	count := 0
 	for _, v := range rows(index, "profiles") {
 		p := v.(map[string]any)
+		if exit, ok := p["userExit"].(map[string]any); ok {
+			for _, item := range rows(exit, "servers") {
+				entry, _ := item.(map[string]any)
+				if entry["id"] == server {
+					return nil, errors.New("服务器仍承载套餐专属出口，请先清除出口后解除管理")
+				}
+			}
+		}
 		for _, v := range rows(p, "remoteNodes") {
 			b := v.(map[string]any)
 			if b["serverId"] == server && (b["status"] == "active" || b["status"] == "provisioning") {

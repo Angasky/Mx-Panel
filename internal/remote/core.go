@@ -202,6 +202,10 @@ func (m *Manager) withCore(ctx context.Context, id string, action func(context.C
 		m.mu.Unlock()
 		return nil, err
 	}
+	if value(record["profileExitPending"]) != "" && ctx.Value(profileExitOperationKey{}) != true {
+		m.mu.Unlock()
+		return nil, errors.New("服务器有待核对的用户出口操作，请先恢复原操作")
+	}
 	kind := value(record["installType"])
 	if len(detectSing) > 0 && detectSing[0] {
 		if kind != "sing-box" && !probeInventoryOnly(record) {

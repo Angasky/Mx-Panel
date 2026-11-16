@@ -219,6 +219,9 @@ func validUserCredentials(username, password string, requirePassword bool) bool 
 	return utf8.ValidString(username) && utf8.RuneCountInString(username) >= 3 && utf8.RuneCountInString(username) <= 64 && strings.IndexFunc(username, unicode.IsSpace) < 0 && !strings.ContainsAny(username, ":\x00") && (!requirePassword && password == "" || utf8.ValidString(password) && utf8.RuneCountInString(password) >= 12 && len(password) <= 1024 && !strings.ContainsAny(password, "\r\n\x00"))
 }
 func (s *Server) userAdminRoute(w http.ResponseWriter, r *http.Request) bool {
+	if s.userPackagesRoute(w, r) {
+		return true
+	}
 	if s.userSubscriptionsRoute(w, r) {
 		return true
 	}
@@ -299,6 +302,10 @@ func (s *Server) userAdminRoute(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		input.ID = hex.EncodeToString(raw)
+	}
+	if e := s.checkPackageAssignment(input.ID, input.Profiles, r.Method == "DELETE"); e != nil {
+		problem(w, 409, e.Error())
+		return true
 	}
 	err = s.updateUsers(func(doc map[string]any) error {
 		users, e := decodeUsers(doc)
