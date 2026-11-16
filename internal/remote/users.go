@@ -213,7 +213,12 @@ func NewUser(row Record) (Record, error) {
 			if flow != "" && flow != "xtls-rprx-vision" && flow != "xtls-rprx-vision-udp443" {
 				return nil, errors.New("现有 VLESS flow 未适配")
 			}
-			if flow != "" {
+			stream, err := object(row["streamSettings"])
+			if err != nil {
+				return nil, err
+			}
+			network := valueString(stream["network"])
+			if flow != "" && (network == "" || network == "tcp" || network == "raw") {
 				user["flow"] = flow
 			}
 			break

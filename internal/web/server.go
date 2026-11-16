@@ -89,6 +89,7 @@ type Server struct {
 	hashSlots            chan struct{}
 	sourceSlots          chan struct{}
 	fetchSubscription    func(context.Context, string) (string, error)
+	countryRefresh       func(context.Context, string) (geo.Country, error)
 	countryLookup        func(context.Context, string) (geo.Country, error)
 	now                  func() time.Time
 	repository           *config.Repository
@@ -123,7 +124,8 @@ func New(options Options) (*Server, error) {
 	}
 	repository := &config.Repository{Root: options.Root}
 	ignored, _ := doc["goIgnoredRelease"].(string)
-	return &Server{agentViews: map[string]agentObservation{}, agentSlots: make(chan struct{}, 128), shareSlots: make(chan struct{}, 4), shareStreamSlots: make(chan struct{}, 32), history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: geo.New().Lookup, now: time.Now, repository: repository}, nil
+	countryResolver := geo.New()
+	return &Server{agentViews: map[string]agentObservation{}, agentSlots: make(chan struct{}, 128), shareSlots: make(chan struct{}, 4), shareStreamSlots: make(chan struct{}, 32), history: monitorhistory.New(options.Root), options: options, updates: goUpdates{ignored: ignored}, account: auth, sessions: sessions, failures: failures, hashSlots: make(chan struct{}, 2), sourceSlots: make(chan struct{}, 4), fetchSubscription: subsource.NewClient().Fetch, countryLookup: countryResolver.Lookup, countryRefresh: countryResolver.Refresh, now: time.Now, repository: repository}, nil
 }
 
 func respond(w http.ResponseWriter, status int, value any) {

@@ -13,7 +13,10 @@ func (s *Server) flagRoutes(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != "POST" || r.URL.Path != "/admin/api/nodes/flags" {
 		return false
 	}
-	var input struct{ Names any }
+	var input struct {
+		Names   any
+		Refresh bool
+	}
 	if err := readJSON(w, r, &input); err != nil {
 		problem(w, 400, err.Error())
 		return true
@@ -39,7 +42,11 @@ func (s *Server) flagRoutes(w http.ResponseWriter, r *http.Request) bool {
 		go func() {
 			defer group.Done()
 			for server := range jobs {
-				country, err := s.countryLookup(ctx, server)
+				lookup := s.countryLookup
+				if input.Refresh {
+					lookup = s.countryRefresh
+				}
+				country, err := lookup(ctx, server)
 				result := config.FlagCountry{Code: country.Code, IP: country.IP}
 				if err != nil {
 					result.Error = err.Error()

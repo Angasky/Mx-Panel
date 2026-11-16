@@ -4208,7 +4208,7 @@ function relayTemplateOptions(server, ingressKind, exit=false) {
   return base;
 }
 
-async function managedRelayForm(initialServer='') {
+async function managedRelayForm(initialServer='',initialExit='') {
   const profile=S.profile;
   const data=await api('/servers');
   if(S.profile!==profile)return;
@@ -4245,6 +4245,7 @@ async function managedRelayForm(initialServer='') {
     $(id+'Scan').onclick=()=>openSniScanner(val(id+'Server'),id+'Sni');
     refreshSide(id,true);
   }
+  if(initialExit && nodes.some(n=>n.name===initialExit)){$('mrSource').value='node';$('mrNode').value=initialExit;}
   $('mrSource').onchange=refreshSource;refreshSource();
   const payload=id=>{
     const template=val(id+'Template'),sni=$(id+'Sni');
@@ -5527,7 +5528,7 @@ function nodes() {
     <details class="node-secondary" open><summary>批量操作 · 标签、名称与证书验证</summary><div class="toolbar">
       <button type="button" class="btn small" onclick="selectAllNodes()">全选全部</button>
       <button type="button" class="btn small" onclick="clearNodeSelection()">取消选择</button>
-      <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button>
+      <button type="button" class="btn small primary" onclick="autoAddCountryFlags()">${uiIcon('globe')}自动添加国旗</button><button type="button" class="btn small" onclick="autoAddCountryFlags(true)">重新识别 / 修正旗帜</button>
       <button id="bulkNodeTLSButton" type="button" class="btn small" onclick="nodeConnectivity(undefined,'tls')">检查 TLS 证书</button>
       <button id="bulkNodeProbeButton" type="button" class="btn small" onclick="nodeConnectivity()">检查入口连通性</button>
       <button id="bulkTagsButton" type="button" class="btn small" onclick="nodeTagsModal()">批量管理标签</button>
@@ -5555,6 +5556,7 @@ function nodes() {
               <div class="node-card-actions">
                 <button class="btn small" onclick="nodeModal(${x.index})">编辑</button>
                 <button class="btn small" onclick="nodeGroupsModal(${x.index})">策略组</button>
+                ${!x.config?.['dialer-proxy']?`<button class="btn small" onclick="managedRelayForm('',S.data.nodes.find(n=>n.index===${x.index}).name).catch(e=>notice(e.message))">添加外部中转</button>`:''}
                 <button class="btn small" onclick="nodeTagsModal(${x.index})">标签</button>
                 <button class="btn small" onclick="nodeConnectivity(${x.index})">检查入口</button>
                 <button class="btn small" onclick="nodeConnectivity(${x.index},'tls')">TLS 检查</button>
@@ -7132,6 +7134,17 @@ function renderGroupExtra() {
     </div>`;
 }
 
+function sortGroupNodeChoices(mode) {
+ const box=$('groupNodeChoices');if(!box)return;
+ const nodes=new Map(S.data.nodes.map(n=>[n.name,n.config||{}]));
+ const region=name=>{const flag=Array.from(name.trim()).slice(0,2);return flag.length===2&&flag.every(c=>c.codePointAt(0)>=0x1f1e6&&c.codePointAt(0)<=0x1f1ff)?flag.join(''):'\uffff'};
+ const labels=[...box.children],slots=labels.filter(e=>nodes.has(e.querySelector('input').value));
+ const compare=new Intl.Collator('zh-CN',{numeric:true,sensitivity:'base'});
+ const key=name=>mode==='region'?region(name):mode==='server'?(nodes.get(name).server||''):name;
+ const sorted=[...slots].sort((a,b)=>{const x=a.querySelector('input').value,y=b.querySelector('input').value;return compare.compare(key(x),key(y))||compare.compare(x,y)});
+ let i=0;for(const label of labels)box.append(nodes.has(label.querySelector('input').value)?sorted[i++]:label);
+ $('groupSortStatus').textContent='节点顺序已调整，勾选与内置策略位置保留；保存策略组后生效。';
+}
 function groupModal(index) {
   let x = index == null ? null : S.data.groups.find(n => n.index === index);
   const primary = S.data.groups.find(group => group.name === '✈️ Proxy');
@@ -7162,8 +7175,9 @@ function groupModal(index) {
 
     <fieldset class="section">
       <legend>可选节点与级联策略</legend>
-      <p class="hint">勾选该组包含的节点或上一级策略组；已选节点将保持设置的优先调用顺序。</p>
-      <div class="checks">
+      <p class="hint">勾选该组包含的节点或上一级策略组；已选节点将保持设置的优先调用顺序。地区排序依据现有名称前的旗帜；服务器排序依据节点连接地址。</p>
+      <div class="toolbar"><button type="button" class="btn small" onclick="sortGroupNodeChoices('region')">按地区排序</button><button type="button" class="btn small" onclick="sortGroupNodeChoices('server')">按服务器排序</button><button type="button" class="btn small" onclick="sortGroupNodeChoices('name')">按名称排序</button></div><p id="groupSortStatus" class="hint" role="status"></p>
+      <div class="checks" id="groupNodeChoices">
         ${ordered.map(a => `
           <label class="choice">
             <input class="gChoice" type="checkbox" value="${esc(a)}" ${selected.has(a) ? 'checked' : ''}>
@@ -7714,13 +7728,13 @@ async function bulkDeleteNodes() {
   }
 }
 
-async function autoAddCountryFlags() {
+async function autoAddCountryFlags(refresh=false) {
   let names = [...S.nodeSelection];
   let scope = names.length ? `已勾选的 ${names.length} 个节点` : `全部 ${S.data.nodes.length} 个节点`;
-  if (!S.data.nodes.length || !(await confirmAction(`将根据服务器公网 IP 为${scope}识别国家并规范化名称开头的国旗。\n\n重复执行不会重复添加国旗，是否继续？`))) return;
+  if (!S.data.nodes.length || !(await confirmAction(`将根据服务器公网 IP 为${scope}识别国家并规范化名称开头的国旗。${refresh?'本次绕过七天缓存，重新查询 IP 地区并替换旧旗帜。':''}\n\n重复执行不会重复添加国旗，是否继续？`))) return;
   try {
     notice('正在解析节点 IP 并识别国家，请稍候……');
-    let result = await api('/nodes/flags', jsonOpt('POST', { names }));
+    let result = await api('/nodes/flags', jsonOpt('POST', { names, refresh }));
     S.nodeSelection.clear();
     await reload();
     let text = `已更新 ${result.updated} 个节点，${result.unchanged} 个无需修改`;

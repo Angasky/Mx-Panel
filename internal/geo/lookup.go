@@ -33,6 +33,12 @@ func New() *Resolver {
 	return &Resolver{cache: map[string]cached{}, interval: 120 * time.Millisecond, slots: make(chan struct{}, 8), lookup: net.DefaultResolver.LookupNetIP, fetch: subsource.NewClient().Fetch}
 }
 func (r *Resolver) Lookup(ctx context.Context, host string) (Country, error) {
+	return r.lookupCountry(ctx, host, false)
+}
+func (r *Resolver) Refresh(ctx context.Context, host string) (Country, error) {
+	return r.lookupCountry(ctx, host, true)
+}
+func (r *Resolver) lookupCountry(ctx context.Context, host string, force bool) (Country, error) {
 	host = strings.Trim(strings.TrimSpace(host), "[]")
 	if host == "" {
 		return Country{}, errors.New("服务器地址为空")
@@ -65,7 +71,7 @@ func (r *Resolver) Lookup(ctx context.Context, host string) (Country, error) {
 	}
 	now := time.Now()
 	r.mu.Lock()
-	if entry, ok := r.cache[address]; ok && now.Sub(entry.at) >= 0 && now.Sub(entry.at) < 7*24*time.Hour {
+	if entry, ok := r.cache[address]; !force && ok && now.Sub(entry.at) >= 0 && now.Sub(entry.at) < 7*24*time.Hour {
 		r.mu.Unlock()
 		return entry.value, nil
 	}
