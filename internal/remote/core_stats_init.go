@@ -121,12 +121,14 @@ func (m *Manager) enableCoreStats(ctx context.Context, id, kind string, record R
 		if !verified {
 			return nil, errors.New("没有与旧版记录一致的启用入站，暂不能配置计量")
 		}
-		if _, err := run(ctx, "command -v timeout >/dev/null && ! timeout 2 bash -c 'true </dev/tcp/127.0.0.1/10085' 2>/dev/null", 64<<10); err != nil {
-			return nil, errors.New("统计端口已被占用，或服务器缺少 timeout 工具")
-		}
 		next, err = planCoreStats(kind, doc)
 		if err != nil {
 			return nil, err
+		}
+		if _, agentAPI := ctx.Value(coreRPCKey{}).(CoreRPC); !agentAPI {
+			if _, err := run(ctx, "command -v timeout >/dev/null && ! timeout 2 bash -c 'true </dev/tcp/127.0.0.1/10085' 2>/dev/null", 64<<10); err != nil {
+				return nil, errors.New("统计端口预检查失败，请核对端口占用、timeout 工具和 SSH 连接")
+			}
 		}
 	}
 	if _, err := coreStatsAddress(kind, next, stats); err != nil {
