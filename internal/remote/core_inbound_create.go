@@ -105,6 +105,13 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	if err != nil {
 		return nil, err
 	}
+	// Persist the combined plan in the recovery journal; older pending creates
+	// retain their original configuration hash and separate stats workflow.
+	stats, _ := stateDoc["userStats"].(Record)
+	initializeStats := kind == "xray" && len(stats) == 0 && journal == nil
+	if journal != nil {
+		initializeStats = journal["initializeStats"] == true
+	}
 	var row Record
 	if journal != nil {
 		row, ok = journal["row"].(Record)
@@ -225,6 +232,17 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 		}
 		next["inbounds"] = append(append([]any{}, live...), native)
 	}
+	verify := ""
+	if initializeStats {
+		if journal == nil || journal["after"] != before {
+			next, err = planCoreStats(kind, next)
+			if err != nil {
+				return nil, err
+			}
+		}
+		stateDoc["userStats"] = Record{"listen": coreStatsListen, "binary": "/usr/local/bin/xray", "users": []any{}}
+		verify = xrayStatsReady
+	}
 	stateDoc["inbounds"] = append(rows, row)
 	nextState, err := m.SealUser(stateDoc)
 	if err != nil {
@@ -236,7 +254,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	}
 	after := coreConfigHash(data)
 	if journal == nil {
-		journal = Record{"key": key, "operation": coreInboundCreate, "before": before, "after": after, "row": row, "cancelFence": true}
+		journal = Record{"key": key, "operation": coreInboundCreate, "before": before, "after": after, "row": row, "cancelFence": true, "initializeStats": initializeStats}
 		pending, err = m.SealUser(journal)
 		if err != nil {
 			return nil, err
@@ -247,7 +265,7 @@ func (m *Manager) createCoreInbound(ctx context.Context, server, kind, key, requ
 	} else if journal["after"] != after {
 		return nil, errors.New("独立内核创建计划与保存记录不一致")
 	}
-	if _, err := applyCoreVerified(ctx, kind, raw, next, tag, "", run, key); err != nil {
+	if _, err := applyCoreVerified(ctx, kind, raw, next, tag, verify, run, key); err != nil {
 		if (errors.Is(err, errCoreRolledBack) || errors.Is(err, errCoreValidation)) && journal["before"] == before {
 			err = errors.Join(err, m.updateCoreUserState(server, stateToken, pending, stateToken, ""))
 		}
