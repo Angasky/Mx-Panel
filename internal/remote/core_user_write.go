@@ -256,11 +256,16 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 		}
 		stateDoc["userStats"] = stats
 	}
+	var appliedSnapshot []byte
 	finish := func() (Record, error) {
 		if operation != "add" {
 			return Record{"updated": true, "removed": operation == "remove"}, nil
 		}
-		return readCoreUser(ctx, kind, legacyCoreState{Inbounds: rows, UserStats: stateDoc["userStats"].(Record)}, binding, run)
+		finalState := legacyCoreState{Inbounds: rows, UserStats: stateDoc["userStats"].(Record)}
+		if appliedSnapshot != nil {
+			return readCoreUserSnapshot(ctx, kind, finalState, binding, run, appliedSnapshot, next)
+		}
+		return readCoreUser(ctx, kind, finalState, binding, run)
 	}
 	nextState, err := m.SealUser(stateDoc)
 	if err != nil {
@@ -294,11 +299,17 @@ func (m *Manager) changeCoreUser(ctx context.Context, id, kind, operation string
 		return nil, errors.New("独立内核待核对的配置与用户变更结果不一致")
 	}
 	tag := "mxioc-inbound-" + value(binding["inboundId"])
-	if _, err := applyCore(ctx, kind, raw, next, tag, run); err != nil {
+	applied, err := applyCore(ctx, kind, raw, next, tag, run)
+	if err != nil {
 		if errors.Is(err, errCoreRolledBack) && journal["before"] == before && journal["keepOnRollback"] != true {
 			err = errors.Join(err, m.updateCoreUserState(id, stateToken, pendingToken, stateToken, ""))
 		}
 		return nil, err
+	}
+	// Single-file Xray writes report a verified hash. Multi-file sing-box
+	// retains its layout-aware readback and must not use marshaled bytes here.
+	if kind == "xray" && applied["version"] == after {
+		appliedSnapshot = payload
 	}
 	if err := m.updateCoreUserState(id, stateToken, pendingToken, nextState, ""); err != nil {
 		return nil, errors.New("远端用户已变更，总控记录保存待重试")

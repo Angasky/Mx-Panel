@@ -49,6 +49,13 @@ func readCoreUser(ctx context.Context, kind string, state legacyCoreState, bindi
 	if err != nil {
 		return nil, err
 	}
+	return readCoreUserSnapshot(ctx, kind, state, binding, run, raw, doc)
+}
+
+// A successful apply already attests the saved configuration. Reuse that
+// snapshot for identity checks, but still reread after querying counters to
+// detect external edits during collection.
+func readCoreUserSnapshot(ctx context.Context, kind string, state legacyCoreState, binding Record, run coreRunner, raw []byte, doc Record) (Record, error) {
 	id := value(binding["inboundId"])
 	tag := "mxioc-inbound-" + id
 	var row, actual Record
